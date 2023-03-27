@@ -5,7 +5,7 @@ import Header from '../components/generate/Header';
 import Logo from '../components/generate/Logo';
 import Button from '../components/generate/Button';
 import Paragraph from '../components/generate/Paragraph';
-import SelectOption from '../components/generate/SelectOption'
+import SelectOption from '../components/generate/SelectOption';
 import { storeData, getData } from '../helpers/storage';
 import { getBranches, getDeliveron } from '../redux/Actions'
 
@@ -82,7 +82,7 @@ export const BranchScreen = ({ navigation }) => {
         error={!!branch?.error}
         errorText={branch?.error || ''}
       />
-      
+
       <Button
         mode="contained"
         style={{backgroundColor: '#000'}}

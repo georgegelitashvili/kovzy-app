@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react'
+import React from 'react'
 import { View, Platform, StyleSheet, Text, Keyboard, TouchableWithoutFeedback } from 'react-native';
 import RNPickerSelect from "react-native-picker-select";
 import { theme } from '../../core/theme';
@@ -47,17 +47,3 @@ const styles = StyleSheet.create({
     paddingTop: 8,
   },
 });
-
-const pickerSelectStyles = StyleSheet.create({
-  pickerSelect: {
-      backgroundColor: theme.colors.surface,
-      fontSize: 16,
-      paddingVertical: 12,
-      paddingHorizontal: 10,
-      borderWidth: 1,
-      borderColor: 'gray',
-      borderRadius: 4,
-      color: 'black',
-      paddingRight: 30,
-    },
-  });
