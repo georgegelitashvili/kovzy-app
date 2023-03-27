@@ -1,57 +1,149 @@
-import axios from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import {ActionTypes} from './ActionTypes';
+import axios from "axios";
+import { ActionTypes } from "./ActionTypes";
+import { storeData, getData } from "../helpers/storage";
 
-// Construct a BASE URL for API endpoint
-const API_URL = 'https://fakestoreapi.com/products';
-const API_KEY = 'products';
-const PARAMS = 'limit=10';
-const BASE_URL = `${API_URL}?${PARAMS}`;
+// Construct api headers
+const headers = {
+  'Accept': "application/json",
+  'Content-Type': "application/json",
+};
 
-export const getOrders = () => {
+// export const checkDomain = (options) => {
+//   if (options !== null || options != "undefind") {
+//     try {
+//       return async (dispatch) => {
+//         await axios(options)
+//       };
+//     } catch (e) {
+//       console.log(e.error);
+//     }
+//   }
+// };
+
+export const getBranches = (options) => {
+  if (options !== null || options != "undefind") {
     try {
-      return async dispatch => {
-        const res = await axios.get(`${BASE_URL}`)
-  
-        if (res) {
-          dispatch({
-            type: ActionTypes.GET_ORDERS,
-            payload: res.data,
+      return async (dispatch) => {
+        await axios(options, headers)
+          .then((response) => {
+            dispatch({
+              type: ActionTypes.GET_BRANCH,
+              payload: response.data.data.map(item => ({label: item.title, value: item.id, enabled: item.enabled})),
+            });
+          })
+          .catch((error) => {
+            if (error.response) {
+              console.log('---------- response');
+              console.log(error.response.data);
+              console.log('---------- end response');
+            } else if (error.request) {
+              console.log('---------- request');
+              console.log(error.request);
+              console.log('---------- end request');
+            } else {
+              console.log('Error', error.message);
+            }
+            // console.log(error.config);
           });
-        } else {
-          console.log('Unable to fetch');
-        }
       };
-    } catch (error) {
-      // Add custom logic to handle errors
+    } catch (e) {
+      console.log(e.message);
     }
-  };
+  }
+};
 
-  // store theme value into storage
-const storeData = async (value) => {
-  try {
-    await await AsyncStorage.setItem("@darktheme", value.toString());
-  } catch (e) {
+export const getDeliveron = (options) => {
+  if (options !== null || options != "undefind") {
+    try {
+      return async (dispatch) => {
+        await axios(options, headers)
+          .then((response) => {
+            dispatch({
+              type: ActionTypes.GET_DELIVERON,
+              payload: response.data.data,
+            });
+          })
+          .catch((error) => console.log({ getDeliveron: error }));
+      };
+    } catch (e) {
+      console.log(e.message);
+    }
+  }
+};
+
+export const login = (options) => {
+  if (options !== null || options != "undefind") {
+    try {
+      return async (dispatch) => {
+        await axios(options, headers)
+          .then((response) => {
+            console.log(response.data);
+            dispatch({
+              type: ActionTypes.LOGIN_REQUEST,
+              payload: response.data.authorized,
+            });
+          })
+          .catch((error) => {
+            if (error.response) {
+              console.log(error.response.data);
+            } else if (error.request) {
+              console.log(error.request);
+            } else {
+              console.log('Error', error.message);
+            }
+            console.log(error.config);
+          });
+      };
+    } catch (e) {
+      console.log(e.message);
+    }
+  }
+};
+
+export const authorized = (options) => {
+  if (options !== null || options != "undefind") {
+    try {
+      return async (dispatch) => {
+        await axios(options, headers)
+          .then((response) => {
+            console.log(response.data);
+            dispatch({
+              type: ActionTypes.LOGIN_SUCCESS,
+              payload: response.data.authorized,
+            });
+          })
+          .catch((error) => {
+            if (error.response) {
+              console.log(error.response.data);
+            } else if (error.request) {
+              console.log(error.request);
+            } else {
+              console.log('Error', error.message);
+            }
+            console.log(error.config);
+          });
+      };
+    } catch (e) {
+      console.log(e.message);
+    }
   }
 }
-  
+
 export const ToggleTheme = (theme) => {
-  storeData(theme);
-    return async dispatch => {
-        if (theme === true) {
-            dispatch({
-                type: ActionTypes.DARK_THEME,
-                payload: theme,
-            })
-        } else {
-            dispatch({
-                type: ActionTypes.LIGHT_THEME,
-                payload: theme,
-            })
-        }
+  storeData("@darktheme", theme);
+  return async (dispatch) => {
+    if (theme === true) {
+      dispatch({
+        type: ActionTypes.DARK_THEME,
+        payload: theme,
+      });
+    } else {
+      dispatch({
+        type: ActionTypes.LIGHT_THEME,
+        payload: theme,
+      });
     }
-}
-
-
+  };
+};
 
 //   other actions

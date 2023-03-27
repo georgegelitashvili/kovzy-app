@@ -1,9 +1,17 @@
-import {createStore, combineReducers, applyMiddleware} from 'redux';
+import { combineReducers, applyMiddleware } from 'redux';
 import thunk from 'redux-thunk';
 import { configureStore } from '@reduxjs/toolkit'
 
-import { ordersReducer, themeReducer } from './Reducers';
+import { authReducer, branchesReducer, deliveronReducer, themeReducer } from './Reducers';
 
-const rootReducer = combineReducers({ordersReducer, themeReducer});
+const rootReducer = combineReducers({
+    authReducer,
+    branchesReducer,
+    deliveronReducer,
+    themeReducer
+});
 
-export const store = createStore(rootReducer, applyMiddleware(thunk));
+export const store = configureStore({
+    reducer: rootReducer,
+    middleware: [thunk]
+});

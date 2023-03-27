@@ -1,63 +1,167 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useContext } from "react";
 import { useSelector, useDispatch } from "react-redux";
-
 import {
   StyleSheet,
-  View,
-  TouchableOpacity,
-  FlatList,
   Dimensions,
+  View,
+  ScrollView,
+  TouchableOpacity,
+  RefreshControl,
 } from "react-native";
-import { Text, Card, Button, Divider } from "react-native-paper";
+import { Text, Button, Divider, Card } from "react-native-paper";
+import { FlatGrid } from "react-native-super-grid";
 import {
-  Ionicons,
   MaterialCommunityIcons,
   FontAwesome,
+  SimpleLineIcons,
 } from "@expo/vector-icons";
 
-import { getOrders } from "../../redux/Actions";
+import { storeData, getData, getMultipleData } from "../../helpers/storage";
+import { String, LanguageContext } from "../Language";
+import { Request } from "../../axios/apiRequests";
 import OrdersDetail from "./OrdersDetail";
 import OrdersModal from "../modal/OrdersModal";
+import printRows from "../../PrintRows";
 
+const width = Dimensions.get("window").width;
 
-const screenHeight = Dimensions.get("window").height;
-const screenWidth = Dimensions.get("window").width;
-const numColumns = 4;
-const tileSize = screenWidth / numColumns
-
+const numColumns = printRows(width);
+const cardSize = width / numColumns;
 
 // render entered orders function
 export const EnteredOrdersList = () => {
+  const [orders, setOrders] = useState([]);
 
-  const { orders } = useSelector((state) => state.ordersReducer);
+  const [options, setOptions] = useState({}); // api options
+  const [optionsIsLoaded, setOptionsIsLoaded] = useState(false); // api options
+  const [deliveronOptions, setDeliveronOptions] = useState({});
+  const [isDeliveronOptions, setIsDeliveronOptions] = useState(false);
+  const [acceptOrderOptions, setAcceptOrderOptions] = useState({});
+  const [rejectOrderOptions, setRejectOrderOptions] = useState({});
+
+  const [deliveron, setDeliveron] = useState([]);
   const [visible, setVisible] = useState(false); // modal state
+  const [itemId, setItemId] = useState(null); //item id for modal
+  const [isOpen, setOpenState] = useState([]); // my accordion state
+  const [lang, setLang] = useState("");
+  const [modalType, setModalType] = useState("");
 
-  // modal show
-  const showModal = () => setVisible(true);
+  const { dictionary } = useContext(LanguageContext);
 
-  const onChangeModalState = (newState) => {
-    setTimeout(() => setVisible(newState), 0);
+  const onChangeModalState = useCallback((newState) => {
+    setTimeout(() => {
+      setVisible(newState);
+      setIsDeliveronOptions(newState);
+      setItemId(null);
+    }, 0);
+  });
+
+  const toggleContent = useCallback((value) => {
+    setOpenState([...isOpen, value]);
+
+    let index = isOpen.indexOf(value);
+    if (index > -1) setOpenState([...isOpen.filter((i) => i !== value)]);
+  });
+
+  const readData = async () => {
+    await getMultipleData(["domain", "branch"]).then((data) => {
+      let domain = [JSON.parse(data[0][1])].map((e) => e.value);
+      let branchid = data[1][1];
+
+      setOptions({
+        method: "POST",
+        data: {
+          type: 0,
+          page: 1,
+          branchid: branchid,
+        },
+        url: `https://${domain[0]}/api/getUnansweredOrders`,
+      });
+      setOptionsIsLoaded(true);
+    });
   };
 
-  const dispatch = useDispatch();
-  const fetchOrders = () => dispatch(getOrders());
+  const readDataDeliveron = async () => {
+    await getData("domain").then((data) => {
+      setDeliveronOptions({
+        method: "POST",
+        url: `https://${data.value}/api/deliveronRecheck`,
+      });
+    });
+  };
+
+  const readDataAcceptOrder = async () => {
+    await getData("domain").then((data) => {
+      setAcceptOrderOptions({
+        method: "POST",
+        url: `https://${data.value}/api/acceptOrder`,
+      });
+    });
+  };
+
+  const readDataRejectOrder = async () => {
+    await getData("domain").then((data) => {
+      setRejectOrderOptions({
+        method: "POST",
+        url: `https://${data.value}/api/rejectOrder`,
+      });
+    });
+  };
+
+  // modal show
+  const showModal = (type) => {
+    setModalType(type);
+    if (deliveron) {
+      setVisible(true);
+    }
+  };
+
+  getData("rcml-lang").then((lang) => setLang(lang || "ka"));
+
+  // console.log('---------------- enterd orders');
+  // console.log(lang);
+  // console.log('---------------- end enterd orders');
 
   useEffect(() => {
-    fetchOrders();
-    // const interval = setInterval(() => {
-    //   fetchOrders();
-    // }, 500);
-
-    // return () => {
-    //   clearInterval(interval)
-    // }
+    readData();
+    readDataDeliveron();
+    readDataAcceptOrder();
+    readDataRejectOrder();
   }, []);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (optionsIsLoaded) {
+        Request(options).then((resp) => setOrders(resp));
+      }
+    }, 5000);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [optionsIsLoaded]);
+
+
+  useEffect(() => {
+    if (itemId) {
+      setDeliveronOptions({ ...deliveronOptions, data: { orderId: itemId } });
+      setIsDeliveronOptions(true);
+    }
+  }, [itemId]);
+
+
+  useEffect(() => {
+    if (isDeliveronOptions) {
+      Request(deliveronOptions).then((resp) => setDeliveron(resp));
+    }
+  }, [isDeliveronOptions]);
 
 
   const renderEnteredOrdersList = ({ item }) => {
     return (
-        <Card style={styles.card}>
-          <Card.Content>
+      <Card key={item.id}>
+        <TouchableOpacity onPress={() => toggleContent(item.id)}>
+          <Card.Content style={styles.head}>
             <Text variant="headlineMedium" style={styles.header}>
               <MaterialCommunityIcons
                 name="music-accidental-sharp"
@@ -65,74 +169,137 @@ export const EnteredOrdersList = () => {
               />
               {item.id}
             </Text>
-          </Card.Content>
-          <Card.Content>
-            <Text variant="titleMedium">{item.title}</Text>
-          </Card.Content>
-          <Divider />
-          {/* accordion */}
-          <OrdersDetail ordersDetail={item} />
-          <Divider />
-          <Card.Content>
-            <Text variant="titleLarge">
-              {item.price} <FontAwesome name="dollar" size={20} />
+            <Text variant="headlineMedium" style={styles.header}>
+              <SimpleLineIcons
+                name={!isOpen.includes(item.id) ? "arrow-up" : "arrow-down"}
+                style={styles.rightIcon}
+              />
             </Text>
           </Card.Content>
-          <Card.Actions>
-            <Button onPress={showModal}>accept</Button>
-            <Button>cancel</Button>
-          </Card.Actions>
-        </Card>
+        </TouchableOpacity>
+        {!isOpen.includes(item.id) ? (
+          <Card.Content>
+            <Text variant="titleSmall" style={styles.title}>
+              {dictionary["orders.status"]}: {dictionary["orders.pending"]}
+            </Text>
+
+            <Text variant="titleSmall" style={styles.title}>
+              {dictionary["orders.fName"]}: {item.firstname} {item.lastname}
+            </Text>
+
+            <Text variant="titleSmall" style={styles.title}>
+              {dictionary["orders.phone"]}: {item.phone_number}
+            </Text>
+
+            <Text variant="titleSmall" style={styles.title}>
+              {dictionary["orders.address"]}: {item.address}
+            </Text>
+
+            <Divider />
+            <OrdersDetail orderId={item.id} lang={lang} />
+            <Divider />
+
+            <Text variant="titleLarge">{item.price} GEL</Text>
+
+            <Card.Actions>
+              <Button
+                textColor="white"
+                buttonColor="#2fa360"
+                onPress={() => {
+                  setItemId(item.id);
+                  showModal('accept');
+                }}
+              >
+                {dictionary["orders.accept"]}
+              </Button>
+              <Button textColor="white" buttonColor="#f14c4c" onPress={() => {
+                  setItemId(item.id);
+                  showModal('reject');
+                }}>
+                {dictionary["orders.reject"]}
+              </Button>
+            </Card.Actions>
+          </Card.Content>
+        ) : null}
+      </Card>
     );
   };
 
+  if (orders?.length == 0) {
+    return null;
+  }
 
+  // console.log('------------ entered orders Lang');
+  // console.log(lang);
+  // console.log('------------ end entered orders Lang');
+
+  // console.log(orders)
 
   return (
-      <View style={styles.container}>
-      {visible ? <OrdersModal isVisible={visible} onChangeState={onChangeModalState}/> : null}
-      <FlatList
+    <View>
+      <ScrollView horizontal={true} showsVerticalScrollIndicator={false}>
+        {visible ? (
+          <OrdersModal
+            isVisible={visible}
+            onChangeState={onChangeModalState}
+            hasItemId={itemId}
+            deliveron={deliveron}
+            deliveronOptions={deliveronOptions}
+            type={modalType}
+            accept={acceptOrderOptions}
+            reject={rejectOrderOptions}
+          />
+        ) : null}
+        <FlatGrid
+          itemDimension={cardSize}
           data={orders}
           renderItem={renderEnteredOrdersList}
-          keyExtractor={(item) => item.id.toString()}
-          initialNumToRender={5}
-          ItemSeparatorComponent={() => <View style={{height: 3}} />}
-      />
-      </View>
+          adjustGridToStyles={true}
+          contentContainerStyle={{ justifyContent: "flex-start" }}
+          keyExtractor={(item) => item.id}
+        />
+      </ScrollView>
+    </View>
   );
 };
 
-
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    alignItems: "space-between",
-    justifyContent: "space-between",
+    flex: 12,
+    justifyContent: "flex-start",
   },
   card: {
-    flex: 0.5,
-    with: tileSize,
     backgroundColor: "#fff",
+    justifyContent: "flex-start",
 
-    margin: 20,
-    paddingVertical: 18,
+    margin: 10,
     borderRadius: 10,
-    ...Platform.select({
-      ios: {
-        shadowOffset: { width: 0, height: 1 },
-        shadowColor: "#14141405",
-        shadowOpacity: 0.8,
-      },
-      android: {
-        elevation: 4,
-      },
-    }),
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4.65,
+
+    elevation: 8,
+  },
+  head: {
+    flexDirection: "row",
+    justifyContent: "space-between",
   },
   header: {
-    paddingVertical: 0,
+    paddingVertical: 10,
   },
   leftIcon: {
     marginRight: 3,
     fontSize: 32,
+  },
+  rightIcon: {
+    marginRight: 15,
+    fontSize: 25,
+  },
+  title: {
+    paddingVertical: 10,
   },
 });

@@ -1,5 +1,5 @@
 import React from "react";
-
+import { useDispatch, useSelector } from "react-redux";
 import {
   NavigationContainer,
   DarkTheme as NavigationDarkTheme,
@@ -11,7 +11,6 @@ import {
   Provider as PaperProvider,
 } from 'react-native-paper';
 
-import { useDispatch, useSelector } from "react-redux";
 import RootNavigator from "./RootNavigator";
 
 const CombinedDefaultTheme = {
@@ -22,8 +21,8 @@ const CombinedDefaultTheme = {
     ...NavigationDefaultTheme.colors,
   },
 };
-const CombinedDarkTheme = { 
-  ...PaperDarkTheme, 
+const CombinedDarkTheme = {
+  ...PaperDarkTheme,
   ...NavigationDarkTheme,
   colors: {
     ...PaperDarkTheme.colors,
@@ -41,6 +40,6 @@ export default function Main() {
     <NavigationContainer theme={themeMode}>
       <RootNavigator />
     </NavigationContainer>
-  </PaperProvider> 
+  </PaperProvider>
   );
 };
