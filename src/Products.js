@@ -49,7 +49,6 @@ export default function Products({ navigation }) {
     });
   };
 
-  console.log(activityOptions);
 
   useEffect(() => {
     readDomain();
