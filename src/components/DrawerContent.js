@@ -3,7 +3,7 @@ import { View, StyleSheet } from "react-native";
 import { DrawerItem, DrawerContentScrollView } from "@react-navigation/drawer";
 import { Drawer, Text, TouchableRipple, Switch } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { ToggleTheme } from "../redux/Actions";
+import { ToggleTheme, logout } from "../redux/Actions";
 import { useDispatch, useSelector } from "react-redux";
 import { storeData, getData } from '../helpers/storage';
 import LanguageSelector from './generate/LanguageSelector';
@@ -18,8 +18,15 @@ export default function DrawerContent(props) {
 
   const [options, setOptions] = useState({}); // api options
   const [optionsIsLoaded, setOptionsIsLoaded] = useState(false); // check api options is loaded
+  const [logoutOptions, setLogoutOptions] = useState({});
+  const [logoutOptionsIsLoaded, setLogoutOptionsIsLoaded] = useState(false);
   const [selected, setSelected] = useState(null);
   const [branchEnabled, setBranchEnabled] = useState(false);
+
+  // console.log('--------------------- branch data');
+  // console.log(options);
+  // console.log('--------------------- end branch data');
+
 
   const switchDarkTheme = useCallback(() => {
     return isdarkTheme
@@ -29,6 +36,15 @@ export default function DrawerContent(props) {
 
   const onLogoutPressed = useCallback(() => {
     // removeData().then(() => console.log('Cleared'));
+    if(logoutOptionsIsLoaded) {
+      console.log(logoutOptions);
+      dispatch(logout(logoutOptions));
+      // Request(logoutOptions).then(resp => {
+      //   console.log('--------- logout');
+      //   console.log(resp.message);
+      //   console.log('--------- logout');
+      // });
+    }
     props.navigation.navigate("Start", { screen: "Domain" });
   });
 
@@ -41,6 +57,18 @@ export default function DrawerContent(props) {
       setOptionsIsLoaded(true);
     })
   };
+
+
+  const readLogout = async () => {
+    await getData("domain").then(data => {
+      setLogoutOptions({
+        method: "GET",
+        url: `https://${data.value}/api/auth/logout`
+      });
+      setLogoutOptionsIsLoaded(true);
+    })
+  };
+
 
   const readBranch = useCallback(async () => {
     try {
@@ -64,7 +92,6 @@ export default function DrawerContent(props) {
 
 
   const toggleBranch = () => {
-    console.log(options);
     setBranchEnabled(data => !data);
 
     if(options){
@@ -75,6 +102,7 @@ export default function DrawerContent(props) {
   useEffect(() => {
     readBranch();
     readDomain();
+    readLogout();
     dispatch(ToggleTheme(isdarkTheme));
   }, [optionsIsLoaded]);
 
