@@ -29,7 +29,7 @@ const numColumns = printRows(width);
 const cardSize = width / numColumns;
 
 // render entered orders function
-export const EnteredOrdersList = () => {
+export const EnteredOrdersList = (auth) => {
   const [orders, setOrders] = useState([]);
 
   const [options, setOptions] = useState({}); // api options
@@ -65,6 +65,7 @@ export const EnteredOrdersList = () => {
 
   const readData = async () => {
     await getMultipleData(["domain", "branch"]).then((data) => {
+      console.log(data);
       let domain = [JSON.parse(data[0][1])].map((e) => e.value);
       let branchid = data[1][1];
 
@@ -111,35 +112,35 @@ export const EnteredOrdersList = () => {
   // modal show
   const showModal = (type) => {
     setModalType(type);
-    if (deliveron) {
-      setVisible(true);
-    }
+    console.log(deliveron);
+    setVisible(true);
   };
 
   getData("rcml-lang").then((lang) => setLang(lang || "ka"));
 
-  // console.log('---------------- enterd orders');
-  // console.log(lang);
-  // console.log('---------------- end enterd orders');
+  useEffect(() => {
+    if(auth) {
+      readData();
+      readDataDeliveron();
+      readDataAcceptOrder();
+      readDataRejectOrder();
+    }
+  }, [auth]);
 
   useEffect(() => {
-    readData();
-    readDataDeliveron();
-    readDataAcceptOrder();
-    readDataRejectOrder();
-  }, []);
+    if(auth) {
+      readData();
+      const interval = setInterval(() => {
+        if (optionsIsLoaded) {
+          Request(options).then((resp) => setOrders(resp));
+        }
+      }, 5000);
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (optionsIsLoaded) {
-        Request(options).then((resp) => setOrders(resp));
-      }
-    }, 5000);
-
-    return () => {
-      clearInterval(interval);
-    };
-  }, [optionsIsLoaded]);
+      return () => {
+        clearInterval(interval);
+      };
+    }
+  }, [optionsIsLoaded, auth]);
 
 
   useEffect(() => {
@@ -225,13 +226,13 @@ export const EnteredOrdersList = () => {
     );
   };
 
-  if (orders?.length == 0) {
+  if (orders?.length == 0 || orders == null) {
     return null;
   }
 
-  // console.log('------------ entered orders Lang');
-  // console.log(lang);
-  // console.log('------------ end entered orders Lang');
+  // console.log('------------ entered orders');
+  // console.log(options);
+  // console.log('------------ end entered orders');
 
   // console.log(orders)
 
@@ -242,6 +243,7 @@ export const EnteredOrdersList = () => {
           <OrdersModal
             isVisible={visible}
             onChangeState={onChangeModalState}
+            orders={orders}
             hasItemId={itemId}
             deliveron={deliveron}
             deliveronOptions={deliveronOptions}
@@ -252,7 +254,7 @@ export const EnteredOrdersList = () => {
         ) : null}
         <FlatGrid
           itemDimension={cardSize}
-          data={orders}
+          data={orders || []}
           renderItem={renderEnteredOrdersList}
           adjustGridToStyles={true}
           contentContainerStyle={{ justifyContent: "flex-start" }}

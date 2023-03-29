@@ -29,7 +29,7 @@ const numColumns = printRows(width);
 const cardSize = width / numColumns;
 
 // render accepted orders function
-export const AcceptedOrdersList = () => {
+export const AcceptedOrdersList = (auth) => {
   const [orders, setOrders] = useState([]);
 
   const [options, setOptions] = useState({}); // api options
@@ -85,16 +85,16 @@ export const AcceptedOrdersList = () => {
     await getData("domain").then((data) => {
       setDeliveronOptions({
         method: "POST",
-        url: `https://${data.value}/api/deliveronRecheck`,
+        url: `https://${data.value}/api/checkOrderStatus`,
       });
     });
   };
 
-  const readDataAcceptOrder = async () => {
+  const readDataPreparedOrder = async () => {
     await getData("domain").then((data) => {
       setAcceptOrderOptions({
         method: "POST",
-        url: `https://${data.value}/api/acceptOrder`,
+        url: `https://${data.value}/api/orderPrepared`,
       });
     });
   };
@@ -111,43 +111,38 @@ export const AcceptedOrdersList = () => {
   // modal show
   const showModal = (type) => {
     setModalType(type);
-    if (deliveron) {
-      setVisible(true);
-    }
+
+    setVisible(true);
+
   };
 
-  // console.log('---------------- enterd orders');
-  // console.log(deliveron);
-  // console.log('---------------- end enterd orders');
+  getData("rcml-lang").then((lang) => setLang(lang || "ka"));
 
   useEffect(() => {
     readData();
     readDataDeliveron();
-    readDataAcceptOrder();
+    readDataPreparedOrder();
     readDataRejectOrder();
   }, []);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      if (optionsIsLoaded) {
-        Request(options).then((resp) => setOrders(resp));
-      }
-    }, 5000);
+    if(auth) {
+      const interval = setInterval(() => {
+        if (optionsIsLoaded) {
+          Request(options).then((resp) => setOrders(resp));
+        }
+      }, 5000);
 
-    return () => {
-      clearInterval(interval);
-    };
-  }, [optionsIsLoaded]);
-
-
-  useEffect(() => {
-    getData("rcml-lang").then((lang) => setLang(lang || "ka"));
-  }, [lang]);
+      return () => {
+        clearInterval(interval);
+      };
+    }
+  }, [optionsIsLoaded, auth]);
 
 
   useEffect(() => {
     if (itemId) {
-      setDeliveronOptions({ ...deliveronOptions, data: { orderId: itemId } });
+      setDeliveronOptions({ ...deliveronOptions });
       setIsDeliveronOptions(true);
     }
   }, [itemId]);
@@ -155,7 +150,8 @@ export const AcceptedOrdersList = () => {
 
   useEffect(() => {
     if (isDeliveronOptions) {
-      Request(deliveronOptions).then((resp) => setDeliveron(resp));
+      setDeliveron({status: 0});
+      // Request(deliveronOptions).then((resp) => setDeliveron(resp));
     }
   }, [isDeliveronOptions]);
 
@@ -210,7 +206,7 @@ export const AcceptedOrdersList = () => {
                 buttonColor="#2fa360"
                 onPress={() => {
                   setItemId(item.id);
-                  showModal('accept');
+                  showModal('status');
                 }}
               >
                 {dictionary["orders.finish"]}
@@ -228,7 +224,7 @@ export const AcceptedOrdersList = () => {
     );
   };
 
-  if (orders?.length == 0) {
+  if (orders?.length == 0 || orders == null) {
     return null;
   }
 
@@ -245,6 +241,7 @@ export const AcceptedOrdersList = () => {
           <OrdersModal
             isVisible={visible}
             onChangeState={onChangeModalState}
+            orders={orders}
             hasItemId={itemId}
             deliveron={deliveron}
             deliveronOptions={deliveronOptions}
@@ -255,7 +252,7 @@ export const AcceptedOrdersList = () => {
         ) : null}
         <FlatGrid
           itemDimension={cardSize}
-          data={orders}
+          data={orders || []}
           renderItem={renderEnteredOrdersList}
           adjustGridToStyles={true}
           contentContainerStyle={{ justifyContent: "flex-start" }}
