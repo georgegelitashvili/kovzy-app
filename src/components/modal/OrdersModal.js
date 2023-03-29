@@ -4,6 +4,7 @@ import { StyleSheet, View, Dimensions } from "react-native";
 import Modal from "react-native-modal";
 import OrdersModalAccept from "./OrdersModalAccept";
 import OrdersModalReject from "./OrdersModalReject";
+import OrdersModalStatus from "./OrdersModalStatus";
 
 const deviceWidth = Dimensions.get("window").width;
 
@@ -12,6 +13,7 @@ const deviceHeight = Dimensions.get("window").height;
 export default function OrdersModal({
   isVisible,
   onChangeState,
+  orders,
   hasItemId,
   deliveron,
   deliveronOptions,
@@ -56,6 +58,17 @@ export default function OrdersModal({
           <OrdersModalReject
             itemId={hasItemId}
             reject={reject}
+            hideModal={hideModal}
+          />
+        )
+      case 'status':
+        return (
+          <OrdersModalStatus
+            itemId={hasItemId}
+            orders={orders}
+            deliveron={deliveron}
+            accept={accept}
+            deliveronOptions={deliveronOptions}
             hideModal={hideModal}
           />
         )

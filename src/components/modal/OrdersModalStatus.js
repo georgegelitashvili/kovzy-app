@@ -1,20 +1,22 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { Text, Button } from 'react-native-paper';
-import TextField from '../generate/TextField';
-import SelectOption from '../generate/SelectOption';
 import { StyleSheet, View, Keyboard, TouchableWithoutFeedback } from 'react-native';
 import { Request } from "../../axios/apiRequests";
 import { String, LanguageContext } from '../Language';
 
 
 export default function OrdersModalContent(props) {
-    const [options, setOptions] = useState(props.reject);
+    const [options, setOptions] = useState(props.deliveronOptions);
+    const [acceptOptions, setAcceptOptions] = useState(props.accept);
+    const [status, setStatus] = useState({});
+    const [isDisabled, setDisabled] = useState(false);
 
     const { dictionary } = useContext(LanguageContext);
 
-    const rejectOrder = () => {
+    const finishOrder = () => {
       if(options) {
         console.log(options);
+        return;
         Request(options).then(resp => {
           if(resp.status == 0) {
             alert(dictionary['orders.declined']);
@@ -24,20 +26,38 @@ export default function OrdersModalContent(props) {
     };
 
     useEffect(() => {
-        if(options) {
-            setOptions({...options, data: {
-                Orderid: props.itemId,
-            }})
+      if(options) {
+        if(props.deliveron.status == 0) {
+          props.orders?.map((item) => {
+            if(item.id == props.itemId) {
+              const deliveronId = JSON.parse(item.deliveron_data);
+              if(deliveronId?.length == 0 || deliveronId['order_id_deliveron'] == null) {
+                setOptions({...props.accept, data: {
+                  Orderid: props.itemId,
+              }})
+              }else {
+                setOptions({...options, data: {
+                  deliveronOrderId: deliveronId['order_id_deliveron'],
+              }})
+              }
+
+            }
+          })
+        }else {
+          setOptions({...props.accept, data: {
+            Orderid: props.itemId,
+        }})
         }
-    }, [])
+      }
+    }, [props.itemId, props.deliveron.status])
 
     return (
         <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
         <View style={styles.content}>
-          <Text textColor="black" style={styles.contentTitle}>{dictionary['orders.rejectionWarning']}</Text>
+          <Text textColor="black" style={styles.contentTitle}>{dictionary['orders.finishingWarning']}</Text>
 
             <View style={styles.buttonModal}>
-              <Button mode="contained" textColor="white" style={styles.buttonReject} onPress={rejectOrder}>{dictionary['orders.reject']}</Button>
+              <Button mode="contained" textColor="white" style={styles.buttonAccept} onPress={finishOrder} disabled={isDisabled}>{dictionary['orders.finish']}</Button>
               <Button mode="contained" textColor="white" style={styles.buttonClose} onPress={props. hideModal}>{dictionary['close']}</Button>
           </View>
         </View>
@@ -69,10 +89,10 @@ export default function OrdersModalContent(props) {
       flexDirection: "row",
       justifyContent: "space-around",
     },
-    buttonReject: {
+    buttonAccept: {
       padding: 7,
       justifyContent: "space-between",
-      backgroundColor: "#f14c4c",
+      backgroundColor: "#2fa360",
       marginRight: 10
     },
     buttonClose: {
