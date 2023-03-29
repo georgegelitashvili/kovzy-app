@@ -4,6 +4,7 @@ import {ActionTypes} from './ActionTypes';
 const initialState = {
   isLoggingIn: false,
   isAuthenticated: false,
+  loginError: [],
   branches: [],
   deliveron: [],
   isdarkTheme: false,
@@ -13,11 +14,13 @@ const initialState = {
 export function authReducer(state = initialState, action) {
   switch (action.type) {
     case ActionTypes.LOGIN_REQUEST:
-      return {...state, isLoggingIn: action.payload};
+      return {...state, isLoggingIn: action.payload, isAuthenticated: action.payload};
     case ActionTypes.LOGIN_SUCCESS:
-      return {...state, isAuthenticated: action.payload};
+      return {...state, isAuthenticated: action.payload, isLoggingIn: action.payload == false ? false : true};
+    case ActionTypes.LOGIN_FAILURE:
+      return {...state, loginError: action.payload, isLoggingIn: false};
     case ActionTypes.LOGOUT_REQUEST:
-      return {...state, isLoggingIn: action.payload};
+      return {...state, isLoggingIn: false};
     default:
       return state;
   }

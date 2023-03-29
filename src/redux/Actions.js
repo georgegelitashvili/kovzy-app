@@ -1,4 +1,5 @@
 import axios from "axios";
+import { Request }  from "../axios/apiRequests";
 import { ActionTypes } from "./ActionTypes";
 import { storeData, getData } from "../helpers/storage";
 
@@ -24,11 +25,11 @@ export const getBranches = (options) => {
   if (options !== null || options != "undefind") {
     try {
       return async (dispatch) => {
-        await axios(options, headers)
+        await Request(options)
           .then((response) => {
             dispatch({
               type: ActionTypes.GET_BRANCH,
-              payload: response.data.data.map(item => ({label: item.title, value: item.id, enabled: item.enabled})),
+              payload: response.map(item => ({label: item.title, value: item.id, enabled: item.enabled})),
             });
           })
           .catch((error) => {
@@ -43,7 +44,7 @@ export const getBranches = (options) => {
             } else {
               console.log('Error', error.message);
             }
-            // console.log(error.config);
+            console.log(error.config);
           });
       };
     } catch (e) {
@@ -56,11 +57,11 @@ export const getDeliveron = (options) => {
   if (options !== null || options != "undefind") {
     try {
       return async (dispatch) => {
-        await axios(options, headers)
+        await Request(options)
           .then((response) => {
             dispatch({
               type: ActionTypes.GET_DELIVERON,
-              payload: response.data.data,
+              payload: response,
             });
           })
           .catch((error) => console.log({ getDeliveron: error }));
@@ -77,7 +78,6 @@ export const login = (options) => {
       return async (dispatch) => {
         await axios(options, headers)
           .then((response) => {
-            console.log(response.data);
             dispatch({
               type: ActionTypes.LOGIN_REQUEST,
               payload: response.data.authorized,
@@ -85,7 +85,10 @@ export const login = (options) => {
           })
           .catch((error) => {
             if (error.response) {
-              console.log(error.response.data);
+              dispatch({
+                type: ActionTypes.LOGIN_FAILURE,
+                payload: error.response.data.error.message,
+              });
             } else if (error.request) {
               console.log(error.request);
             } else {
@@ -100,13 +103,12 @@ export const login = (options) => {
   }
 };
 
-export const authorized = (options) => {
+export const authLegal = (options) => {
   if (options !== null || options != "undefind") {
     try {
       return async (dispatch) => {
         await axios(options, headers)
           .then((response) => {
-            console.log(response.data);
             dispatch({
               type: ActionTypes.LOGIN_SUCCESS,
               payload: response.data.authorized,
@@ -128,6 +130,37 @@ export const authorized = (options) => {
     }
   }
 }
+
+
+export const logout = (options) => {
+  if (options !== null || options != "undefind") {
+    try {
+      return async (dispatch) => {
+        await axios(options, headers)
+          .then((response) => {
+            dispatch({
+              type: ActionTypes.LOGOUT_REQUEST,
+              payload: response.data,
+            });
+          })
+          .catch((error) => {
+            if (error.response) {
+              console.log('---------- response');
+              console.log(error.response.data);
+              console.log('---------- end response');
+            } else if (error.request) {
+              console.log(error.request);
+            } else {
+              console.log('Error', error.message);
+            }
+            console.log(error.config);
+          });
+      };
+    } catch (e) {
+      console.log(e.message);
+    }
+  }
+};
 
 export const ToggleTheme = (theme) => {
   storeData("@darktheme", theme);
