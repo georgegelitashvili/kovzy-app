@@ -17,6 +17,7 @@ import { login } from '../redux/Actions'
 
 export const LoginScreen = ({ navigation }) => {
   const { isLoggingIn } = useSelector((state) => state.authReducer);
+  const { loginError } = useSelector((state) => state.authReducer);
   const [name, setName] = useState({ value: '', error: '' });
   const [password, setPassword] = useState({ value: '', error: '' });
 
@@ -63,6 +64,14 @@ export const LoginScreen = ({ navigation }) => {
       setOptions({...options, data: {username: name.value, password: password.value}});
     }
   }, [name, password]);
+
+  useEffect(() => {
+    if (loginError?.length != 0) {
+      setName({ ...name, error: typeof loginError === 'object' && loginError !== null ? loginError.username[0] : '' })
+      setPassword({ ...password, error: typeof loginError === 'object' && loginError !== null ? '' : loginError })
+      return;
+    }
+  }, [loginError])
 
   // if admin is authorized redirects to orders
   useEffect(() => {

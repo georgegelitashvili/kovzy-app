@@ -42,7 +42,8 @@ export const BranchScreen = ({ navigation }) => {
       setBranch({ ...branch, error: 'Branch must choose!'});
       return;
     }
-    storeData("branch", selected);
+    console.log(selected);
+
     navigation.navigate("Login");
   };
 
@@ -64,6 +65,10 @@ export const BranchScreen = ({ navigation }) => {
       setBranch({data: branches, error: ''})
     }
   }, [branches]);
+
+  useEffect(() => {
+    storeData("branch", selected);
+  }, [selected]);
 
 
   if(branches?.length == 0){

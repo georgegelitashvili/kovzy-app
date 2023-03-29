@@ -9,9 +9,9 @@ import { storeData, getData } from '../helpers/storage';
 export const DomainScreen = ({ navigation }) => {
     const [domain, setDomain] = useState({ value: "", error: "" });
 
-    const readData = () => {
+    const readData = async () => {
       try {
-        getData("domain").then(value => value ? setDomain(value) : "")
+        await getData("domain").then(value => {typeof value != 'undefined' ? setDomain(value) : ""})
       } catch (e) {
         console.log('Failed to fetch the input from storage');
       }
