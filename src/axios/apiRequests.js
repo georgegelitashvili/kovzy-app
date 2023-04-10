@@ -1,4 +1,5 @@
 import axios from "axios";
+import { log } from "react-native-reanimated";
 
 // Construct api headers
 const headers = {
@@ -12,13 +13,16 @@ export const Request = async (options) => {
       try {
         axios.interceptors.response.use(
           response => {
-            return response;
+            if(response.status === 200) {
+              return response;
+            }else {
+              console.log(response);
+            }
           },
           error => {
-            if (error.response.status === 401) {
-              // handle 401 error here
-              console.log('Unauthorized');
-              return null;
+            if (error.response && error.response.data) {
+              console.log(error.response.data);
+              return Promise.reject(error);
             }
             return Promise.reject(error);
           }
@@ -28,6 +32,11 @@ export const Request = async (options) => {
             .then((response) => {
               const items = response.data.data;
               return items;
+            }).catch((error) => {
+              if(error){
+                console.log({apiRequest: error});
+                return [];
+              }
             })
       } catch (e) {
         console.log(e.message);

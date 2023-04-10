@@ -18,9 +18,9 @@ export function authReducer(state = initialState, action) {
     case ActionTypes.LOGIN_SUCCESS:
       return {...state, isAuthenticated: action.payload, isLoggingIn: action.payload == false ? false : true};
     case ActionTypes.LOGIN_FAILURE:
-      return {...state, loginError: action.payload, isLoggingIn: false};
+      return {...state, loginError: action.payload, isLoggingIn: false, isAuthenticated: false};
     case ActionTypes.LOGOUT_REQUEST:
-      return {...state, isLoggingIn: false};
+      return {...state, isLoggingIn: false, isAuthenticated: false};
     default:
       return state;
   }

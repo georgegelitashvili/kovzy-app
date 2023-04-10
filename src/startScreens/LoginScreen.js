@@ -69,7 +69,6 @@ export const LoginScreen = ({ navigation }) => {
     if (loginError?.length != 0) {
       setName({ ...name, error: typeof loginError === 'object' && loginError !== null ? loginError.username[0] : '' })
       setPassword({ ...password, error: typeof loginError === 'object' && loginError !== null ? '' : loginError })
-      return;
     }
   }, [loginError])
 

@@ -7,6 +7,7 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
+  Alert
 } from "react-native";
 import { Text, Button, Divider, Card } from "react-native-paper";
 import { FlatGrid } from "react-native-super-grid";
@@ -15,6 +16,7 @@ import {
   FontAwesome,
   SimpleLineIcons,
 } from "@expo/vector-icons";
+import { Audio } from "expo-av";
 
 import { storeData, getData, getMultipleData } from "../../helpers/storage";
 import { String, LanguageContext } from "../Language";
@@ -27,6 +29,9 @@ const width = Dimensions.get("window").width;
 
 const numColumns = printRows(width);
 const cardSize = width / numColumns;
+
+let ordersCount;
+let temp = 0;
 
 // render entered orders function
 export const EnteredOrdersList = (auth) => {
@@ -45,8 +50,10 @@ export const EnteredOrdersList = (auth) => {
   const [isOpen, setOpenState] = useState([]); // my accordion state
   const [lang, setLang] = useState("");
   const [modalType, setModalType] = useState("");
+  const [sound, setSound] = useState(new Audio.Sound());
 
   const { dictionary } = useContext(LanguageContext);
+  // console.log(auth);
 
   const onChangeModalState = useCallback((newState) => {
     setTimeout(() => {
@@ -63,9 +70,35 @@ export const EnteredOrdersList = (auth) => {
     if (index > -1) setOpenState([...isOpen.filter((i) => i !== value)]);
   });
 
+  const onStopPlaySound = async () => {
+    sound.stopAsync();
+  }
+
+  const onPlaySound = async () => {
+    const source = require("../../assets/audio/alert.mp3");
+    try {
+      await sound.loadAsync(source);
+      await sound.playAsync().then(async PlaybackStatus => {
+        setTimeout(() => {
+          sound.unloadAsync();
+        }, PlaybackStatus.playableDurationMillis)
+      }).catch(error => {
+        console.log(error)
+      })
+    } catch (error) {
+      console.log(error)
+    }
+  }
+
+  const orderReceived = () => {
+    Alert.alert("ALERT", "***New Order Received***", [
+      {text: 'OK', onPress: () => onStopPlaySound()},
+    ]);
+  }
+
   const readData = async () => {
     await getMultipleData(["domain", "branch"]).then((data) => {
-      console.log(data);
+      // console.log(data);
       let domain = [JSON.parse(data[0][1])].map((e) => e.value);
       let branchid = data[1][1];
 
@@ -118,21 +151,19 @@ export const EnteredOrdersList = (auth) => {
 
   getData("rcml-lang").then((lang) => setLang(lang || "ka"));
 
+
   useEffect(() => {
-    if(auth) {
       readData();
       readDataDeliveron();
       readDataAcceptOrder();
       readDataRejectOrder();
-    }
-  }, [auth]);
+  }, []);
 
   useEffect(() => {
-    if(auth) {
-      readData();
+    if(auth === true) {
       const interval = setInterval(() => {
         if (optionsIsLoaded) {
-          Request(options).then((resp) => setOrders(resp));
+          Request(options).then((resp) => {setOrders(resp);});
         }
       }, 5000);
 
@@ -156,6 +187,16 @@ export const EnteredOrdersList = (auth) => {
       Request(deliveronOptions).then((resp) => setDeliveron(resp));
     }
   }, [isDeliveronOptions]);
+
+
+  useEffect(() => {
+    ordersCount = Object.keys(orders).length;
+    if(ordersCount > temp) {
+      onPlaySound();
+      orderReceived();
+    }
+    temp = ordersCount;
+  }, [orders])
 
 
   const renderEnteredOrdersList = ({ item }) => {
@@ -231,10 +272,10 @@ export const EnteredOrdersList = (auth) => {
   }
 
   // console.log('------------ entered orders');
-  // console.log(options);
+  // console.log(orders);
   // console.log('------------ end entered orders');
 
-  // console.log(orders)
+  // console.log(orders);
 
   return (
     <View>

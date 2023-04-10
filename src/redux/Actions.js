@@ -2,6 +2,7 @@ import axios from "axios";
 import { Request }  from "../axios/apiRequests";
 import { ActionTypes } from "./ActionTypes";
 import { storeData, getData } from "../helpers/storage";
+import { log } from "react-native-reanimated";
 
 // Construct api headers
 const headers = {
@@ -78,9 +79,10 @@ export const login = (options) => {
       return async (dispatch) => {
         await axios(options, headers)
           .then((response) => {
+            // console.log(response.data);
             dispatch({
               type: ActionTypes.LOGIN_REQUEST,
-              payload: response.data.authorized,
+              payload: response.data.data.authorized,
             });
           })
           .catch((error) => {
@@ -138,6 +140,9 @@ export const logout = (options) => {
       return async (dispatch) => {
         await axios(options, headers)
           .then((response) => {
+            console.log('------------- logout');
+            console.log(response.data);
+            console.log('------------- end logout');
             dispatch({
               type: ActionTypes.LOGOUT_REQUEST,
               payload: response.data,
@@ -148,6 +153,10 @@ export const logout = (options) => {
               console.log('---------- response');
               console.log(error.response.data);
               console.log('---------- end response');
+              dispatch({
+                type: ActionTypes.LOGIN_FAILURE,
+                payload: error.response.data.error.message,
+              });
             } else if (error.request) {
               console.log(error.request);
             } else {

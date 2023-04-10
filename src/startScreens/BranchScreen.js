@@ -9,8 +9,6 @@ import SelectOption from '../components/generate/SelectOption';
 import { storeData, getData } from '../helpers/storage';
 import { getBranches, getDeliveron } from '../redux/Actions'
 
-const apiEndPoints = {branch: `api/branches`, deliveron: `api/deliveron`};
-
 export const BranchScreen = ({ navigation }) => {
   const { branches } = useSelector((state) => state.branchesReducer);
   const [branch, setBranch] = useState({data: branches, error: ''});
@@ -23,7 +21,7 @@ export const BranchScreen = ({ navigation }) => {
       // console.log(data);
       setOptions({
         method: "POST",
-        url: `https://${data.value}/${endPoint}`
+        url: `https://${data.value}/api/branches`
       });
       setOptionsIsLoaded(true);
     })
@@ -49,10 +47,9 @@ export const BranchScreen = ({ navigation }) => {
 
   const dispatch = useDispatch();
   const fetchBranches = () => {dispatch(getBranches(options))};
-  const fetchDeliveron = () => {dispatch(getDeliveron(options))};
 
   useEffect(() => {
-    branchApi(apiEndPoints.branch);
+    branchApi();
     readBranch();
 
     if(optionsIsLoaded) {

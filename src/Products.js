@@ -23,16 +23,21 @@ export default function Products({ navigation }) {
   const [optionsIsLoaded, setOptionsIsLoaded] = useState(false); // api options
   const [activityOptions, setActivityOptions] = useState({});
   const [activityOptionsIsLoaded, setActivityOptionsIsLoaded] = useState(false); // api options
+  const [sendApi, setSendApi] = useState(false);
+  const [sendEnabled, setSendEnabled] = useState(false);
   const [value, setValue] = useState("");
   const [enabled, setEnabled] = useState("");
+  const [productEnabled, setProductEnabled] = useState(false);
+  const [lang, setLang] = useState("");
 
   const { dictionary } = useContext(LanguageContext);
+
+  getData("rcml-lang").then((lang) => setLang(lang || "ka"));
 
   const readDomain = async () => {
     await getData("domain").then((data) => {
       setOptions({
         method: "POST",
-        data: { languageid: 1, page: page },
         url: `https://${data.value}/api/getProducts`,
       });
       setOptionsIsLoaded(true);
@@ -49,48 +54,62 @@ export default function Products({ navigation }) {
     });
   };
 
-
   useEffect(() => {
     readDomain();
     productActivity();
-    if (optionsIsLoaded) {
+  }, [])
+
+  useEffect(() => {
+    if (optionsIsLoaded && (page || lang)) {
+      setOptions({ ...options, data: { lang: lang, page: page } });
+      setSendApi(true);
+    }
+  }, [page, lang, optionsIsLoaded]);
+
+  useEffect(() => {
+    if (sendApi) {
       Request(options).then((resp) => {
-        setProducts(resp.data);
+        // console.log(resp);
+        setProducts(resp);
         setTotalPages(resp.total / resp.per_page);
       });
+      setSendApi(false);
+      // console.log(options);
     }
-  }, [optionsIsLoaded]);
+  }, [sendApi]);
+
 
   useEffect(() => {
-    if (page) {
-      setOptions({ ...options, data: { languageid: 1, page: page } });
-    }
-  }, [page]);
-
-  useEffect(() => {
-    if(options) {
-      Request(options).then((resp) => {
-        setProducts(resp.data);
-        setTotalPages(resp.total / resp.per_page);
-      });
-    }
-  }, [options])
-
-  useEffect(() => {
-    if(activityOptionsIsLoaded) {
-      if(value) {
-        setActivityOptions({...activityOptions, data: {pid: value, enabled: enabled}})
-      }
+    if(activityOptionsIsLoaded && value) {
+      setActivityOptions({...activityOptions, data: {pid: value, enabled: enabled}});
+      setSendEnabled(true);
     }
   }, [activityOptionsIsLoaded, value, enabled])
 
   useEffect(() => {
-    if(activityOptions) {
+    if(sendEnabled) {
+      console.log(activityOptions)
       Request(activityOptions).then((resp) => {
-        console.log(resp)
+        console.log(resp);
       });
+      setProductEnabled(true);
+      setSendEnabled(false);
     }
-  }, [activityOptions])
+  }, [sendEnabled])
+
+
+  useEffect(() => {
+    if (productEnabled) {
+      Request(options).then((resp) => {
+        // console.log(resp);
+        setProducts(resp);
+        setTotalPages(resp.total / resp.per_page);
+      });
+      setProductEnabled(false);
+      setSendApi(false);
+      // console.log(options);
+    }
+  }, [productEnabled]);
 
 
   const renderProductList = (items) => {
@@ -113,7 +132,9 @@ export default function Products({ navigation }) {
     );
   };
 
-  if (products.data?.length == 0) {
+
+
+  if (products == null || products?.data?.length == 0) {
     return null;
   }
 
@@ -121,7 +142,7 @@ export default function Products({ navigation }) {
     <>
       <FlatGrid
         itemDimension={width}
-        data={products}
+        data={products.data || []}
         renderItem={renderProductList}
         adjustGridToStyles={true}
         contentContainerStyle={{ justifyContent: "flex-start" }}

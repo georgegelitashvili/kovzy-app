@@ -35,9 +35,11 @@ export const AcceptedOrdersList = (auth) => {
   const [options, setOptions] = useState({}); // api options
   const [optionsIsLoaded, setOptionsIsLoaded] = useState(false); // api options
   const [deliveronOptions, setDeliveronOptions] = useState({});
+  const [deliveronStatus, setDeliveronStatus] = useState({});
   const [isDeliveronOptions, setIsDeliveronOptions] = useState(false);
   const [acceptOrderOptions, setAcceptOrderOptions] = useState({});
   const [rejectOrderOptions, setRejectOrderOptions] = useState({});
+  const [deliveronData, setDeliveronData] = useState({});
 
   const [deliveron, setDeliveron] = useState([]);
   const [visible, setVisible] = useState(false); // modal state
@@ -81,6 +83,15 @@ export const AcceptedOrdersList = (auth) => {
     });
   };
 
+  const readDeliveronStatus = async (endPoint) => {
+    await getData("domain").then(data => {
+      setDeliveronStatus({
+        method: "POST",
+        url: `https://${data.value}/api/deliveronStatus`
+      });
+    })
+  };
+
   const readDataDeliveron = async () => {
     await getData("domain").then((data) => {
       setDeliveronOptions({
@@ -111,22 +122,21 @@ export const AcceptedOrdersList = (auth) => {
   // modal show
   const showModal = (type) => {
     setModalType(type);
-
     setVisible(true);
-
   };
 
   getData("rcml-lang").then((lang) => setLang(lang || "ka"));
 
   useEffect(() => {
     readData();
+    readDeliveronStatus();
     readDataDeliveron();
     readDataPreparedOrder();
     readDataRejectOrder();
   }, []);
 
   useEffect(() => {
-    if(auth) {
+    if(auth === true) {
       const interval = setInterval(() => {
         if (optionsIsLoaded) {
           Request(options).then((resp) => setOrders(resp));
@@ -142,7 +152,7 @@ export const AcceptedOrdersList = (auth) => {
 
   useEffect(() => {
     if (itemId) {
-      setDeliveronOptions({ ...deliveronOptions });
+      setDeliveronStatus({ ...deliveronStatus });
       setIsDeliveronOptions(true);
     }
   }, [itemId]);
@@ -150,8 +160,7 @@ export const AcceptedOrdersList = (auth) => {
 
   useEffect(() => {
     if (isDeliveronOptions) {
-      setDeliveron({status: 0});
-      // Request(deliveronOptions).then((resp) => setDeliveron(resp));
+      Request(deliveronStatus).then((resp) => setDeliveron(resp));
     }
   }, [isDeliveronOptions]);
 
@@ -227,12 +236,6 @@ export const AcceptedOrdersList = (auth) => {
   if (orders?.length == 0 || orders == null) {
     return null;
   }
-
-  // console.log('------------ entered orders Lang');
-  // console.log(lang);
-  // console.log('------------ end entered orders Lang');
-
-  // console.log(orders)
 
   return (
     <View>

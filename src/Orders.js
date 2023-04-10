@@ -21,7 +21,6 @@ export default function Orders({ navigation }) {
   // }, [authlegal])
 
 
-
   const obj = {
     tab1: useCallback(EnteredOrdersList(authlegal)),
     tab2: useCallback(AcceptedOrdersList(authlegal)),

@@ -5,7 +5,7 @@ import { Drawer, Text, TouchableRipple, Switch } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { ToggleTheme, logout } from "../redux/Actions";
 import { useDispatch, useSelector } from "react-redux";
-import { storeData, getData } from '../helpers/storage';
+import { storeData, getData, removeData } from '../helpers/storage';
 import LanguageSelector from './generate/LanguageSelector';
 import { Request } from "../axios/apiRequests";
 import { String, LanguageContext } from './Language';
@@ -22,6 +22,13 @@ export default function DrawerContent(props) {
   const [logoutOptionsIsLoaded, setLogoutOptionsIsLoaded] = useState(false);
   const [selected, setSelected] = useState(null);
   const [branchEnabled, setBranchEnabled] = useState(false);
+  const [deliveronEnabled, setDeliveronEnabled] = useState(false);
+  const[deliveronOptions, setDeliveronOptions] = useState({});
+  const[deliveronChangeOptions, setDeliveronChangeOptions] = useState({});
+  const [deliveronIsLoaded, setDeliveronIsLoaded] = useState(false);
+
+  const [isBranchEnabled, setIsBranchEnabled] = useState(false);
+  const [isDeliveronEnabled, setIsDeliveronEnabled] = useState(false);
 
   // console.log('--------------------- branch data');
   // console.log(options);
@@ -45,6 +52,7 @@ export default function DrawerContent(props) {
       //   console.log('--------- logout');
       // });
     }
+    removeData();
     props.navigation.navigate("Start", { screen: "Domain" });
   });
 
@@ -58,6 +66,24 @@ export default function DrawerContent(props) {
     })
   };
 
+  const deliveronStatus = async () => {
+    await getData("domain").then(data => {
+      setDeliveronOptions({
+        method: "POST",
+        url: `https://${data.value}/api/deliveronStatus`
+      });
+      setDeliveronIsLoaded(true);
+    })
+  };
+
+  const changeDeliveronStatus = async () => {
+    await getData("domain").then(data => {
+      setDeliveronChangeOptions({
+        method: "POST",
+        url: `https://${data.value}/api/deliveronActivity`
+      });
+    })
+  };
 
   const readLogout = async () => {
     await getData("domain").then(data => {
@@ -94,23 +120,51 @@ export default function DrawerContent(props) {
   const toggleBranch = () => {
     setBranchEnabled(data => !data);
 
-    if(options){
+    if(isBranchEnabled){
       Request(options).then(resp => setBranchEnabled(resp));
+      setIsBranchEnabled(false);
+    }
+  };
+
+
+  const toggleDeliveron = () => {
+    setDeliveronEnabled(data => !data);
+
+    if(isDeliveronEnabled){
+      console.log(deliveronChangeOptions);
+      Request(deliveronChangeOptions).then(resp => setDeliveronEnabled(resp));
+      setIsDeliveronEnabled(false);
     }
   };
 
   useEffect(() => {
     readBranch();
     readDomain();
+    deliveronStatus();
+    changeDeliveronStatus();
     readLogout();
     dispatch(ToggleTheme(isdarkTheme));
-  }, [optionsIsLoaded]);
+  }, []);
 
   useEffect(() => {
-    if(options) {
-      setOptions({...options, data: { branchid: selected,enabled: branchEnabled ? 0 : 1,}});
+    setOptions({...options, data: { branchid: selected, enabled: branchEnabled ? 0 : 1 }});
+    setIsBranchEnabled(true);
+  }, [branchEnabled]);
+
+  useEffect(() => {
+    if(deliveronIsLoaded) {
+      Request(deliveronOptions).then(resp => {
+        setDeliveronEnabled(resp.status == 0 ? true : false);
+      });
     }
-  }, [selected, branchEnabled]);
+  }, [deliveronIsLoaded])
+
+
+  useEffect(() => {
+    setDeliveronChangeOptions({...deliveronChangeOptions, data: {enabled: deliveronEnabled ? 0 : 1}});
+    setIsDeliveronEnabled(true);
+  }, [deliveronEnabled])
+
 
   useEffect(() => {
     enabledBranch();
@@ -161,11 +215,11 @@ export default function DrawerContent(props) {
           />
         </Drawer.Section>
         <Drawer.Section theme="dark">
-          <TouchableRipple onPress={() => {}}>
+          <TouchableRipple onPress={toggleDeliveron}>
             <View style={styles.preference}>
               <Text>{dictionary['dv.deliveron']}</Text>
               <View pointerEvents="none">
-                <Switch value={false} />
+                <Switch value={deliveronEnabled} />
               </View>
             </View>
           </TouchableRipple>

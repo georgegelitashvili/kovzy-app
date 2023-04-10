@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { Text, Button } from 'react-native-paper';
+import { Text, Button, Divider } from 'react-native-paper';
 import { StyleSheet, View, Keyboard, TouchableWithoutFeedback } from 'react-native';
 import { Request } from "../../axios/apiRequests";
 import { String, LanguageContext } from '../Language';
@@ -8,8 +8,9 @@ import { String, LanguageContext } from '../Language';
 export default function OrdersModalContent(props) {
     const [options, setOptions] = useState(props.deliveronOptions);
     const [acceptOptions, setAcceptOptions] = useState(props.accept);
-    const [status, setStatus] = useState({});
+    const [status, setStatus] = useState(false);
     const [isDisabled, setDisabled] = useState(false);
+    const [text, setText] = useState("");
 
     const { dictionary } = useContext(LanguageContext);
 
@@ -39,6 +40,7 @@ export default function OrdersModalContent(props) {
                 setOptions({...options, data: {
                   deliveronOrderId: deliveronId['order_id_deliveron'],
               }})
+                setStatus(true);
               }
 
             }
@@ -51,13 +53,29 @@ export default function OrdersModalContent(props) {
       }
     }, [props.itemId, props.deliveron.status])
 
+    useEffect(() => {
+      if(status) {
+        Request(options).then(resp => {
+          console.log(resp);
+          setText(resp.content);
+        });
+        setDisabled(true);
+        setStatus(false);
+      }
+    }, [status])
+
     return (
         <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
         <View style={styles.content}>
           <Text textColor="black" style={styles.contentTitle}>{dictionary['orders.finishingWarning']}</Text>
 
-            <View style={styles.buttonModal}>
-              <Button mode="contained" textColor="white" style={styles.buttonAccept} onPress={finishOrder} disabled={isDisabled}>{dictionary['orders.finish']}</Button>
+          <Divider />
+          <Text textColor="black" style={styles.contentTitle}>{text}</Text>
+          <Divider />
+
+          <View style={styles.buttonModal}>
+              <Button disabled={isDisabled} mode="contained" textColor="white" style={styles.buttonAccept}  onPress={finishOrder}>{dictionary['orders.finish']}</Button>
+
               <Button mode="contained" textColor="white" style={styles.buttonClose} onPress={props. hideModal}>{dictionary['close']}</Button>
           </View>
         </View>
@@ -88,6 +106,7 @@ export default function OrdersModalContent(props) {
     buttonModal: {
       flexDirection: "row",
       justifyContent: "space-around",
+      paddingTop: 20,
     },
     buttonAccept: {
       padding: 7,
