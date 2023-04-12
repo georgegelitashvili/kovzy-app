@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { Text, Button } from 'react-native-paper';
 import TextField from '../generate/TextField';
 import SelectOption from '../generate/SelectOption';
+import Loader from "../generate/loader";
 import { StyleSheet, View, Keyboard, TouchableWithoutFeedback } from 'react-native';
 import { Request } from "../../axios/apiRequests";
 import { String, LanguageContext } from '../Language';
@@ -15,6 +16,8 @@ export default function OrdersModalContent(props) {
     const [deliveron, setDeliveron] = useState({data: props.items, error: ''});
     const [selected, setSelected] = useState(null);
 
+    const [loading, setLoading] = useState(false);
+
     // console.log(props.deliveron);
 
     const { dictionary } = useContext(LanguageContext);
@@ -23,8 +26,10 @@ export default function OrdersModalContent(props) {
       if(options) {
         // console.log(options);
         // return;
+        setLoading(true);
         Request(options).then(resp => {
           if(resp.status == 0) {
+            setLoading(false);
             alert(dictionary['dv.orderSuccess']);
           }
         });
@@ -63,6 +68,7 @@ export default function OrdersModalContent(props) {
 
         <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
         <View style={styles.content}>
+        {loading ? <Loader text="Preparing order"/> : null}
           <Text textColor="black" style={styles.contentTitle}>{dictionary['orders.approvingWarning']}</Text>
           <TextField
               label={dictionary['general.AOPT']}

@@ -25,14 +25,16 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FFFFFF"
       },
+      "package": "com.kovzy.app",
       "softwareKeyboardLayoutMode": "pan"
-    },
-    "packagerOpts": {
-      "config": "metro.config.js",
-      "sourceExts": ["js", "jsx", "scss", "sass"]
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "7c64e824-e18a-4864-bfc6-5399fa7da11a"
+      }
     }
   }
 }

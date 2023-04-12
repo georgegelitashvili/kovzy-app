@@ -21,17 +21,27 @@ export const LoginScreen = ({ navigation }) => {
   const [name, setName] = useState({ value: '', error: '' });
   const [password, setPassword] = useState({ value: '', error: '' });
 
+  const [domain, setDomain] = useState(null);
+  const [domainIsLoaded, setDomainIsLoaded] = useState(false);
+
   const [options, setOptions] = useState({}); // api options
   const [optionsIsLoaded, setOptionsIsLoaded] = useState(false); // check api options is loaded
 
+
   const readData = async () => {
     await getData("domain").then(data => {
-      setOptions({
-        method: "POST",
-        url: `https://${data.value}/api/auth/login`,
-      });
-      setOptionsIsLoaded(true);
+      setDomain(data.value);
+      setDomainIsLoaded(true);
     })
+  }
+
+
+  const loginOptions = async () => {
+    setOptions({
+      method: "POST",
+      url: `https://${domain}/api/auth/login`,
+    });
+    setOptionsIsLoaded(true);
   };
 
   const dispatch = useDispatch();
@@ -48,15 +58,21 @@ export const LoginScreen = ({ navigation }) => {
       return;
     }
 
-    if(options) {
+    if(optionsIsLoaded) {
       fetchLogin();
     }
   }
 
-  // get options value
   useEffect(() => {
     readData();
-  }, [optionsIsLoaded]);
+  });
+
+  // get options value
+  useEffect(() => {
+    if(domainIsLoaded) {
+      loginOptions();
+    }
+  }, [domainIsLoaded]);
 
   // if name or password changed
   useEffect(() => {
@@ -85,7 +101,7 @@ export const LoginScreen = ({ navigation }) => {
       <TextField
         label="User name"
         returnKeyType="next"
-        value={name.value}
+        value={name?.value || ""}
         onChangeText={(text) => setName({ value: text, error: '' })}
         error={!!name.error}
         errorText={name.error}
@@ -97,7 +113,7 @@ export const LoginScreen = ({ navigation }) => {
       <TextField
         label="Password"
         returnKeyType="done"
-        value={password.value}
+        value={password?.value || ""}
         onChangeText={(text) => setPassword({ value: text, error: '' })}
         error={!!password.error}
         errorText={password.error}

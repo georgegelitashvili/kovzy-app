@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect } from 'react'
 import Background from '../components/generate/Background';
 import Logo from '../components/generate/Logo';
 import Button from '../components/generate/Button';
@@ -11,7 +11,7 @@ export const DomainScreen = ({ navigation }) => {
 
     const readData = async () => {
       try {
-        await getData("domain").then(value => {typeof value != 'undefined' ? setDomain(value) : ""})
+        await getData("domain").then(value => {setDomain(value)})
       } catch (e) {
         console.log('Failed to fetch the input from storage');
       }

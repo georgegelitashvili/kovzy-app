@@ -8,6 +8,7 @@ import {
 import { Text, Button, Divider, Card } from "react-native-paper";
 import { FlatGrid } from "react-native-super-grid";
 import { getData } from "./helpers/storage";
+import Loader from "./components/generate/loader";
 import { String, LanguageContext } from "./components/Language";
 import { Request } from "./axios/apiRequests";
 
@@ -15,6 +16,9 @@ const width = Dimensions.get("window").width;
 
 export default function Products({ navigation }) {
   const [products, setProducts] = useState([]);
+
+  const [domain, setDomain] = useState(null);
+  const [domainIsLoaded, setDomainIsLoaded] = useState(false);
 
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
@@ -30,51 +34,62 @@ export default function Products({ navigation }) {
   const [productEnabled, setProductEnabled] = useState(false);
   const [lang, setLang] = useState("");
 
+  const [loading, setLoading] = useState(true);
+
   const { dictionary } = useContext(LanguageContext);
 
   getData("rcml-lang").then((lang) => setLang(lang || "ka"));
 
-  const readDomain = async () => {
+  const readData = async () => {
     await getData("domain").then((data) => {
-      setOptions({
-        method: "POST",
-        url: `https://${data.value}/api/getProducts`,
-      });
-      setOptionsIsLoaded(true);
+      setDomain(data.value);
+      setDomainIsLoaded(true);
     });
   };
 
-  const productActivity = async () => {
-    await getData("domain").then((data) => {
-      setActivityOptions({
-        method: "POST",
-        url: `https://${data.value}/api/productActivity`,
-      });
-      setActivityOptionsIsLoaded(true);
+  const readDomain = () => {
+    setOptions({
+      method: "POST",
+      url: `https://${domain}/api/getProducts`,
     });
+    setOptionsIsLoaded(true);
+  };
+
+  const productActivity = () => {
+    setActivityOptions({
+      method: "POST",
+      url: `https://${domain}/api/productActivity`,
+    });
+    setActivityOptionsIsLoaded(true);
   };
 
   useEffect(() => {
-    readDomain();
-    productActivity();
-  }, [])
+    readData();
+  });
+
+  useEffect(() => {
+    if(domainIsLoaded) {
+      readDomain();
+      productActivity();
+    }
+  }, [domainIsLoaded])
 
   useEffect(() => {
     if (optionsIsLoaded && (page || lang)) {
       setOptions({ ...options, data: { lang: lang, page: page } });
       setSendApi(true);
+      setLoading(true);
     }
   }, [page, lang, optionsIsLoaded]);
 
   useEffect(() => {
     if (sendApi) {
       Request(options).then((resp) => {
-        // console.log(resp);
         setProducts(resp);
         setTotalPages(resp.total / resp.per_page);
       });
       setSendApi(false);
-      // console.log(options);
+      setLoading(false);
     }
   }, [sendApi]);
 
@@ -88,10 +103,7 @@ export default function Products({ navigation }) {
 
   useEffect(() => {
     if(sendEnabled) {
-      console.log(activityOptions)
-      Request(activityOptions).then((resp) => {
-        console.log(resp);
-      });
+      Request(activityOptions)
       setProductEnabled(true);
       setSendEnabled(false);
     }
@@ -101,13 +113,11 @@ export default function Products({ navigation }) {
   useEffect(() => {
     if (productEnabled) {
       Request(options).then((resp) => {
-        // console.log(resp);
         setProducts(resp);
         setTotalPages(resp.total / resp.per_page);
       });
       setProductEnabled(false);
       setSendApi(false);
-      // console.log(options);
     }
   }, [productEnabled]);
 
@@ -132,10 +142,10 @@ export default function Products({ navigation }) {
     );
   };
 
+console.log(loading);
 
-
-  if (products == null || products?.data?.length == 0) {
-    return null;
+  if(loading) {
+    return (<Loader text="Loading products"/>)
   }
 
   return (

@@ -13,18 +13,26 @@ export const BranchScreen = ({ navigation }) => {
   const { branches } = useSelector((state) => state.branchesReducer);
   const [branch, setBranch] = useState({data: branches, error: ''});
   const [selected, setSelected] = useState(null);
+
+  const [domain, setDomain] = useState(null);
+  const [domainIsLoaded, setDomainIsLoaded] = useState(false);
+
   const [options, setOptions] = useState({}); // api options
   const [optionsIsLoaded, setOptionsIsLoaded] = useState(false); // check api options is loaded
 
-  const branchApi = async (endPoint) => {
+  const readData = async () => {
     await getData("domain").then(data => {
-      // console.log(data);
-      setOptions({
-        method: "POST",
-        url: `https://${data.value}/api/branches`
-      });
-      setOptionsIsLoaded(true);
+      setDomain(data.value);
+      setDomainIsLoaded(true);
     })
+  }
+
+  const branchApi = async () => {
+    setOptions({
+      method: "POST",
+      url: `https://${domain}/api/branches`
+    });
+    setOptionsIsLoaded(true);
   };
 
   const readBranch = async () => {
@@ -40,8 +48,6 @@ export const BranchScreen = ({ navigation }) => {
       setBranch({ ...branch, error: 'Branch must choose!'});
       return;
     }
-    console.log(selected);
-
     navigation.navigate("Login");
   };
 
@@ -49,9 +55,17 @@ export const BranchScreen = ({ navigation }) => {
   const fetchBranches = () => {dispatch(getBranches(options))};
 
   useEffect(() => {
-    branchApi();
-    readBranch();
+    readData();
+  });
 
+  useEffect(() => {
+    if(domainIsLoaded) {
+      branchApi();
+      readBranch();
+    }
+  }, [domainIsLoaded])
+
+  useEffect(() => {
     if(optionsIsLoaded) {
       fetchBranches();
     }
@@ -64,7 +78,9 @@ export const BranchScreen = ({ navigation }) => {
   }, [branches]);
 
   useEffect(() => {
-    storeData("branch", selected);
+    if(selected) {
+      storeData("branch", selected);
+    }
   }, [selected]);
 
 
@@ -77,7 +93,7 @@ export const BranchScreen = ({ navigation }) => {
         <Logo />
 
       <SelectOption
-        value={selected}
+        value={selected || null}
         onValueChange={(value) => {setSelected(value);setBranch({ ...branch, error: '' });}}
         items={branch?.data || ''}
         key={(item)=> item?.id || ''}

@@ -17,6 +17,7 @@ import {
 } from "@expo/vector-icons";
 
 import { storeData, getData, getMultipleData } from "../../helpers/storage";
+import Loader from "../generate/loader";
 import { String, LanguageContext } from "../Language";
 import { Request } from "../../axios/apiRequests";
 import OrdersDetail from "./OrdersDetail";
@@ -31,6 +32,10 @@ const cardSize = width / numColumns;
 // render accepted orders function
 export const AcceptedOrdersList = (auth) => {
   const [orders, setOrders] = useState([]);
+
+  const [domain, setDomain] = useState(null);
+  const [branchid, setBranchid] = useState(null);
+  const [domainIsLoaded, setDomainIsLoaded] = useState(false);
 
   const [options, setOptions] = useState({}); // api options
   const [optionsIsLoaded, setOptionsIsLoaded] = useState(false); // api options
@@ -48,13 +53,28 @@ export const AcceptedOrdersList = (auth) => {
   const [lang, setLang] = useState("");
   const [modalType, setModalType] = useState("");
 
+  const [loading, setLoading] = useState(true);
+  const [loadingOptions, setLoadingOptions] = useState(false);
+
   const { dictionary } = useContext(LanguageContext);
+
+  const readData = async () => {
+    await getMultipleData(["domain", "branch"]).then((data) => {
+      let domain = [JSON.parse(data[0][1])].map((e) => e.value);
+      let branchid = data[1][1];
+
+      setDomain(domain[0]);
+      setBranchid(branchid);
+      setDomainIsLoaded(true);
+    });
+  }
 
   const onChangeModalState = useCallback((newState) => {
     setTimeout(() => {
       setVisible(newState);
       setIsDeliveronOptions(newState);
       setItemId(null);
+      setDeliveron([]);
     }, 0);
   });
 
@@ -65,57 +85,44 @@ export const AcceptedOrdersList = (auth) => {
     if (index > -1) setOpenState([...isOpen.filter((i) => i !== value)]);
   });
 
-  const readData = async () => {
-    await getMultipleData(["domain", "branch"]).then((data) => {
-      let domain = [JSON.parse(data[0][1])].map((e) => e.value);
-      let branchid = data[1][1];
+  const getOrders = () => {
+    setOptions({
+      method: "POST",
+      data: {
+        type: 0,
+        page: 1,
+        branchid: branchid,
+      },
+      url: `https://${domain}/api/getAcceptedOrders`,
+    });
+    setOptionsIsLoaded(true);
+  };
 
-      setOptions({
-        method: "POST",
-        data: {
-          type: 0,
-          page: 1,
-          branchid: branchid,
-        },
-        url: `https://${domain[0]}/api/getAcceptedOrders`,
-      });
-      setOptionsIsLoaded(true);
+  const readDeliveronStatus = (endPoint) => {
+    setDeliveronStatus({
+      method: "POST",
+      url: `https://${domain}/api/deliveronStatus`
     });
   };
 
-  const readDeliveronStatus = async (endPoint) => {
-    await getData("domain").then(data => {
-      setDeliveronStatus({
-        method: "POST",
-        url: `https://${data.value}/api/deliveronStatus`
-      });
-    })
-  };
-
-  const readDataDeliveron = async () => {
-    await getData("domain").then((data) => {
-      setDeliveronOptions({
-        method: "POST",
-        url: `https://${data.value}/api/checkOrderStatus`,
-      });
+  const readDataDeliveron = () => {
+    setDeliveronOptions({
+      method: "POST",
+      url: `https://${domain}/api/checkOrderStatus`,
     });
   };
 
-  const readDataPreparedOrder = async () => {
-    await getData("domain").then((data) => {
-      setAcceptOrderOptions({
-        method: "POST",
-        url: `https://${data.value}/api/orderPrepared`,
-      });
+  const readDataPreparedOrder = () => {
+    setAcceptOrderOptions({
+      method: "POST",
+      url: `https://${domain}/api/orderPrepared`,
     });
   };
 
-  const readDataRejectOrder = async () => {
-    await getData("domain").then((data) => {
-      setRejectOrderOptions({
-        method: "POST",
-        url: `https://${data.value}/api/rejectOrder`,
-      });
+  const readDataRejectOrder = () => {
+    setRejectOrderOptions({
+      method: "POST",
+      url: `https://${domain}/api/rejectOrder`,
     });
   };
 
@@ -129,11 +136,25 @@ export const AcceptedOrdersList = (auth) => {
 
   useEffect(() => {
     readData();
-    readDeliveronStatus();
-    readDataDeliveron();
-    readDataPreparedOrder();
-    readDataRejectOrder();
-  }, []);
+  });
+
+  useEffect(() => {
+    if(domainIsLoaded) {
+      getOrders();
+      readDeliveronStatus();
+      readDataDeliveron();
+      readDataPreparedOrder();
+      readDataRejectOrder();
+    }
+  }, [domainIsLoaded])
+
+  useEffect(() => {
+    if(branchid || domain) {
+      setOptionsIsLoaded(false);
+      setDomainIsLoaded(false);
+      setOrders([]);
+    }
+  }, [branchid, domain])
 
   useEffect(() => {
     if(auth === true) {
@@ -154,8 +175,15 @@ export const AcceptedOrdersList = (auth) => {
     if (itemId) {
       setDeliveronStatus({ ...deliveronStatus });
       setIsDeliveronOptions(true);
+      setLoadingOptions(true);
     }
   }, [itemId]);
+
+  useEffect(() => {
+    if(deliveron) {
+      setLoadingOptions(false);
+    }
+  },[deliveron])
 
 
   useEffect(() => {
@@ -238,7 +266,8 @@ export const AcceptedOrdersList = (auth) => {
   }
 
   return (
-    <View>
+    <View style={{flex: 1}}>
+      {loadingOptions ? <Loader text="Loading options"/> : null}
       <ScrollView horizontal={true} showsVerticalScrollIndicator={false}>
         {visible ? (
           <OrdersModal

@@ -7,7 +7,8 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
-  Alert
+  Alert,
+  ActivityIndicator
 } from "react-native";
 import { Text, Button, Divider, Card } from "react-native-paper";
 import { FlatGrid } from "react-native-super-grid";
@@ -19,6 +20,7 @@ import {
 import { Audio } from "expo-av";
 
 import { storeData, getData, getMultipleData } from "../../helpers/storage";
+import Loader from "../generate/loader";
 import { String, LanguageContext } from "../Language";
 import { Request } from "../../axios/apiRequests";
 import OrdersDetail from "./OrdersDetail";
@@ -33,9 +35,22 @@ const cardSize = width / numColumns;
 let ordersCount;
 let temp = 0;
 
+function LoadingAnimation() {
+  return (
+    <View style={styles.indicatorWrapper}>
+      <ActivityIndicator size="large" style={styles.indicator}/>
+      <Text style={styles.indicatorText}>Loading orders...</Text>
+    </View>
+  );
+}
+
 // render entered orders function
 export const EnteredOrdersList = (auth) => {
   const [orders, setOrders] = useState([]);
+
+  const [domain, setDomain] = useState(null);
+  const [branchid, setBranchid] = useState(null);
+  const [domainIsLoaded, setDomainIsLoaded] = useState(false);
 
   const [options, setOptions] = useState({}); // api options
   const [optionsIsLoaded, setOptionsIsLoaded] = useState(false); // api options
@@ -52,23 +67,37 @@ export const EnteredOrdersList = (auth) => {
   const [modalType, setModalType] = useState("");
   const [sound, setSound] = useState(new Audio.Sound());
 
-  const { dictionary } = useContext(LanguageContext);
-  // console.log(auth);
+  const [loading, setLoading] = useState(true);
+  const [loadingOptions, setLoadingOptions] = useState(false);
 
-  const onChangeModalState = useCallback((newState) => {
+  const { dictionary } = useContext(LanguageContext);
+
+  const readData = async () => {
+    await getMultipleData(["domain", "branch"]).then((data) => {
+      let domain = [JSON.parse(data[0][1])].map((e) => e.value);
+      let branchid = data[1][1];
+
+      setDomain(domain[0]);
+      setBranchid(branchid);
+      setDomainIsLoaded(true);
+    });
+  }
+
+  const onChangeModalState = (newState) => {
     setTimeout(() => {
       setVisible(newState);
       setIsDeliveronOptions(newState);
       setItemId(null);
+      setDeliveron([]);
     }, 0);
-  });
+  };
 
-  const toggleContent = useCallback((value) => {
+  const toggleContent = (value) => {
     setOpenState([...isOpen, value]);
 
     let index = isOpen.indexOf(value);
     if (index > -1) setOpenState([...isOpen.filter((i) => i !== value)]);
-  });
+  };
 
   const onStopPlaySound = async () => {
     sound.stopAsync();
@@ -96,49 +125,37 @@ export const EnteredOrdersList = (auth) => {
     ]);
   }
 
-  const readData = async () => {
-    await getMultipleData(["domain", "branch"]).then((data) => {
-      // console.log(data);
-      let domain = [JSON.parse(data[0][1])].map((e) => e.value);
-      let branchid = data[1][1];
+  const getOrders = () => {
+    setOptions({
+      method: "POST",
+      data: {
+        type: 0,
+        page: 1,
+        branchid: branchid,
+      },
+      url: `https://${domain}/api/getUnansweredOrders`,
+    });
+    setOptionsIsLoaded(true);
+  };
 
-      setOptions({
-        method: "POST",
-        data: {
-          type: 0,
-          page: 1,
-          branchid: branchid,
-        },
-        url: `https://${domain[0]}/api/getUnansweredOrders`,
-      });
-      setOptionsIsLoaded(true);
+  const readDataDeliveron = () => {
+    setDeliveronOptions({
+      method: "POST",
+      url: `https://${domain}/api/deliveronRecheck`,
     });
   };
 
-  const readDataDeliveron = async () => {
-    await getData("domain").then((data) => {
-      setDeliveronOptions({
-        method: "POST",
-        url: `https://${data.value}/api/deliveronRecheck`,
-      });
+  const readDataAcceptOrder = () => {
+    setAcceptOrderOptions({
+      method: "POST",
+      url: `https://${domain}/api/acceptOrder`,
     });
   };
 
-  const readDataAcceptOrder = async () => {
-    await getData("domain").then((data) => {
-      setAcceptOrderOptions({
-        method: "POST",
-        url: `https://${data.value}/api/acceptOrder`,
-      });
-    });
-  };
-
-  const readDataRejectOrder = async () => {
-    await getData("domain").then((data) => {
-      setRejectOrderOptions({
-        method: "POST",
-        url: `https://${data.value}/api/rejectOrder`,
-      });
+  const readDataRejectOrder = () => {
+    setRejectOrderOptions({
+      method: "POST",
+      url: `https://${domain}/api/rejectOrder`,
     });
   };
 
@@ -154,16 +171,32 @@ export const EnteredOrdersList = (auth) => {
 
   useEffect(() => {
       readData();
+  });
+
+  useEffect(() => {
+    if(domainIsLoaded) {
+      getOrders();
       readDataDeliveron();
       readDataAcceptOrder();
       readDataRejectOrder();
-  }, []);
+    }
+  }, [domainIsLoaded])
+
+  useEffect(() => {
+    if(branchid || domain) {
+      setOptionsIsLoaded(false);
+      setDomainIsLoaded(false);
+      setOrders([]);
+      setLoading(true);
+    }
+  }, [branchid, domain])
 
   useEffect(() => {
     if(auth === true) {
       const interval = setInterval(() => {
         if (optionsIsLoaded) {
           Request(options).then((resp) => {setOrders(resp);});
+          setLoading(false);
         }
       }, 5000);
 
@@ -178,6 +211,7 @@ export const EnteredOrdersList = (auth) => {
     if (itemId) {
       setDeliveronOptions({ ...deliveronOptions, data: { orderId: itemId } });
       setIsDeliveronOptions(true);
+      setLoadingOptions(true);
     }
   }, [itemId]);
 
@@ -187,6 +221,12 @@ export const EnteredOrdersList = (auth) => {
       Request(deliveronOptions).then((resp) => setDeliveron(resp));
     }
   }, [isDeliveronOptions]);
+
+  useEffect(() => {
+    if(deliveron) {
+      setLoadingOptions(false);
+    }
+  },[deliveron])
 
 
   useEffect(() => {
@@ -267,8 +307,8 @@ export const EnteredOrdersList = (auth) => {
     );
   };
 
-  if (orders?.length == 0 || orders == null) {
-    return null;
+  if(loading) {
+    return (<Loader text="Loading orders"/>)
   }
 
   // console.log('------------ entered orders');
@@ -278,7 +318,8 @@ export const EnteredOrdersList = (auth) => {
   // console.log(orders);
 
   return (
-    <View>
+    <View style={{flex: 1}}>
+      {loadingOptions ? <Loader text="Loading options"/> : null}
       <ScrollView horizontal={true} showsVerticalScrollIndicator={false}>
         {visible ? (
           <OrdersModal
@@ -293,14 +334,14 @@ export const EnteredOrdersList = (auth) => {
             reject={rejectOrderOptions}
           />
         ) : null}
-        <FlatGrid
-          itemDimension={cardSize}
-          data={orders || []}
-          renderItem={renderEnteredOrdersList}
-          adjustGridToStyles={true}
-          contentContainerStyle={{ justifyContent: "flex-start" }}
-          keyExtractor={(item) => item.id}
-        />
+            <FlatGrid
+            itemDimension={cardSize}
+            data={orders || []}
+            renderItem={renderEnteredOrdersList}
+            adjustGridToStyles={true}
+            contentContainerStyle={{ justifyContent: "flex-start" }}
+            keyExtractor={(item) => item.id}
+          />
       </ScrollView>
     </View>
   );

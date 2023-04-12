@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet, Text, Keyboard, TouchableWithoutFeedback } from 'react-native';
+import { View, StyleSheet, Text, Keyboard, TouchableWithoutFeedback, Platform } from 'react-native';
 import { TextInput } from 'react-native-paper';
 import { theme } from '../../core/theme';
 
@@ -30,10 +30,17 @@ const styles = StyleSheet.create({
   },
   input: {
     backgroundColor: theme.colors.surface,
-    ...(Platform.OS === 'android' && {
-      fontFamily: 'Roboto',
-      placeholderTextColor: '#ccc',
-      textAlignVertical: 'top',
+    ...Platform.select({
+      ios: {
+        fontFamily: 'Roboto',
+        placeholderTextColor: '#ccc',
+        textAlignVertical: 'top',
+      },
+      android: {
+        fontFamily: 'Roboto',
+        placeholderTextColor: '#ccc',
+        textAlignVertical: 'top',
+      },
     }),
   },
   description: {
