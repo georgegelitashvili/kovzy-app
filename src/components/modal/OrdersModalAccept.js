@@ -24,8 +24,6 @@ export default function OrdersModalContent(props) {
 
     const acceptOrder = () => {
       if(options) {
-        // console.log(options);
-        // return;
         setLoading(true);
         Request(options).then(resp => {
           if(resp.status == 0) {
@@ -40,7 +38,6 @@ export default function OrdersModalContent(props) {
       if(selected) {
         props.deliveron.content?.map((item) => {
           if(item.companyId == selected) {
-            // console.log(item);
             setOptions({...options, data: {
               deliveronOrder: 1,
               orderId: props.itemId,

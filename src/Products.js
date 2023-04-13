@@ -142,8 +142,6 @@ export default function Products({ navigation }) {
     );
   };
 
-console.log(loading);
-
   if(loading) {
     return (<Loader text="Loading products"/>)
   }
