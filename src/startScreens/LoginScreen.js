@@ -117,7 +117,7 @@ export const LoginScreen = ({ navigation }) => {
         onChangeText={(text) => setPassword({ value: text, error: '' })}
         error={!!password.error}
         errorText={password.error}
-        secureTextEntry
+        secureTextEntry={true}
       />
       <View style={styles.forgotPassword}>
         <TouchableOpacity

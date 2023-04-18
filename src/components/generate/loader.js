@@ -4,7 +4,7 @@ import { ActivityIndicator, StyleSheet, View, Text } from 'react-native';
 export default function Loader(props) {
     return (
       <View style={styles.indicatorWrapper}>
-        <ActivityIndicator size="large" style={styles.indicator}/>
+        <ActivityIndicator animating={true} size="large" style={styles.indicator}/>
         <Text style={styles.indicatorText}>{props.text}</Text>
       </View>
     );
