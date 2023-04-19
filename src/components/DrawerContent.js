@@ -1,15 +1,17 @@
 import React, { useState, useContext, useEffect } from "react";
 import { View, StyleSheet } from "react-native";
 import { useIsFocused } from '@react-navigation/native';
-import { DrawerItem, DrawerContentScrollView } from "@react-navigation/drawer";
+import { DrawerItem, DrawerContentScrollView, useDrawerStatus } from "@react-navigation/drawer";
 import { Drawer, Text, TouchableRipple, Switch } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { ToggleTheme, logout } from "../redux/Actions";
 import { useDispatch, useSelector } from "react-redux";
+import { AuthContext, AuthProvider } from '../context/AuthProvider';
 import { storeData, getData, removeData } from '../helpers/storage';
 import LanguageSelector from './generate/LanguageSelector';
 import { Request } from "../axios/apiRequests";
 import { String, LanguageContext } from './Language';
+
 
 
 export default function DrawerContent(props) {
@@ -17,9 +19,10 @@ export default function DrawerContent(props) {
   const isFocused = useIsFocused();
   const { branches } = useSelector((state) => state.branchesReducer);
   const { isdarkTheme } = useSelector((state) => state.themeReducer);
+  const { domain, branchid, setUser, setOrders } = useContext(AuthContext);
   const { dictionary } = useContext(LanguageContext);
 
-  const [domain, setDomain] = useState(null);
+  // const [domain, setDomain] = useState(null);
   const [domainIsLoaded, setDomainIsLoaded] = useState(false);
 
   const [options, setOptions] = useState({}); // api options
@@ -36,6 +39,7 @@ export default function DrawerContent(props) {
   const [isBranchEnabled, setIsBranchEnabled] = useState(false);
   const [isDeliveronEnabled, setIsDeliveronEnabled] = useState(false);
 
+  const isDrawerOpen = useDrawerStatus() === 'open';
 
   const switchDarkTheme = () => {
     return isdarkTheme
@@ -43,20 +47,15 @@ export default function DrawerContent(props) {
       : dispatch(ToggleTheme(true));
   };
 
-  const readData = async () => {
-    await getData("domain").then(data => {
-      setDomain(data.value);
-      setDomainIsLoaded(true);
-    })
-  }
-
   const onLogoutPressed = () => {
     if(logoutOptionsIsLoaded) {
       console.log(logoutOptions);
       dispatch(logout(logoutOptions));
     }
     // removeData();
-    props.navigation.navigate("Start", { screen: "Domain" });
+    props.navigation.closeDrawer();
+    setOrders([]);
+    setUser(null);
   };
 
   const changeBranchStatus = () => {
@@ -90,15 +89,6 @@ export default function DrawerContent(props) {
     setLogoutOptionsIsLoaded(true);
   };
 
-
-  const readBranch = async () => {
-    try {
-      await getData("branch").then(value => setSelected(value))
-    } catch (e) {
-      console.log('Failed to fetch the input from storage');
-    }
-  };
-
   const toggleBranch = () => {
     setBranchEnabled(data => !data);
 
@@ -119,18 +109,13 @@ export default function DrawerContent(props) {
   };
 
   useEffect(() => {
-    readData();
-    readBranch();
-  });
-
-  useEffect(() => {
-    if(domainIsLoaded) {
+    if(domain) {
       changeBranchStatus();
       deliveronStatus();
       changeDeliveronStatus();
       readLogout();
     }
-  }, [domainIsLoaded])
+  }, [domain])
 
   useEffect(() => {
     if(deliveronIsLoaded) {
@@ -143,7 +128,7 @@ export default function DrawerContent(props) {
   useEffect(() => {
     if(branches?.length > 0) {
       branches?.map(e => {
-        if(e.value == selected){
+        if(e.value == branchid){
           if(e.enabled == 1) {
             setBranchEnabled(true);
           }else {
@@ -152,15 +137,15 @@ export default function DrawerContent(props) {
         }
       });
     }
-  }, [branches, selected])
+  }, [branches, branchid])
 
   useEffect(() => {
-    setOptions({...options, data: { branchid: selected, enabled: branchEnabled ? 0 : 1 }});
+    setOptions((prev) => ({...prev, data: { branchid: branchid, enabled: branchEnabled ? 0 : 1 }}));
     setIsBranchEnabled(true);
-  }, [branchEnabled, selected]);
+  }, [branchEnabled, branchid]);
 
   useEffect(() => {
-    setDeliveronChangeOptions({...deliveronChangeOptions, data: {enabled: deliveronEnabled ? 0 : 1}});
+    setDeliveronChangeOptions((prev) => ({...prev, data: {enabled: deliveronEnabled ? 0 : 1}}));
     setIsDeliveronEnabled(true);
   }, [deliveronEnabled])
 

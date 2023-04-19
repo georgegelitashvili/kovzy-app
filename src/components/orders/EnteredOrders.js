@@ -19,6 +19,7 @@ import {
 } from "@expo/vector-icons";
 import { Audio } from "expo-av";
 
+import { AuthContext, AuthProvider } from '../../context/AuthProvider';
 import { storeData, getData, getMultipleData } from "../../helpers/storage";
 import Loader from "../generate/loader";
 import { String, LanguageContext } from "../Language";
@@ -26,6 +27,7 @@ import { Request } from "../../axios/apiRequests";
 import OrdersDetail from "./OrdersDetail";
 import OrdersModal from "../modal/OrdersModal";
 import printRows from "../../PrintRows";
+import { PrivateValueStore } from "@react-navigation/native";
 
 const width = Dimensions.get("window").width;
 
@@ -35,21 +37,14 @@ const cardSize = width / numColumns;
 let ordersCount;
 let temp = 0;
 
-function LoadingAnimation() {
-  return (
-    <View style={styles.indicatorWrapper}>
-      <ActivityIndicator size="large" style={styles.indicator}/>
-      <Text style={styles.indicatorText}>Loading orders...</Text>
-    </View>
-  );
-}
-
 // render entered orders function
 export const EnteredOrdersList = (auth) => {
-  const [orders, setOrders] = useState([]);
+  // const [orders, setOrders] = useState([]);
 
-  const [domain, setDomain] = useState(null);
-  const [branchid, setBranchid] = useState(null);
+  const { domain, branchid, orders, setOrders } = useContext(AuthContext);
+
+  // const [domain, setDomain] = useState(null);
+  // const [branchid, setBranchid] = useState(null);
   const [domainIsLoaded, setDomainIsLoaded] = useState(false);
 
   const [options, setOptions] = useState({}); // api options
@@ -168,34 +163,38 @@ export const EnteredOrdersList = (auth) => {
 
   getData("rcml-lang").then((lang) => setLang(lang || "ka"));
 
+  console.log(orders);
+  // console.log(branchid);
+  // console.log(options);
+
+  // useEffect(() => {
+  //     readData();
+  // });
 
   useEffect(() => {
-      readData();
-  });
 
-  useEffect(() => {
-    if(domainIsLoaded) {
+    if(domain || branchid) {
       getOrders();
       readDataDeliveron();
       readDataAcceptOrder();
       readDataRejectOrder();
     }
-  }, [domainIsLoaded])
+
+  }, [domain, branchid])
+
+  // useEffect(() => {
+  //   if(branchid || domain) {
+  //     setOptionsIsLoaded(false);
+  //     setDomainIsLoaded(false);
+  //     setOrders([]);
+  //     setLoading(true);
+  //   }
+  // }, [branchid, domain])
 
   useEffect(() => {
-    if(branchid || domain) {
-      setOptionsIsLoaded(false);
-      setDomainIsLoaded(false);
-      setOrders([]);
-      setLoading(true);
-    }
-  }, [branchid, domain])
-
-  useEffect(() => {
-    if(auth === true) {
       const interval = setInterval(() => {
         if (optionsIsLoaded) {
-          Request(options).then((resp) => {setOrders(resp);});
+          Request(options).then((resp) => {console.log(resp);setOrders(resp);});
           setLoading(false);
         }
       }, 5000);
@@ -203,13 +202,12 @@ export const EnteredOrdersList = (auth) => {
       return () => {
         clearInterval(interval);
       };
-    }
-  }, [optionsIsLoaded, auth]);
+  }, [optionsIsLoaded]);
 
 
   useEffect(() => {
     if (itemId) {
-      setDeliveronOptions({ ...deliveronOptions, data: { orderId: itemId } });
+      setDeliveronOptions((prev) => ({ ...prev, data: { orderId: itemId } }));
       setIsDeliveronOptions(true);
       setLoadingOptions(true);
     }

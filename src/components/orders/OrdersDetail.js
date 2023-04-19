@@ -6,6 +6,7 @@ import {
   Text
 } from "react-native-paper";
 
+import { AuthContext, AuthProvider } from '../../context/AuthProvider';
 import { getData } from "../../helpers/storage";
 import { String, LanguageContext } from '../Language';
 import { Request } from "../../axios/apiRequests";
@@ -19,6 +20,7 @@ export default function OrdersDetail({ orderId, lang })
     const handlePress = () => setExpanded(!expanded);
 
     const [orderCart, setOrderCart] = useState([]);
+    const { domain, branchid, setUser } = useContext(AuthContext);
 
     const [options, setOptions] = useState({}); // api options
     const [optionsIsLoaded, setOptionsIsLoaded] = useState(false); // api options
@@ -30,7 +32,7 @@ export default function OrdersDetail({ orderId, lang })
           setOptions({
             method: "POST",
             data: {Orderid: orderId,lang: lang},
-            url: `https://${data.value}/api/getOrderCart`
+            url: `https://${domain}/api/getOrderCart`
           });
           setOptionsIsLoaded(true);
         })
@@ -49,7 +51,7 @@ export default function OrdersDetail({ orderId, lang })
 
       useEffect(() => {
         if(lang) {
-          setOptions({...options, data: {Orderid: orderId, lang: lang}})
+          setOptions((prev) => ({...prev, data: {Orderid: orderId, lang: lang}}))
         }
       }, [lang, orderId])
 

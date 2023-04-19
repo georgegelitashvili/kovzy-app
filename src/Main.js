@@ -11,6 +11,9 @@ import {
   Provider as PaperProvider,
 } from 'react-native-paper';
 
+import { AuthProvider } from "./context/AuthProvider";
+import { LanguageProvider } from './components/Language';
+
 import RootNavigator from "./RootNavigator";
 
 const CombinedDefaultTheme = {
@@ -36,10 +39,14 @@ export default function Main() {
   const themeMode = isdarkTheme ? CombinedDarkTheme : CombinedDefaultTheme;
 
   return (
-  <PaperProvider theme={themeMode}>
-    <NavigationContainer theme={themeMode}>
-      <RootNavigator />
-    </NavigationContainer>
-  </PaperProvider>
+    <AuthProvider>
+      <LanguageProvider>
+        <PaperProvider theme={themeMode}>
+          <NavigationContainer theme={themeMode}>
+            <RootNavigator />
+          </NavigationContainer>
+        </PaperProvider>
+      </LanguageProvider>
+    </AuthProvider>
   );
 };

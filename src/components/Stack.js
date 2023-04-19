@@ -35,7 +35,7 @@ const Header = (props) =>
   );
 };
 
-export default function StackNavigator () {
+export const HomeNavigator = () => {
   return (
     <Stack.Navigator
       screenOptions={{
@@ -43,10 +43,6 @@ export default function StackNavigator () {
         header: (props) => <Header {...props} />,
       }}
     >
-      <Stack.Screen name="Domain" options={{ headerShown: false }} component={DomainScreen} />
-      <Stack.Screen name="Branch" component={BranchScreen} />
-      <Stack.Screen name="Login" component={LoginScreen} />
-      
       <Stack.Screen name="Order" options={{ headerShown: false }}>
         {(props) => <Orders {...props} />}
       </Stack.Screen>
@@ -57,3 +53,19 @@ export default function StackNavigator () {
     </Stack.Navigator>
   );
 };
+
+
+export const AuthNavigator = () => {
+  return (
+    <Stack.Navigator
+      screenOptions={{
+        headerMode: "screen",
+        header: (props) => <Header {...props} />,
+      }}
+    >
+      <Stack.Screen name="Domain" options={{ headerShown: false }} component={DomainScreen} />
+      <Stack.Screen name="Branch" component={BranchScreen} />
+      <Stack.Screen name="Login" component={LoginScreen} />
+    </Stack.Navigator>
+  );
+}

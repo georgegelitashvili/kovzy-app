@@ -16,6 +16,7 @@ import {
   SimpleLineIcons,
 } from "@expo/vector-icons";
 
+import { AuthContext, AuthProvider } from '../../context/AuthProvider';
 import { storeData, getData, getMultipleData } from "../../helpers/storage";
 import Loader from "../generate/loader";
 import { String, LanguageContext } from "../Language";
@@ -32,9 +33,10 @@ const cardSize = width / numColumns;
 // render accepted orders function
 export const AcceptedOrdersList = (auth) => {
   const [orders, setOrders] = useState([]);
+  const { domain, branchid, setUser } = useContext(AuthContext);
 
-  const [domain, setDomain] = useState(null);
-  const [branchid, setBranchid] = useState(null);
+  // const [domain, setDomain] = useState(null);
+  // const [branchid, setBranchid] = useState(null);
   const [domainIsLoaded, setDomainIsLoaded] = useState(false);
 
   const [options, setOptions] = useState({}); // api options
@@ -134,41 +136,39 @@ export const AcceptedOrdersList = (auth) => {
 
   getData("rcml-lang").then((lang) => setLang(lang || "ka"));
 
-  useEffect(() => {
-    readData();
-  });
+  // useEffect(() => {
+  //   readData();
+  // });
 
   useEffect(() => {
-    if(domainIsLoaded) {
+    if(domain) {
       getOrders();
       readDeliveronStatus();
       readDataDeliveron();
       readDataPreparedOrder();
       readDataRejectOrder();
     }
-  }, [domainIsLoaded])
+  }, [domain])
+
+  // useEffect(() => {
+  //   if(branchid || domain) {
+  //     setOptionsIsLoaded(false);
+  //     setDomainIsLoaded(false);
+  //     setOrders([]);
+  //   }
+  // }, [branchid, domain])
 
   useEffect(() => {
-    if(branchid || domain) {
-      setOptionsIsLoaded(false);
-      setDomainIsLoaded(false);
-      setOrders([]);
-    }
-  }, [branchid, domain])
+    const interval = setInterval(() => {
+      if (optionsIsLoaded) {
+        Request(options).then((resp) => setOrders(resp));
+      }
+    }, 5000);
 
-  useEffect(() => {
-    if(auth === true) {
-      const interval = setInterval(() => {
-        if (optionsIsLoaded) {
-          Request(options).then((resp) => setOrders(resp));
-        }
-      }, 5000);
-
-      return () => {
-        clearInterval(interval);
-      };
-    }
-  }, [optionsIsLoaded, auth]);
+    return () => {
+      clearInterval(interval);
+    };
+  }, [optionsIsLoaded]);
 
 
   useEffect(() => {

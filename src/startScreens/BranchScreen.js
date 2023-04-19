@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import Background from '../components/generate/Background';
 import Header from '../components/generate/Header';
@@ -7,15 +7,21 @@ import Button from '../components/generate/Button';
 import Paragraph from '../components/generate/Paragraph';
 import SelectOption from '../components/generate/SelectOption';
 import { storeData, getData } from '../helpers/storage';
-import { getBranches, getDeliveron } from '../redux/Actions'
+import Loader from "../components/generate/loader";
+import { AuthContext, AuthProvider } from '../context/AuthProvider';
+import { getBranches } from '../redux/Actions'
 
 export const BranchScreen = ({ navigation }) => {
   const { branches } = useSelector((state) => state.branchesReducer);
-  const [branch, setBranch] = useState({data: branches, error: ''});
-  const [selected, setSelected] = useState(null);
+  const { domain, branchid } = useContext(AuthContext);
 
-  const [domain, setDomain] = useState(null);
-  const [domainIsLoaded, setDomainIsLoaded] = useState(false);
+  const [branch, setBranch] = useState({data: branches, error: ''});
+  const [selected, setSelected] = useState(branchid);
+
+  // const [domain, setDomain] = useState(null);
+  // const [domainIsLoaded, setDomainIsLoaded] = useState(false);
+
+  const [isLoading, setIsLoading] = useState(true);
 
   const [options, setOptions] = useState({}); // api options
   const [optionsIsLoaded, setOptionsIsLoaded] = useState(false); // check api options is loaded
@@ -27,7 +33,7 @@ export const BranchScreen = ({ navigation }) => {
     })
   }
 
-  const branchApi = async () => {
+  const branchApi = () => {
     setOptions({
       method: "POST",
       url: `https://${domain}/api/branches`
@@ -48,22 +54,21 @@ export const BranchScreen = ({ navigation }) => {
       setBranch({ ...branch, error: 'Branch must choose!'});
       return;
     }
+
     navigation.navigate("Login");
   };
 
   const dispatch = useDispatch();
   const fetchBranches = () => {dispatch(getBranches(options))};
 
-  useEffect(() => {
-    readData();
-  });
+  console.log(domain);
 
   useEffect(() => {
-    if(domainIsLoaded) {
+    // readBranch();
+    if(domain) {
       branchApi();
-      readBranch();
     }
-  }, [domainIsLoaded])
+  }, [domain])
 
   useEffect(() => {
     if(optionsIsLoaded) {
@@ -73,7 +78,8 @@ export const BranchScreen = ({ navigation }) => {
 
   useEffect(() => {
     if(branches) {
-      setBranch({data: branches, error: ''})
+      setBranch({data: branches, error: ''});
+      setIsLoading(false);
     }
   }, [branches]);
 
@@ -84,8 +90,8 @@ export const BranchScreen = ({ navigation }) => {
   }, [selected]);
 
 
-  if(branches?.length == 0){
-    return null;
+  if(isLoading) {
+    return <Loader text="loading"/>
   }
 
   return (
@@ -93,7 +99,7 @@ export const BranchScreen = ({ navigation }) => {
         <Logo />
 
       <SelectOption
-        value={selected || null}
+        value={selected}
         onValueChange={(value) => {setSelected(value);setBranch({ ...branch, error: '' });}}
         items={branch?.data || ''}
         key={(item)=> item?.id || ''}

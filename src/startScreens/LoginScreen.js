@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { TouchableOpacity, StyleSheet, View } from 'react-native'
 import { Text } from 'react-native-paper'
@@ -10,6 +10,7 @@ import { theme } from '../core/theme'
 import { nameValidator } from '../helpers/nameValidator'
 import { passwordValidator } from '../helpers/passwordValidator'
 import { storeData, getData } from "../helpers/storage";
+import { AuthContext, AuthProvider } from '../context/AuthProvider';
 import { login } from '../redux/Actions'
 
 // 'alexander.tsintsadze'
@@ -18,11 +19,13 @@ import { login } from '../redux/Actions'
 export const LoginScreen = ({ navigation }) => {
   const { isLoggingIn } = useSelector((state) => state.authReducer);
   const { loginError } = useSelector((state) => state.authReducer);
+  const { domain, setUser } = useContext(AuthContext);
+
   const [name, setName] = useState({ value: '', error: '' });
   const [password, setPassword] = useState({ value: '', error: '' });
 
-  const [domain, setDomain] = useState(null);
-  const [domainIsLoaded, setDomainIsLoaded] = useState(false);
+  // const [domain, setDomain] = useState(null);
+  // const [domainIsLoaded, setDomainIsLoaded] = useState(false);
 
   const [options, setOptions] = useState({}); // api options
   const [optionsIsLoaded, setOptionsIsLoaded] = useState(false); // check api options is loaded
@@ -36,10 +39,10 @@ export const LoginScreen = ({ navigation }) => {
   }
 
 
-  const loginOptions = async () => {
+  const loginOptions = () => {
     setOptions({
       method: "POST",
-      url: `https://${domain}/api/auth/login`,
+      url: `https://${domain}/api/auth/login`
     });
     setOptionsIsLoaded(true);
   };
@@ -63,21 +66,28 @@ export const LoginScreen = ({ navigation }) => {
     }
   }
 
-  useEffect(() => {
-    readData();
-  });
+  // useEffect(() => {
+  //   readData();
+  // });
+
+  // console.log('-------------------- login');
+  // console.log(domain);
+  // console.log(options);
+  // console.log(optionsIsLoaded);
+  // console.log('-------------------- end login');
+
 
   // get options value
   useEffect(() => {
-    if(domainIsLoaded) {
+    if(domain) {
       loginOptions();
     }
-  }, [domainIsLoaded]);
+  }, [domain]);
 
   // if name or password changed
   useEffect(() => {
-    if(options) {
-      setOptions({...options, data: {username: name.value, password: password.value}});
+    if(name && password) {
+      setOptions((prev) => ({ ...prev, data: {username: name.value, password: password.value }}));
     }
   }, [name, password]);
 
@@ -91,9 +101,11 @@ export const LoginScreen = ({ navigation }) => {
   // if admin is authorized redirects to orders
   useEffect(() => {
     if(isLoggingIn) {
-      navigation.navigate("Orders", { screen: "Order" });
+      setUser('gio');
+      // navigation.navigate("Orders", { screen: "Order" });
     }
   }, [isLoggingIn])
+
 
   return (
     <Background>
