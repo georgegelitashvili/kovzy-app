@@ -9,29 +9,21 @@ export const AuthProvider = ({ children }) => {
     const [domain, setDomain] = useState(null);
     const [branchid, setBranchid] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
-    const [isDataSet, setIsDateSet] = useState(false);
-    const [orders, setOrders] = useState([]);
+    const [isDataSet, setIsDataSet] = useState(false);
 
     const readData = async () => {
         await getMultipleData(["domain", "branch"]).then((data) => {
-            console.log('----------- authProvider');
-            console.log(data);
-            console.log('----------- end authProvider');
-
             let domain = JSON.parse(data[0][1]);
             let branchid = JSON.parse(data[1][1]);
 
             setDomain(domain);
             setBranchid(branchid);
-            setIsDateSet(true);
           });
       }
 
       useEffect(() => {
-        if(isDataSet) {
-            readData();
-        }
-      }, [isDataSet])
+        readData();
+      })
 
     return(
         <AuthContext.Provider
@@ -41,9 +33,7 @@ export const AuthProvider = ({ children }) => {
                 isLoading,
                 domain,
                 branchid,
-                orders,
-                setOrders,
-                setIsDateSet,
+                setIsDataSet,
                 login: (username, password) => {
                     setUser('giorgi');
                 },

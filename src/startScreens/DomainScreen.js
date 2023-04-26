@@ -1,13 +1,15 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useContext } from 'react';
 import Background from '../components/generate/Background';
 import Logo from '../components/generate/Logo';
 import Button from '../components/generate/Button';
 import TextField from '../components/generate/TextField';
+import { AuthContext, AuthProvider } from '../context/AuthProvider';
 import { domainValidator } from '../helpers/domainValidator';
 import { storeData, getData } from '../helpers/storage';
 
 
 export const DomainScreen = ({ navigation }) => {
+  const { setIsDataSet } = useContext(AuthContext);
     const [domain, setDomain] = useState({ value: "", error: "" });
 
     const readData = async () => {
@@ -24,11 +26,8 @@ export const DomainScreen = ({ navigation }) => {
         setDomain({ ...domain, error: domainError })
         return
       }
-
-      console.log('------------------- domain');
-      console.log(domain.value);
-      console.log('------------------- end domain');
       storeData("domain", domain.value);
+      setIsDataSet(true);
 
       navigation.navigate("Branch");
     };
@@ -36,15 +35,6 @@ export const DomainScreen = ({ navigation }) => {
     useEffect(() => {
       readData();
     }, []);
-
-    // useEffect(() => {
-    //   if(domain.value) {
-    //     console.log('------------------- domain');
-    //     console.log(domain.value);
-    //     console.log('------------------- end domain');
-    //     storeData("domain", domain.value);
-    //   }
-    // }, [domain.value])
 
   return (
     <Background>

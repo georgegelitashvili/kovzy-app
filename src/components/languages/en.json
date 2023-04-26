@@ -40,6 +40,7 @@
     "makePreferred" : "Make preferred",
     "cardUpdated" : "Card data update is successful",
     "preferredUpdated" : "Preferred card was changed",
+    "loading" : "Is loading...",
     "inf.contract": "Please read the contract and select the appropriate field",
     "nav.ordersReport": "Orders Report",
     "nav.pendingOrders": "Pending Orders",

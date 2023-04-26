@@ -24,19 +24,8 @@ export const LoginScreen = ({ navigation }) => {
   const [name, setName] = useState({ value: '', error: '' });
   const [password, setPassword] = useState({ value: '', error: '' });
 
-  // const [domain, setDomain] = useState(null);
-  // const [domainIsLoaded, setDomainIsLoaded] = useState(false);
-
   const [options, setOptions] = useState({}); // api options
   const [optionsIsLoaded, setOptionsIsLoaded] = useState(false); // check api options is loaded
-
-
-  const readData = async () => {
-    await getData("domain").then(data => {
-      setDomain(data.value);
-      setDomainIsLoaded(true);
-    })
-  }
 
 
   const loginOptions = () => {
@@ -65,10 +54,6 @@ export const LoginScreen = ({ navigation }) => {
       fetchLogin();
     }
   }
-
-  // useEffect(() => {
-  //   readData();
-  // });
 
   // console.log('-------------------- login');
   // console.log(domain);
@@ -102,7 +87,6 @@ export const LoginScreen = ({ navigation }) => {
   useEffect(() => {
     if(isLoggingIn) {
       setUser('gio');
-      // navigation.navigate("Orders", { screen: "Order" });
     }
   }, [isLoggingIn])
 

@@ -16,8 +16,8 @@ export default function OrdersModalContent(props) {
 
     const finishOrder = () => {
       if(options) {
-        console.log(options);
-        return;
+        // console.log(options);
+        // return;
         Request(options).then(resp => {
           if(resp.status == 0) {
             alert(dictionary['orders.declined']);

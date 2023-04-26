@@ -18,20 +18,10 @@ export const BranchScreen = ({ navigation }) => {
   const [branch, setBranch] = useState({data: branches, error: ''});
   const [selected, setSelected] = useState(branchid);
 
-  // const [domain, setDomain] = useState(null);
-  // const [domainIsLoaded, setDomainIsLoaded] = useState(false);
-
   const [isLoading, setIsLoading] = useState(true);
 
   const [options, setOptions] = useState({}); // api options
   const [optionsIsLoaded, setOptionsIsLoaded] = useState(false); // check api options is loaded
-
-  const readData = async () => {
-    await getData("domain").then(data => {
-      setDomain(data.value);
-      setDomainIsLoaded(true);
-    })
-  }
 
   const branchApi = () => {
     setOptions({
@@ -39,14 +29,6 @@ export const BranchScreen = ({ navigation }) => {
       url: `https://${domain}/api/branches`
     });
     setOptionsIsLoaded(true);
-  };
-
-  const readBranch = async () => {
-    try {
-      await getData("branch").then(value => value ? setSelected(value) : '')
-    } catch (e) {
-      console.log('Failed to fetch the input from storage');
-    }
   };
 
   const onCheckPressed = () => {
@@ -61,10 +43,7 @@ export const BranchScreen = ({ navigation }) => {
   const dispatch = useDispatch();
   const fetchBranches = () => {dispatch(getBranches(options))};
 
-  console.log(domain);
-
   useEffect(() => {
-    // readBranch();
     if(domain) {
       branchApi();
     }
@@ -91,7 +70,7 @@ export const BranchScreen = ({ navigation }) => {
 
 
   if(isLoading) {
-    return <Loader text="loading"/>
+    return <Loader />
   }
 
   return (
