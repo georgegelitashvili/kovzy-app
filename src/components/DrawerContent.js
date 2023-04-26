@@ -1,7 +1,7 @@
 import React, { useState, useContext, useEffect } from "react";
 import { View, StyleSheet } from "react-native";
 import { useIsFocused } from '@react-navigation/native';
-import { DrawerItem, DrawerContentScrollView, useDrawerStatus } from "@react-navigation/drawer";
+import { DrawerItem, DrawerContentScrollView } from "@react-navigation/drawer";
 import { Drawer, Text, TouchableRipple, Switch } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { ToggleTheme, logout } from "../redux/Actions";
@@ -19,7 +19,7 @@ export default function DrawerContent(props) {
   const isFocused = useIsFocused();
   const { branches } = useSelector((state) => state.branchesReducer);
   const { isdarkTheme } = useSelector((state) => state.themeReducer);
-  const { domain, branchid, setUser, setOrders } = useContext(AuthContext);
+  const { domain, branchid, setUser, setIsDataSet } = useContext(AuthContext);
   const { dictionary } = useContext(LanguageContext);
 
   // const [domain, setDomain] = useState(null);
@@ -39,8 +39,6 @@ export default function DrawerContent(props) {
   const [isBranchEnabled, setIsBranchEnabled] = useState(false);
   const [isDeliveronEnabled, setIsDeliveronEnabled] = useState(false);
 
-  const isDrawerOpen = useDrawerStatus() === 'open';
-
   const switchDarkTheme = () => {
     return isdarkTheme
       ? dispatch(ToggleTheme(false))
@@ -52,9 +50,9 @@ export default function DrawerContent(props) {
       console.log(logoutOptions);
       dispatch(logout(logoutOptions));
     }
-    // removeData();
+    removeData();
     props.navigation.closeDrawer();
-    setOrders([]);
+    setIsDataSet(false);
     setUser(null);
   };
 

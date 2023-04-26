@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext, useCallback } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import {
   StyleSheet,
   View,
@@ -7,6 +7,7 @@ import {
 } from "react-native";
 import { Text, Button, Divider, Card } from "react-native-paper";
 import { FlatGrid } from "react-native-super-grid";
+import { AuthContext, AuthProvider } from './context/AuthProvider';
 import { getData } from "./helpers/storage";
 import Loader from "./components/generate/loader";
 import { String, LanguageContext } from "./components/Language";
@@ -17,7 +18,9 @@ const width = Dimensions.get("window").width;
 export default function Products({ navigation }) {
   const [products, setProducts] = useState([]);
 
-  const [domain, setDomain] = useState(null);
+  const { domain } = useContext(AuthContext);
+
+  // const [domain, setDomain] = useState(null);
   const [domainIsLoaded, setDomainIsLoaded] = useState(false);
 
   const [page, setPage] = useState(1);
@@ -40,13 +43,6 @@ export default function Products({ navigation }) {
 
   getData("rcml-lang").then((lang) => setLang(lang || "ka"));
 
-  const readData = async () => {
-    await getData("domain").then((data) => {
-      setDomain(data.value);
-      setDomainIsLoaded(true);
-    });
-  };
-
   const readDomain = () => {
     setOptions({
       method: "POST",
@@ -64,19 +60,15 @@ export default function Products({ navigation }) {
   };
 
   useEffect(() => {
-    readData();
-  });
-
-  useEffect(() => {
-    if(domainIsLoaded) {
+    if(domain) {
       readDomain();
       productActivity();
     }
-  }, [domainIsLoaded])
+  }, [domain])
 
   useEffect(() => {
     if (optionsIsLoaded && (page || lang)) {
-      setOptions({ ...options, data: { lang: lang, page: page } });
+      setOptions((prev) => ({ ...prev, data: { lang: lang, page: page } }));
       setSendApi(true);
       setLoading(true);
     }
@@ -96,7 +88,7 @@ export default function Products({ navigation }) {
 
   useEffect(() => {
     if(activityOptionsIsLoaded && value) {
-      setActivityOptions({...activityOptions, data: {pid: value, enabled: enabled}});
+      setActivityOptions((prev) => ({...prev, data: {pid: value, enabled: enabled}}));
       setSendEnabled(true);
     }
   }, [activityOptionsIsLoaded, value, enabled])
@@ -143,7 +135,7 @@ export default function Products({ navigation }) {
   };
 
   if(loading) {
-    return (<Loader text="Loading products"/>)
+    return (<Loader />)
   }
 
   return (

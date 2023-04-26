@@ -33,11 +33,7 @@ const cardSize = width / numColumns;
 // render accepted orders function
 export const AcceptedOrdersList = (auth) => {
   const [orders, setOrders] = useState([]);
-  const { domain, branchid, setUser } = useContext(AuthContext);
-
-  // const [domain, setDomain] = useState(null);
-  // const [branchid, setBranchid] = useState(null);
-  const [domainIsLoaded, setDomainIsLoaded] = useState(false);
+  const { domain, branchid } = useContext(AuthContext);
 
   const [options, setOptions] = useState({}); // api options
   const [optionsIsLoaded, setOptionsIsLoaded] = useState(false); // api options
@@ -60,16 +56,6 @@ export const AcceptedOrdersList = (auth) => {
 
   const { dictionary } = useContext(LanguageContext);
 
-  const readData = async () => {
-    await getMultipleData(["domain", "branch"]).then((data) => {
-      let domain = [JSON.parse(data[0][1])].map((e) => e.value);
-      let branchid = data[1][1];
-
-      setDomain(domain[0]);
-      setBranchid(branchid);
-      setDomainIsLoaded(true);
-    });
-  }
 
   const onChangeModalState = useCallback((newState) => {
     setTimeout(() => {
@@ -136,32 +122,24 @@ export const AcceptedOrdersList = (auth) => {
 
   getData("rcml-lang").then((lang) => setLang(lang || "ka"));
 
-  // useEffect(() => {
-  //   readData();
-  // });
-
   useEffect(() => {
-    if(domain) {
+    if(domain && branchid) {
       getOrders();
       readDeliveronStatus();
       readDataDeliveron();
       readDataPreparedOrder();
       readDataRejectOrder();
+    }else if(domain || branchid) {
+      setOptionsIsLoaded(false);
+      setOrders([]);
     }
-  }, [domain])
-
-  // useEffect(() => {
-  //   if(branchid || domain) {
-  //     setOptionsIsLoaded(false);
-  //     setDomainIsLoaded(false);
-  //     setOrders([]);
-  //   }
-  // }, [branchid, domain])
+  }, [domain, branchid])
 
   useEffect(() => {
     const interval = setInterval(() => {
       if (optionsIsLoaded) {
         Request(options).then((resp) => setOrders(resp));
+        setLoading(false);
       }
     }, 5000);
 
@@ -261,13 +239,13 @@ export const AcceptedOrdersList = (auth) => {
     );
   };
 
-  if (orders?.length == 0 || orders == null) {
-    return null;
+  if(loading) {
+    return (<Loader />)
   }
 
   return (
     <View style={{flex: 1}}>
-      {loadingOptions ? <Loader text="Loading options"/> : null}
+      {loadingOptions ? <Loader /> : null}
       <ScrollView horizontal={true} showsVerticalScrollIndicator={false}>
         {visible ? (
           <OrdersModal

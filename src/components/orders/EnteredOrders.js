@@ -39,12 +39,9 @@ let temp = 0;
 
 // render entered orders function
 export const EnteredOrdersList = (auth) => {
-  // const [orders, setOrders] = useState([]);
+  const [orders, setOrders] = useState([]);
+  const { domain, branchid } = useContext(AuthContext);
 
-  const { domain, branchid, orders, setOrders } = useContext(AuthContext);
-
-  // const [domain, setDomain] = useState(null);
-  // const [branchid, setBranchid] = useState(null);
   const [domainIsLoaded, setDomainIsLoaded] = useState(false);
 
   const [options, setOptions] = useState({}); // api options
@@ -66,17 +63,6 @@ export const EnteredOrdersList = (auth) => {
   const [loadingOptions, setLoadingOptions] = useState(false);
 
   const { dictionary } = useContext(LanguageContext);
-
-  const readData = async () => {
-    await getMultipleData(["domain", "branch"]).then((data) => {
-      let domain = [JSON.parse(data[0][1])].map((e) => e.value);
-      let branchid = data[1][1];
-
-      setDomain(domain[0]);
-      setBranchid(branchid);
-      setDomainIsLoaded(true);
-    });
-  }
 
   const onChangeModalState = (newState) => {
     setTimeout(() => {
@@ -157,44 +143,29 @@ export const EnteredOrdersList = (auth) => {
   // modal show
   const showModal = (type) => {
     setModalType(type);
-    console.log(deliveron);
     setVisible(true);
   };
 
   getData("rcml-lang").then((lang) => setLang(lang || "ka"));
 
-  console.log(orders);
-  // console.log(branchid);
-  // console.log(options);
-
-  // useEffect(() => {
-  //     readData();
-  // });
-
   useEffect(() => {
-
-    if(domain || branchid) {
+    if(domain && branchid) {
       getOrders();
       readDataDeliveron();
       readDataAcceptOrder();
       readDataRejectOrder();
+    }else if(domain || branchid) {
+      setOptionsIsLoaded(false);
+      setOrders([]);
     }
-
   }, [domain, branchid])
 
-  // useEffect(() => {
-  //   if(branchid || domain) {
-  //     setOptionsIsLoaded(false);
-  //     setDomainIsLoaded(false);
-  //     setOrders([]);
-  //     setLoading(true);
-  //   }
-  // }, [branchid, domain])
 
   useEffect(() => {
       const interval = setInterval(() => {
         if (optionsIsLoaded) {
-          Request(options).then((resp) => {console.log(resp);setOrders(resp);});
+          console.log(options);
+          Request(options).then((resp) => {setOrders(resp);});
           setLoading(false);
         }
       }, 5000);
@@ -306,18 +277,20 @@ export const EnteredOrdersList = (auth) => {
   };
 
   if(loading) {
-    return (<Loader text="Loading orders"/>)
+    return (<Loader />)
   }
 
-  // console.log('------------ entered orders');
-  // console.log(orders);
-  // console.log('------------ end entered orders');
+  console.log('------------ entered orders');
+  console.log(orders);
+  console.log(branchid);
+  console.log(optionsIsLoaded);
+  console.log('------------ end entered orders');
 
   // console.log(orders);
 
   return (
     <View style={{flex: 1}}>
-      {loadingOptions ? <Loader text="Loading options"/> : null}
+      {loadingOptions ? <Loader /> : null}
       <ScrollView horizontal={true} showsVerticalScrollIndicator={false}>
         {visible ? (
           <OrdersModal

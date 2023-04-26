@@ -65,7 +65,7 @@ export default function OrdersModalContent(props) {
 
         <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
         <View style={styles.content}>
-        {loading ? <Loader text="Preparing order"/> : null}
+        {loading ? <Loader /> : null}
           <Text textColor="black" style={styles.contentTitle}>{dictionary['orders.approvingWarning']}</Text>
           <TextField
               label={dictionary['general.AOPT']}

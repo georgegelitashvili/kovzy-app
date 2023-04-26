@@ -1,11 +1,14 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import { ActivityIndicator, StyleSheet, View, Text } from 'react-native';
+import { String, LanguageContext } from "../Language";
 
 export default function Loader(props) {
+  const { dictionary } = useContext(LanguageContext);
+
     return (
       <View style={styles.indicatorWrapper}>
         <ActivityIndicator animating={true} size="large" style={styles.indicator}/>
-        <Text style={styles.indicatorText}>{props.text}</Text>
+        <Text style={styles.indicatorText}>{dictionary['loading']}</Text>
       </View>
     );
   }
