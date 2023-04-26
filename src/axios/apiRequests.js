@@ -1,10 +1,12 @@
 import axios from "axios";
-import { log } from "react-native-reanimated";
 
-// Construct api headers
-const headers = {
+// Construct api config
+const config = {
+    headers: {
     'Accept': "application/json",
-    'Content-Type': "application/json",
+    'Content-Type' : 'application/json'
+    },
+    withCredentials: true
   };
 
 
@@ -28,7 +30,7 @@ export const Request = async (options) => {
           }
         );
 
-         return await axios(options, headers)
+         return await axios(options, config)
             .then((response) => {
               const items = response.data.data;
               return items;
