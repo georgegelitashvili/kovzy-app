@@ -164,7 +164,7 @@ export const EnteredOrdersList = (auth) => {
   useEffect(() => {
       const interval = setInterval(() => {
         if (optionsIsLoaded) {
-          console.log(options);
+          // console.log(options);
           Request(options).then((resp) => {setOrders(resp);});
           setLoading(false);
         }
@@ -280,11 +280,11 @@ export const EnteredOrdersList = (auth) => {
     return (<Loader />)
   }
 
-  console.log('------------ entered orders');
-  console.log(orders);
-  console.log(branchid);
-  console.log(optionsIsLoaded);
-  console.log('------------ end entered orders');
+  // console.log('------------ entered orders');
+  // console.log(orders);
+  // console.log(branchid);
+  // console.log(optionsIsLoaded);
+  // console.log('------------ end entered orders');
 
   // console.log(orders);
 

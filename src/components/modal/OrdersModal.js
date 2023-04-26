@@ -7,7 +7,6 @@ import OrdersModalReject from "./OrdersModalReject";
 import OrdersModalStatus from "./OrdersModalStatus";
 
 const deviceWidth = Dimensions.get("window").width;
-
 const deviceHeight = Dimensions.get("window").height;
 
 export default function OrdersModal({

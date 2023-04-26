@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { Text, Button } from 'react-native-paper';
-import TextField from '../generate/TextField';
-import SelectOption from '../generate/SelectOption';
-import { StyleSheet, View, Keyboard, TouchableWithoutFeedback } from 'react-native';
+import { StyleSheet, View, Keyboard, TouchableWithoutFeedback, Alert } from 'react-native';
 import { Request } from "../../axios/apiRequests";
 import { String, LanguageContext } from '../Language';
 
@@ -14,10 +12,11 @@ export default function OrdersModalContent(props) {
 
     const rejectOrder = () => {
       if(options) {
-        // console.log(options);
         Request(options).then(resp => {
           if(resp.status == 0) {
-            alert(dictionary['orders.declined']);
+            Alert.alert("ALERT", dictionary['orders.declined'], [
+              {text: 'OK', onPress: () => props.hideModal()},
+            ]);
           }
         });
       }
@@ -38,7 +37,7 @@ export default function OrdersModalContent(props) {
 
             <View style={styles.buttonModal}>
               <Button mode="contained" textColor="white" style={styles.buttonReject} onPress={rejectOrder}>{dictionary['orders.reject']}</Button>
-              <Button mode="contained" textColor="white" style={styles.buttonClose} onPress={props. hideModal}>{dictionary['close']}</Button>
+              <Button mode="contained" textColor="white" style={styles.buttonClose} onPress={props.hideModal}>{dictionary['close']}</Button>
           </View>
         </View>
         </TouchableWithoutFeedback>

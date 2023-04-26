@@ -8,6 +8,7 @@ import { domainValidator } from '../helpers/domainValidator';
 import { storeData, getData } from '../helpers/storage';
 
 
+
 export const DomainScreen = ({ navigation }) => {
   const { setIsDataSet } = useContext(AuthContext);
     const [domain, setDomain] = useState({ value: "", error: "" });
@@ -30,6 +31,7 @@ export const DomainScreen = ({ navigation }) => {
       setIsDataSet(true);
 
       navigation.navigate("Branch");
+      
     };
 
     useEffect(() => {

@@ -1,6 +1,6 @@
-import React, { createContext, useState } from 'react'
+import React, { createContext, useState, useEffect } from 'react'
 import { storeData, getData, getMultipleData } from "../helpers/storage";
-import { useEffect } from 'react';
+import { DevSettings } from 'react-native';
 
 export const AuthContext = createContext();
 
@@ -39,6 +39,7 @@ export const AuthProvider = ({ children }) => {
                 },
                 logout: () => {
                     setUser(null);
+                    DevSettings.reload();
                 }
             }}
         >

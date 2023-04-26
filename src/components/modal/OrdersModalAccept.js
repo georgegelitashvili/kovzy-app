@@ -3,7 +3,7 @@ import { Text, Button } from 'react-native-paper';
 import TextField from '../generate/TextField';
 import SelectOption from '../generate/SelectOption';
 import Loader from "../generate/loader";
-import { StyleSheet, View, Keyboard, TouchableWithoutFeedback } from 'react-native';
+import { StyleSheet, View, Keyboard, TouchableWithoutFeedback, Alert } from 'react-native';
 import { Request } from "../../axios/apiRequests";
 import { String, LanguageContext } from '../Language';
 
@@ -28,7 +28,9 @@ export default function OrdersModalContent(props) {
         Request(options).then(resp => {
           if(resp.status == 0) {
             setLoading(false);
-            alert(dictionary['dv.orderSuccess']);
+            Alert.alert("ALERT", dictionary['dv.orderSuccess'], [
+              {text: 'OK', onPress: () => props.hideModal()},
+            ]);
           }
         });
       }
