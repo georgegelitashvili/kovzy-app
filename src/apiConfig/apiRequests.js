@@ -50,7 +50,6 @@ import { removeData } from "../helpers/storage";
         console.log(error.response.status);
         if(error.response.data.error.status_code === 401) {
           RootNavigation.navigate('Login', { message: 'Not authorized' });
-          DevSettings.reload();
         }else if(error.response.status === 404) {
           removeData();
           RootNavigation.navigate('Domain', { message: 'Not allowed' });
