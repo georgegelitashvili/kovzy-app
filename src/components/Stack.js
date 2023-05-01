@@ -1,8 +1,6 @@
-import React, { useState, useEffect, TouchableOpacity } from "react";
+import React from "react";
 import { createStackNavigator } from "@react-navigation/stack";
 import { Appbar, useTheme } from "react-native-paper";
-import { Platform } from 'react-native';
-import { FontAwesome } from "@expo/vector-icons";
 
 import { DomainScreen } from "../startScreens/DomainScreen";
 import { BranchScreen } from "../startScreens/BranchScreen";

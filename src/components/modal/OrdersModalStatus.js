@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { Text, Button, Divider } from 'react-native-paper';
-import { StyleSheet, View, Keyboard, TouchableWithoutFeedback } from 'react-native';
-import { Request } from "../../axios/apiRequests";
+import { StyleSheet, View, Keyboard, TouchableWithoutFeedback, Alert } from 'react-native';
+import axiosInstance from "../../apiConfig/apiRequests";
 import { String, LanguageContext } from '../Language';
 
 
 export default function OrdersModalContent(props) {
-    const [options, setOptions] = useState(props.deliveronOptions);
-    const [acceptOptions, setAcceptOptions] = useState(props.accept);
+    const [options, setOptions] = useState(props.options.url_checkOrderStatus);
+    const [acceptOptions, setAcceptOptions] = useState(props.options.url_orderPrepared);
+    const [statusData, setStatusDate] = useState({});
     const [status, setStatus] = useState(false);
     const [isDisabled, setDisabled] = useState(false);
     const [text, setText] = useState("");
@@ -15,49 +16,45 @@ export default function OrdersModalContent(props) {
     const { dictionary } = useContext(LanguageContext);
 
     const finishOrder = () => {
-      if(options) {
-        // console.log(options);
-        // return;
-        Request(options).then(resp => {
-          if(resp.status == 0) {
-            alert(dictionary['orders.declined']);
-          }
-        });
-      }
+      axiosInstance.post(acceptOptions, statusData.data).then(resp => {
+        if(resp.data.data.status == 0) {
+          Alert.alert("ALERT", dictionary['orders.prepared'], [
+            {text: 'OK', onPress: () => props.hideModal()},
+          ]);
+        }
+      });
     };
 
     useEffect(() => {
-      if(options) {
-        if(props.deliveron.status == 0) {
-          props.orders?.map((item) => {
-            if(item.id == props.itemId) {
-              const deliveronId = JSON.parse(item.deliveron_data);
-              if(deliveronId?.length == 0 || deliveronId['order_id_deliveron'] == null) {
-                setOptions({...props.accept, data: {
-                  Orderid: props.itemId,
-              }})
-              }else {
-                setOptions({...options, data: {
-                  deliveronOrderId: deliveronId['order_id_deliveron'],
-              }})
-                setStatus(true);
-              }
-
+      if(props.deliveron.status == 0) {
+        props.orders?.map((item) => {
+          if(item.id == props.itemId) {
+            const deliveronId = JSON.parse(item.deliveron_data);
+            if(deliveronId?.length == 0 || deliveronId['order_id_deliveron'] == null) {
+              setStatusDate({...statusData, data: {
+                Orderid: props.itemId,
+            }})
+            }else {
+              setStatusDate({...statusData, data: {
+                deliveronOrderId: deliveronId['order_id_deliveron'],
+            }})
+              setStatus(true);
             }
-          })
-        }else {
-          setOptions({...props.accept, data: {
-            Orderid: props.itemId,
-        }})
-        }
+
+          }
+        })
+      }else {
+        setStatusDate({...statusData, data: {
+          Orderid: props.itemId,
+        }});
+        setDisabled(false);
       }
     }, [props.itemId, props.deliveron.status])
 
     useEffect(() => {
       if(status) {
-        Request(options).then(resp => {
-          console.log(resp);
-          setText(resp.content);
+        axiosInstance.post(options, statusData.data).then(resp => {
+          setText(resp.data.data.content);
         });
         setDisabled(true);
         setStatus(false);

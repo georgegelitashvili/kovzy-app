@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback, useContext } from "react";
-import { useSelector, useDispatch } from "react-redux";
 import {
   StyleSheet,
   Dimensions,
@@ -8,26 +7,20 @@ import {
   TouchableOpacity,
   RefreshControl,
   Alert,
-  ActivityIndicator
+  ActivityIndicator,
 } from "react-native";
 import { Text, Button, Divider, Card } from "react-native-paper";
 import { FlatGrid } from "react-native-super-grid";
-import {
-  MaterialCommunityIcons,
-  FontAwesome,
-  SimpleLineIcons,
-} from "@expo/vector-icons";
+import { MaterialCommunityIcons, SimpleLineIcons } from "@expo/vector-icons";
 import { Audio } from "expo-av";
 
-import { AuthContext, AuthProvider } from '../../context/AuthProvider';
-import { storeData, getData, getMultipleData } from "../../helpers/storage";
+import { AuthContext, AuthProvider } from "../../context/AuthProvider";
 import Loader from "../generate/loader";
 import { String, LanguageContext } from "../Language";
-import { Request } from "../../axios/apiRequests";
+import axiosInstance from "../../apiConfig/apiRequests";
 import OrdersDetail from "./OrdersDetail";
 import OrdersModal from "../modal/OrdersModal";
 import printRows from "../../PrintRows";
-import { PrivateValueStore } from "@react-navigation/native";
 
 const width = Dimensions.get("window").width;
 
@@ -38,31 +31,26 @@ let ordersCount;
 let temp = 0;
 
 // render entered orders function
-export const EnteredOrdersList = (auth) => {
-  const [orders, setOrders] = useState([]);
+export const EnteredOrdersList = () => {
   const { domain, branchid } = useContext(AuthContext);
-
-  const [domainIsLoaded, setDomainIsLoaded] = useState(false);
+  const [orders, setOrders] = useState([]);
 
   const [options, setOptions] = useState({}); // api options
   const [optionsIsLoaded, setOptionsIsLoaded] = useState(false); // api options
   const [deliveronOptions, setDeliveronOptions] = useState({});
   const [isDeliveronOptions, setIsDeliveronOptions] = useState(false);
-  const [acceptOrderOptions, setAcceptOrderOptions] = useState({});
-  const [rejectOrderOptions, setRejectOrderOptions] = useState({});
 
   const [deliveron, setDeliveron] = useState([]);
   const [visible, setVisible] = useState(false); // modal state
   const [itemId, setItemId] = useState(null); //item id for modal
   const [isOpen, setOpenState] = useState([]); // my accordion state
-  const [lang, setLang] = useState("");
   const [modalType, setModalType] = useState("");
   const [sound, setSound] = useState(new Audio.Sound());
 
   const [loading, setLoading] = useState(true);
   const [loadingOptions, setLoadingOptions] = useState(false);
 
-  const { dictionary } = useContext(LanguageContext);
+  const { dictionary, userLanguage } = useContext(LanguageContext);
 
   const onChangeModalState = (newState) => {
     setTimeout(() => {
@@ -82,62 +70,41 @@ export const EnteredOrdersList = (auth) => {
 
   const onStopPlaySound = async () => {
     sound.stopAsync();
-  }
+  };
 
   const onPlaySound = async () => {
     const source = require("../../assets/audio/alert.mp3");
     try {
       await sound.loadAsync(source);
-      await sound.playAsync().then(async PlaybackStatus => {
-        setTimeout(() => {
-          sound.unloadAsync();
-        }, PlaybackStatus.playableDurationMillis)
-      }).catch(error => {
-        console.log(error)
-      })
+      await sound
+        .playAsync()
+        .then(async (PlaybackStatus) => {
+          setTimeout(() => {
+            sound.unloadAsync();
+          }, PlaybackStatus.playableDurationMillis);
+        })
+        .catch((error) => {
+          console.log(error);
+        });
     } catch (error) {
-      console.log(error)
+      console.log(error);
     }
-  }
+  };
 
   const orderReceived = () => {
     Alert.alert("ALERT", "***New Order Received***", [
-      {text: 'OK', onPress: () => onStopPlaySound()},
+      { text: "OK", onPress: () => onStopPlaySound() },
     ]);
-  }
+  };
 
-  const getOrders = () => {
+  const apiOptions = () => {
     setOptions({
-      method: "POST",
-      data: {
-        type: 0,
-        page: 1,
-        branchid: branchid,
-      },
-      url: `https://${domain}/api/getUnansweredOrders`,
+      url_unansweredOrders: `https://${domain}/api/getUnansweredOrders`,
+      url_deliveronRecheck: `https://${domain}/api/deliveronRecheck`,
+      url_acceptOrder: `https://${domain}/api/acceptOrder`,
+      url_rejectOrder: `https://${domain}/api/rejectOrder`,
     });
     setOptionsIsLoaded(true);
-  };
-
-  const readDataDeliveron = () => {
-    setDeliveronOptions({
-      method: "POST",
-      url: `https://${domain}/api/deliveronRecheck`,
-    });
-  };
-
-  const readDataAcceptOrder = () => {
-    setAcceptOrderOptions({
-      method: "POST",
-      url: `https://${domain}/api/acceptOrder`,
-    });
-  };
-
-  const readDataRejectOrder = () => {
-    setRejectOrderOptions({
-      method: "POST",
-      url: `https://${domain}/api/rejectOrder`,
-    });
   };
 
   // modal show
@@ -146,35 +113,35 @@ export const EnteredOrdersList = (auth) => {
     setVisible(true);
   };
 
-  getData("rcml-lang").then((lang) => setLang(lang || "ka"));
-
   useEffect(() => {
-    if(domain && branchid) {
-      getOrders();
-      readDataDeliveron();
-      readDataAcceptOrder();
-      readDataRejectOrder();
-    }else if(domain || branchid) {
+    if (domain && branchid) {
+      apiOptions();
+    } else if (domain || branchid) {
       setOptionsIsLoaded(false);
       setOrders([]);
     }
-  }, [domain, branchid])
-
+  }, [domain, branchid]);
 
   useEffect(() => {
-      const interval = setInterval(() => {
-        if (optionsIsLoaded) {
-          // console.log(options);
-          Request(options).then((resp) => {setOrders(resp);});
-          setLoading(false);
-        }
-      }, 5000);
+    const interval = setInterval(() => {
+      if (optionsIsLoaded) {
+        axiosInstance
+          .post(options.url_unansweredOrders, {
+            type: 0,
+            page: 1,
+            branchid: branchid,
+          })
+          .then((resp) => {
+            setOrders(resp.data.data);
+          });
+        setLoading(false);
+      }
+    }, 5000);
 
-      return () => {
-        clearInterval(interval);
-      };
+    return () => {
+      clearInterval(interval);
+    };
   }, [optionsIsLoaded]);
-
 
   useEffect(() => {
     if (itemId) {
@@ -184,29 +151,28 @@ export const EnteredOrdersList = (auth) => {
     }
   }, [itemId]);
 
-
   useEffect(() => {
     if (isDeliveronOptions) {
-      Request(deliveronOptions).then((resp) => setDeliveron(resp));
+      axiosInstance
+        .post(options.url_deliveronRecheck, deliveronOptions.data)
+        .then((resp) => {setDeliveron(resp.data.data)});
     }
   }, [isDeliveronOptions]);
 
   useEffect(() => {
-    if(deliveron) {
+    if (deliveron) {
       setLoadingOptions(false);
     }
-  },[deliveron])
-
+  }, [deliveron]);
 
   useEffect(() => {
     ordersCount = Object.keys(orders).length;
-    if(ordersCount > temp) {
+    if (ordersCount > temp) {
       onPlaySound();
       orderReceived();
     }
     temp = ordersCount;
-  }, [orders])
-
+  }, [orders]);
 
   const renderEnteredOrdersList = ({ item }) => {
     return (
@@ -247,7 +213,7 @@ export const EnteredOrdersList = (auth) => {
             </Text>
 
             <Divider />
-            <OrdersDetail orderId={item.id} lang={lang} />
+            <OrdersDetail orderId={item.id} />
             <Divider />
 
             <Text variant="titleLarge">{item.price} GEL</Text>
@@ -258,15 +224,19 @@ export const EnteredOrdersList = (auth) => {
                 buttonColor="#2fa360"
                 onPress={() => {
                   setItemId(item.id);
-                  showModal('accept');
+                  showModal("accept");
                 }}
               >
                 {dictionary["orders.accept"]}
               </Button>
-              <Button textColor="white" buttonColor="#f14c4c" onPress={() => {
+              <Button
+                textColor="white"
+                buttonColor="#f14c4c"
+                onPress={() => {
                   setItemId(item.id);
-                  showModal('reject');
-                }}>
+                  showModal("reject");
+                }}
+              >
                 {dictionary["orders.reject"]}
               </Button>
             </Card.Actions>
@@ -276,8 +246,8 @@ export const EnteredOrdersList = (auth) => {
     );
   };
 
-  if(loading) {
-    return (<Loader />)
+  if (loading) {
+    return <Loader />;
   }
 
   // console.log('------------ entered orders');
@@ -289,7 +259,7 @@ export const EnteredOrdersList = (auth) => {
   // console.log(orders);
 
   return (
-    <View style={{flex: 1}}>
+    <View style={{ flex: 1 }}>
       {loadingOptions ? <Loader /> : null}
       <ScrollView horizontal={true} showsVerticalScrollIndicator={false}>
         {visible ? (
@@ -301,18 +271,17 @@ export const EnteredOrdersList = (auth) => {
             deliveron={deliveron}
             deliveronOptions={deliveronOptions}
             type={modalType}
-            accept={acceptOrderOptions}
-            reject={rejectOrderOptions}
+            options={options}
           />
         ) : null}
-            <FlatGrid
-            itemDimension={cardSize}
-            data={orders || []}
-            renderItem={renderEnteredOrdersList}
-            adjustGridToStyles={true}
-            contentContainerStyle={{ justifyContent: "flex-start" }}
-            keyExtractor={(item) => item.id}
-          />
+        <FlatGrid
+          itemDimension={cardSize}
+          data={orders || []}
+          renderItem={renderEnteredOrdersList}
+          adjustGridToStyles={true}
+          contentContainerStyle={{ justifyContent: "flex-start" }}
+          keyExtractor={(item) => item.id}
+        />
       </ScrollView>
     </View>
   );

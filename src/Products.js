@@ -1,27 +1,22 @@
-import React, { useState, useEffect, useContext } from "react";
-import {
-  StyleSheet,
-  View,
-  TouchableOpacity,
-  Dimensions,
-} from "react-native";
+import React, { useState, useEffect, useContext, useCallback } from "react";
+import { StyleSheet, View, TouchableOpacity, Dimensions, RefreshControl } from "react-native";
 import { Text, Button, Divider, Card } from "react-native-paper";
 import { FlatGrid } from "react-native-super-grid";
-import { AuthContext, AuthProvider } from './context/AuthProvider';
-import { getData } from "./helpers/storage";
+import SelectOption from "./components/generate/SelectOption";
+import { AuthContext, AuthProvider } from "./context/AuthProvider";
 import Loader from "./components/generate/loader";
 import { String, LanguageContext } from "./components/Language";
-import { Request } from "./axios/apiRequests";
+import axiosInstance from "./apiConfig/apiRequests";
 
 const width = Dimensions.get("window").width;
 
 export default function Products({ navigation }) {
-  const [products, setProducts] = useState([]);
-
   const { domain } = useContext(AuthContext);
+  const [products, setProducts] = useState([]);
+  const [category, setCategory] = useState([]);
+  const [productData, setProductData] = useState({});
 
-  // const [domain, setDomain] = useState(null);
-  const [domainIsLoaded, setDomainIsLoaded] = useState(false);
+  const [selected, setSelected] = useState(null);
 
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
@@ -29,125 +24,166 @@ export default function Products({ navigation }) {
   const [options, setOptions] = useState({}); // api options
   const [optionsIsLoaded, setOptionsIsLoaded] = useState(false); // api options
   const [activityOptions, setActivityOptions] = useState({});
-  const [activityOptionsIsLoaded, setActivityOptionsIsLoaded] = useState(false); // api options
   const [sendApi, setSendApi] = useState(false);
   const [sendEnabled, setSendEnabled] = useState(false);
   const [value, setValue] = useState("");
   const [enabled, setEnabled] = useState("");
   const [productEnabled, setProductEnabled] = useState(false);
-  const [lang, setLang] = useState("");
 
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const { dictionary } = useContext(LanguageContext);
+  const { dictionary, userLanguage } = useContext(LanguageContext);
 
-  getData("rcml-lang").then((lang) => setLang(lang || "ka"));
 
-  const readDomain = () => {
+  const apiOptions = () => {
     setOptions({
-      method: "POST",
-      url: `https://${domain}/api/getProducts`,
+      url_getProducts: `https://${domain}/api/getProducts`,
+      url_productActivity: `https://${domain}/api/productActivity`,
     });
+
     setOptionsIsLoaded(true);
   };
 
-  const productActivity = () => {
-    setActivityOptions({
-      method: "POST",
-      url: `https://${domain}/api/productActivity`,
-    });
-    setActivityOptionsIsLoaded(true);
-  };
-
   useEffect(() => {
-    if(domain) {
-      readDomain();
-      productActivity();
+    if (domain) {
+      apiOptions();
     }
-  }, [domain])
-
-  useEffect(() => {
-    if (optionsIsLoaded && (page || lang)) {
-      setOptions((prev) => ({ ...prev, data: { lang: lang, page: page } }));
-      setSendApi(true);
-      setLoading(true);
-    }
-  }, [page, lang, optionsIsLoaded]);
+  }, [domain]);
 
   useEffect(() => {
     if (sendApi) {
-      Request(options).then((resp) => {
-        setProducts(resp);
-        setTotalPages(resp.total / resp.per_page);
-      });
+      fetchData();
       setSendApi(false);
       setLoading(false);
     }
   }, [sendApi]);
 
+  useEffect(() => {
+    if (optionsIsLoaded && (page || userLanguage || selected)) {
+      setProductData((prev) => ({ ...prev, data: { lang: userLanguage, page: page, categoryid: selected } }));
+      setSendApi(true);
+      setLoading(true);
+    }
+  }, [page, userLanguage, selected, optionsIsLoaded]);
 
   useEffect(() => {
-    if(activityOptionsIsLoaded && value) {
-      setActivityOptions((prev) => ({...prev, data: {pid: value, enabled: enabled}}));
+    if (value) {
+      setActivityOptions((prev) => ({
+        ...prev,
+        data: { pid: value, enabled: enabled },
+      }));
       setSendEnabled(true);
     }
-  }, [activityOptionsIsLoaded, value, enabled])
+  }, [value, enabled]);
 
   useEffect(() => {
-    if(sendEnabled) {
-      Request(activityOptions)
+    if (sendEnabled) {
+      axiosInstance.post(options.url_productActivity, activityOptions.data);
       setProductEnabled(true);
       setSendEnabled(false);
+      setLoading(true);
     }
-  }, [sendEnabled])
-
+  }, [sendEnabled]);
 
   useEffect(() => {
     if (productEnabled) {
-      Request(options).then((resp) => {
-        setProducts(resp);
-        setTotalPages(resp.total / resp.per_page);
-      });
+      fetchData();
       setProductEnabled(false);
       setSendApi(false);
+      setLoading(false);
     }
   }, [productEnabled]);
 
+  const fetchData = () => {
+    axiosInstance
+    .post(options.url_getProducts, productData.data)
+    .then((resp) => {
+      resp.data.category?.map((item) =>
+      setCategory((prev) => [
+        ...prev,
+        { label: item.name, value: item.id },
+      ])
+    )
+      setProducts(resp.data.data.data);
+      setTotalPages(resp.data.data.total / resp.data.data.per_page);
+    });
+  }
 
-  const renderProductList = (items) => {
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchData();
+    setSendApi(false);
+    setRefreshing(false);
+  });
+
+  const renderProductList = ({ item }) => {
     return (
-      <Card key={items.index}>
+      <Card key={item.index}>
         <Card.Content style={styles.cardContent}>
           <Text variant="titleMedium" style={styles.title}>
-            {items.item.name}
+            {item.name}
           </Text>
         </Card.Content>
 
-          <Card.Actions>
-                {items.item.enabled == 1 ? (
-                  <Button textColor="white" buttonColor="#f14c4c" style={styles.button} onPress={() => {setValue(items.item.id);setEnabled(0)}}>{dictionary['prod.disableProduct']}</Button>
-                ) : (
-                  <Button textColor="white" buttonColor="#2fa360" style={styles.button} onPress={() => {setValue(items.item.id);setEnabled(1)}}>{dictionary['prod.enableProduct']}</Button>
-                )}
-            </Card.Actions>
+        <Card.Actions>
+          {item.enabled == 1 ? (
+            <Button
+              textColor="white"
+              buttonColor="#f14c4c"
+              style={styles.button}
+              onPress={() => {
+                setValue(item.id);
+                setEnabled(0);
+              }}
+            >
+              {dictionary["prod.disableProduct"]}
+            </Button>
+          ) : (
+            <Button
+              textColor="white"
+              buttonColor="#2fa360"
+              style={styles.button}
+              onPress={() => {
+                setValue(item.id);
+                setEnabled(1);
+              }}
+            >
+              {dictionary["prod.enableProduct"]}
+            </Button>
+          )}
+        </Card.Actions>
       </Card>
     );
   };
 
-  if(loading) {
-    return (<Loader />)
+  if (loading) {
+    return <Loader />;
   }
 
   return (
     <>
+      <View style={{ paddingLeft: 10, paddingRight: 10 }}>
+        <SelectOption
+          value={selected}
+          onValueChange={(value) => {
+            setSelected(value);
+          }}
+          items={category || ""}
+          key={(item) => item?.id || ""}
+        />
+      </View>
       <FlatGrid
         itemDimension={width}
-        data={products.data || []}
+        data={products || []}
+        maxItemsPerRow={4}
         renderItem={renderProductList}
         adjustGridToStyles={true}
         contentContainerStyle={{ justifyContent: "flex-start" }}
         keyExtractor={(item) => item.id}
-        onEndReachedThreshold={0.5}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
       />
 
       <View style={styles.paginationContainer}>
@@ -211,7 +247,7 @@ const styles = StyleSheet.create({
   button: {
     fontSize: 13,
     marginTop: 25,
-    padding: 10
+    padding: 10,
   },
   cardContent: {
     flexDirection: "row",

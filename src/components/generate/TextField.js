@@ -32,7 +32,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.surface,
     ...Platform.select({
       ios: {
-        fontFamily: 'Roboto',
+        // fontFamily: 'Roboto',
         placeholderTextColor: '#ccc',
         textAlignVertical: 'top',
       },

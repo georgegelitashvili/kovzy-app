@@ -13,6 +13,7 @@ import {
 
 import { AuthProvider } from "./context/AuthProvider";
 import { LanguageProvider } from './components/Language';
+import { navigationRef } from './helpers/navigate';
 
 import RootNavigator from "./RootNavigator";
 
@@ -42,7 +43,7 @@ export default function Main() {
     <AuthProvider>
       <LanguageProvider>
         <PaperProvider theme={themeMode}>
-          <NavigationContainer theme={themeMode}>
+          <NavigationContainer theme={themeMode} ref={navigationRef}>
             <RootNavigator />
           </NavigationContainer>
         </PaperProvider>

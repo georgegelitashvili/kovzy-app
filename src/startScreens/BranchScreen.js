@@ -1,21 +1,19 @@
 import React, { useState, useEffect, useContext } from "react";
-import { useSelector, useDispatch } from "react-redux";
-import Background from '../components/generate/Background';
-import Header from '../components/generate/Header';
-import Logo from '../components/generate/Logo';
-import Button from '../components/generate/Button';
-import Paragraph from '../components/generate/Paragraph';
-import SelectOption from '../components/generate/SelectOption';
-import { storeData, getData } from '../helpers/storage';
+import Background from "../components/generate/Background";
+import Logo from "../components/generate/Logo";
+import Button from "../components/generate/Button";
+import SelectOption from "../components/generate/SelectOption";
+import { storeData } from "../helpers/storage";
 import Loader from "../components/generate/loader";
-import { AuthContext, AuthProvider } from '../context/AuthProvider';
-import { getBranches } from '../redux/Actions'
+import { AuthContext, AuthProvider } from "../context/AuthProvider";
+
+import axiosInstance from "../apiConfig/apiRequests";
 
 export const BranchScreen = ({ navigation }) => {
-  const { branches } = useSelector((state) => state.branchesReducer);
   const { domain, branchid } = useContext(AuthContext);
+  const [branches, setBranches] = useState([]);
 
-  const [branch, setBranch] = useState({data: branches, error: ''});
+  const [branch, setBranch] = useState({ data: branches || null, error: "" });
   const [selected, setSelected] = useState(branchid);
 
   const [isLoading, setIsLoading] = useState(true);
@@ -25,74 +23,84 @@ export const BranchScreen = ({ navigation }) => {
 
   const branchApi = () => {
     setOptions({
-      method: "POST",
-      url: `https://${domain}/api/branches`
+      url: `https://${domain}/api/branches`,
     });
     setOptionsIsLoaded(true);
   };
 
   const onCheckPressed = () => {
     if (selected === null) {
-      setBranch({ ...branch, error: 'Branch must choose!'});
+      setBranch({ ...branch, error: "Branch must choose!" });
       return;
     }
 
     navigation.navigate("Login");
   };
 
-  const dispatch = useDispatch();
-  const fetchBranches = () => {dispatch(getBranches(options))};
-
   useEffect(() => {
-    if(domain) {
+    if (domain) {
       branchApi();
     }
-  }, [domain])
+  }, [domain]);
 
   useEffect(() => {
-    if(optionsIsLoaded) {
-      fetchBranches();
+    if (optionsIsLoaded) {
+      axiosInstance.post(options.url).then((e) => {
+        // console.log('------------------ response');
+        // console.log(e);
+        // console.log('------------------ end response');
+        e.data.data?.map((item) =>
+          setBranches((prev) => [
+            ...prev,
+            { label: item.title, value: item.id, enabled: item.enabled },
+          ])
+        );
+      }).catch((error) => {
+        console.log(error.response);
+      });
     }
   }, [optionsIsLoaded]);
 
   useEffect(() => {
-    if(branches) {
-      setBranch({data: branches, error: ''});
+    if (branches) {
+      setBranch({ data: branches, error: "" });
       setIsLoading(false);
     }
   }, [branches]);
 
   useEffect(() => {
-    if(selected) {
+    if (selected) {
       storeData("branch", selected);
     }
   }, [selected]);
 
-
-  if(isLoading) {
-    return <Loader />
+  if (isLoading) {
+    return <Loader />;
   }
 
   return (
     <Background>
-        <Logo />
+      <Logo />
 
       <SelectOption
         value={selected}
-        onValueChange={(value) => {setSelected(value);setBranch({ ...branch, error: '' });}}
-        items={branch?.data || ''}
-        key={(item)=> item?.id || ''}
+        onValueChange={(value) => {
+          setSelected(value);
+          setBranch({ ...branch, error: "" });
+        }}
+        items={branch?.data || ""}
+        key={(item) => item?.id || ""}
         error={!!branch?.error}
-        errorText={branch?.error || ''}
+        errorText={branch?.error || ""}
       />
 
       <Button
         mode="contained"
-        style={{backgroundColor: '#000'}}
+        style={{ backgroundColor: "#000" }}
         onPress={onCheckPressed}
       >
         accept
       </Button>
     </Background>
-  )
-}
+  );
+};

@@ -27,27 +27,6 @@ const styles = StyleSheet.create({
     height: 50,
     marginVertical: 12,
   },
-  pickerSelect: {
-    fontSize: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 10,
-    borderRadius: 4,
-    color: 'black',
-    paddingRight: 30,
-    ...Platform.select({
-      ios: {
-        backgroundColor: theme.colors.surface,
-        border: '',
-        borderWidth: 1,
-        borderColor: 'gray',
-      },
-      android: {
-        backgroundColor: theme.colors.surface,
-        borderWidth: 1,
-        borderColor: '#000',
-      },
-    }),
-  },
   description: {
     fontSize: 13,
     color: theme.colors.secondary,

@@ -1,40 +1,27 @@
 import React, { useState, useContext, useEffect } from "react";
 import { View, StyleSheet } from "react-native";
-import { useIsFocused } from '@react-navigation/native';
 import { DrawerItem, DrawerContentScrollView } from "@react-navigation/drawer";
 import { Drawer, Text, TouchableRipple, Switch } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { ToggleTheme, logout } from "../redux/Actions";
 import { useDispatch, useSelector } from "react-redux";
-import { AuthContext, AuthProvider } from '../context/AuthProvider';
-import { storeData, getData, removeData } from '../helpers/storage';
-import LanguageSelector from './generate/LanguageSelector';
-import { Request } from "../axios/apiRequests";
-import { String, LanguageContext } from './Language';
-
-
+import { AuthContext, AuthProvider } from "../context/AuthProvider";
+import LanguageSelector from "./generate/LanguageSelector";
+import axiosInstance from "../apiConfig/apiRequests";
+import { String, LanguageContext } from "./Language";
 
 export default function DrawerContent(props) {
   const dispatch = useDispatch();
-  const isFocused = useIsFocused();
-  const { branches } = useSelector((state) => state.branchesReducer);
   const { isdarkTheme } = useSelector((state) => state.themeReducer);
-  const { domain, branchid, setUser, setIsDataSet } = useContext(AuthContext);
+  const { domain, branchid, logout } = useContext(AuthContext);
   const { dictionary } = useContext(LanguageContext);
-
-  // const [domain, setDomain] = useState(null);
-  const [domainIsLoaded, setDomainIsLoaded] = useState(false);
 
   const [options, setOptions] = useState({}); // api options
   const [optionsIsLoaded, setOptionsIsLoaded] = useState(false); // check api options is loaded
-  const [logoutOptions, setLogoutOptions] = useState({});
-  const [logoutOptionsIsLoaded, setLogoutOptionsIsLoaded] = useState(false);
-  const [selected, setSelected] = useState(null);
   const [branchEnabled, setBranchEnabled] = useState(false);
   const [deliveronEnabled, setDeliveronEnabled] = useState(false);
-  const[deliveronOptions, setDeliveronOptions] = useState({});
-  const[deliveronChangeOptions, setDeliveronChangeOptions] = useState({});
-  const [deliveronIsLoaded, setDeliveronIsLoaded] = useState(false);
+  const [branchChangeOptions, setBranchChangeOptions] = useState({});
+  const [deliveronChangeOptions, setDeliveronChangeOptions] = useState({});
 
   const [isBranchEnabled, setIsBranchEnabled] = useState(false);
   const [isDeliveronEnabled, setIsDeliveronEnabled] = useState(false);
@@ -45,113 +32,84 @@ export default function DrawerContent(props) {
       : dispatch(ToggleTheme(true));
   };
 
-  const onLogoutPressed = () => {
-    if(logoutOptionsIsLoaded) {
-      console.log(logoutOptions);
-      dispatch(logout(logoutOptions));
-    }
-    removeData();
-    props.navigation.closeDrawer();
-    setIsDataSet(false);
-    setUser(null);
-  };
-
-  const changeBranchStatus = () => {
+  const apiOptions = () => {
     setOptions({
-      method: "POST",
-      url: `https://${domain}/api/branchActivity`
+      url_branchActivity: `https://${domain}/api/branchActivity`,
+      url_deliveronStatus: `https://${domain}/api/deliveronStatus`,
+      url_branchStatus: `https://${domain}/api/branchStatus`,
+      url_deliveronActivity: `https://${domain}/api/deliveronActivity`,
     });
     setOptionsIsLoaded(true);
   };
 
-  const deliveronStatus = () => {
-    setDeliveronOptions({
-      method: "POST",
-      url: `https://${domain}/api/deliveronStatus`
-    });
-    setDeliveronIsLoaded(true);
-  };
-
-  const changeDeliveronStatus = () => {
-    setDeliveronChangeOptions({
-      method: "POST",
-      url: `https://${domain}/api/deliveronActivity`
-    });
-  };
-
-  const readLogout = () => {
-    setLogoutOptions({
-      method: "GET",
-      url: `https://${domain}/api/auth/logout`
-    });
-    setLogoutOptionsIsLoaded(true);
+  const onLogoutPressed = () => {
+    props.navigation.closeDrawer();
+    logout();
   };
 
   const toggleBranch = () => {
-    setBranchEnabled(data => !data);
-
-    if(isBranchEnabled){
-      Request(options).then(resp => setBranchEnabled(resp));
+    setBranchEnabled((data) => !data);
+    if (isBranchEnabled) {
+      axiosInstance
+        .post(options.url_branchActivity, branchChangeOptions.data)
+        .then((resp) => setBranchEnabled(resp.data.data));
       setIsBranchEnabled(false);
     }
   };
 
   const toggleDeliveron = () => {
-    setDeliveronEnabled(data => !data);
+    setDeliveronEnabled((data) => !data);
 
-    if(isDeliveronEnabled){
-      console.log(deliveronChangeOptions);
-      Request(deliveronChangeOptions).then(resp => setDeliveronEnabled(resp));
+    if (isDeliveronEnabled) {
+      axiosInstance
+        .post(options.url_deliveronActivity, deliveronChangeOptions.data)
+        .then((resp) => setDeliveronEnabled(resp.data.data));
       setIsDeliveronEnabled(false);
     }
   };
 
   useEffect(() => {
-    if(domain) {
-      changeBranchStatus();
-      deliveronStatus();
-      changeDeliveronStatus();
-      readLogout();
+    if (domain) {
+      apiOptions();
     }
-  }, [domain])
+  }, [domain]);
 
   useEffect(() => {
-    if(deliveronIsLoaded) {
-      Request(deliveronOptions).then(resp => {
-        setDeliveronEnabled(resp.status == 0 ? true : false);
+    if (optionsIsLoaded) {
+      axiosInstance.post(options.url_deliveronStatus).then((resp) => {
+        setDeliveronEnabled(resp.data.data.status == 0 ? true : false);
       });
+
+      if(branchid) {
+        axiosInstance.post(options.url_branchStatus, {branchid : branchid}).then((resp) => {
+          setBranchEnabled(resp.data.data);
+        });
+      }
     }
-  }, [deliveronIsLoaded])
+  }, [optionsIsLoaded, branchid]);
 
   useEffect(() => {
-    if(branches?.length > 0) {
-      branches?.map(e => {
-        if(e.value == branchid){
-          if(e.enabled == 1) {
-            setBranchEnabled(true);
-          }else {
-            setBranchEnabled(false);
-          }
-        }
-      });
-    }
-  }, [branches, branchid])
-
-  useEffect(() => {
-    setOptions((prev) => ({...prev, data: { branchid: branchid, enabled: branchEnabled ? 0 : 1 }}));
+    setBranchChangeOptions((prev) => ({
+      ...prev,
+      data: { branchid: branchid, enabled: branchEnabled ? 0 : 1 },
+    }));
     setIsBranchEnabled(true);
   }, [branchEnabled, branchid]);
 
   useEffect(() => {
-    setDeliveronChangeOptions((prev) => ({...prev, data: {enabled: deliveronEnabled ? 0 : 1}}));
+    setDeliveronChangeOptions((prev) => ({
+      ...prev,
+      data: { enabled: deliveronEnabled ? 0 : 1 },
+    }));
     setIsDeliveronEnabled(true);
-  }, [deliveronEnabled])
-
+  }, [deliveronEnabled]);
 
   return (
     <DrawerContentScrollView {...props}>
       <View style={styles.drawerContent}>
-        <LanguageSelector style={{paddingVertical: 10}}/>
+        <View style={{ paddingLeft: 17, paddingRight: 17 }}>
+          <LanguageSelector />
+        </View>
         <Drawer.Section style={styles.drawerSection}>
           <DrawerItem
             icon={({ color, size }) => (
@@ -161,7 +119,7 @@ export default function DrawerContent(props) {
                 size={size}
               />
             )}
-            label={dictionary['nav.products']}
+            label={dictionary["nav.products"]}
             onPress={() => {
               props.navigation.navigate("Products", { screen: "Product" });
             }}
@@ -174,18 +132,14 @@ export default function DrawerContent(props) {
                 size={size}
               />
             )}
-            label={dictionary['nav.onlineOrders']}
+            label={dictionary["nav.onlineOrders"]}
             onPress={() => {
               props.navigation.navigate("Orders", { screen: "Order" });
             }}
           />
           <DrawerItem
             icon={({ color, size }) => (
-              <MaterialCommunityIcons
-                name="logout"
-                color={color}
-                size={size}
-              />
+              <MaterialCommunityIcons name="logout" color={color} size={size} />
             )}
             label={dictionary.logout}
             onPress={onLogoutPressed}
@@ -194,7 +148,7 @@ export default function DrawerContent(props) {
         <Drawer.Section theme="dark">
           <TouchableRipple onPress={toggleDeliveron}>
             <View style={styles.preference}>
-              <Text>{dictionary['dv.deliveron']}</Text>
+              <Text>{dictionary["dv.deliveron"]}</Text>
               <View pointerEvents="none">
                 <Switch value={deliveronEnabled} />
               </View>
@@ -203,7 +157,7 @@ export default function DrawerContent(props) {
 
           <TouchableRipple onPress={toggleBranch}>
             <View style={styles.preference}>
-              <Text>{dictionary['orders.branch']}</Text>
+              <Text>{dictionary["orders.branch"]}</Text>
               <View pointerEvents="none">
                 <Switch value={branchEnabled} />
               </View>

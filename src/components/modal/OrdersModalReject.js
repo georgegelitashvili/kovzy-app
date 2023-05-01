@@ -1,34 +1,31 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { Text, Button } from 'react-native-paper';
 import { StyleSheet, View, Keyboard, TouchableWithoutFeedback, Alert } from 'react-native';
-import { Request } from "../../axios/apiRequests";
+import axiosInstance from "../../apiConfig/apiRequests";
 import { String, LanguageContext } from '../Language';
 
 
 export default function OrdersModalContent(props) {
-    const [options, setOptions] = useState(props.reject);
+    const [options, setOptions] = useState(props.options.url_rejectOrder);
+    const [orderData, setOrderData] = useState({});
 
     const { dictionary } = useContext(LanguageContext);
 
     const rejectOrder = () => {
-      if(options) {
-        Request(options).then(resp => {
-          if(resp.status == 0) {
-            Alert.alert("ALERT", dictionary['orders.declined'], [
-              {text: 'OK', onPress: () => props.hideModal()},
-            ]);
-          }
-        });
-      }
+      axiosInstance.post(options, orderData.data).then(resp => {
+        if(resp.data.data.status == 0) {
+          Alert.alert("ALERT", dictionary['orders.declined'], [
+            {text: 'OK', onPress: () => props.hideModal()},
+          ]);
+        }
+      });
     };
 
     useEffect(() => {
-        if(options) {
-            setOptions({...options, data: {
-                Orderid: props.itemId,
-            }})
-        }
-    }, [])
+      setOrderData({...orderData, data: {
+        Orderid: props.itemId,
+    }})
+    }, [props.itemId])
 
     return (
         <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
