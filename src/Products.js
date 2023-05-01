@@ -108,13 +108,13 @@ export default function Products({ navigation }) {
       setProducts(resp.data.data.data);
       setTotalPages(resp.data.data.total / resp.data.data.per_page);
     });
+    setRefreshing(false);
   }
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     fetchData();
     setSendApi(false);
-    setRefreshing(false);
   });
 
   const renderProductList = ({ item }) => {

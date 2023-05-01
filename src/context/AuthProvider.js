@@ -15,6 +15,17 @@ export const AuthProvider = ({ children }) => {
   const [options, setOptions] = useState({});
   const [loginError, setLoginError] = useState([]);
 
+  useEffect(() => {
+    readData();
+  }, [isDataSet]);
+
+  useEffect(() => {
+    if (domain) {
+      apiOptions();
+    }
+  }, [domain]);
+
+
   const readData = async () => {
     await getMultipleData(["domain", "branch"]).then((data) => {
       let domain = JSON.parse(data[0][1]);
@@ -31,16 +42,6 @@ export const AuthProvider = ({ children }) => {
       url_logout: `https://${domain}/api/auth/logout`,
     });
   };
-
-  useEffect(() => {
-    readData();
-  });
-
-  useEffect(() => {
-    if (domain) {
-      apiOptions();
-    }
-  }, [domain]);
 
   return (
     <AuthContext.Provider
@@ -60,14 +61,14 @@ export const AuthProvider = ({ children }) => {
               username,
             })
             .then((e) => {
-              console.log('------------------ response');
-              console.log(e.headers['set-cookie']);
-              console.log('------------------ end response');
-
               if (e.error) {
                 setLoginError(e.error.message);
                 return null;
               }
+
+              console.log('------------------ response');
+              console.log(e.headers['set-cookie']);
+              console.log('------------------ end response');
 
               SecureStore.setItemAsync('cookie', JSON.stringify(e.headers['set-cookie']));
               SecureStore.setItemAsync('user', JSON.stringify(e.data.data));
@@ -78,12 +79,15 @@ export const AuthProvider = ({ children }) => {
         },
         logout: () => {
           axiosInstance.get(options.url_logout).then((resp) => {
-            DevSettings.reload();
-            setIsDataSet(false);
-            setUser(null);
-            removeData();
-            SecureStore.deleteItemAsync('cookie');
-            SecureStore.deleteItemAsync('user');
+            setTimeout(() => {
+              setIsDataSet(false);
+              setUser(null);
+              removeData();
+              SecureStore.deleteItemAsync('cookie');
+              SecureStore.deleteItemAsync('user');
+              DevSettings.reload();
+            }, 0);
+
           })
         },
       }}

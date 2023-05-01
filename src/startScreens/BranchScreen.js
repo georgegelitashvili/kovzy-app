@@ -10,7 +10,7 @@ import { AuthContext, AuthProvider } from "../context/AuthProvider";
 import axiosInstance from "../apiConfig/apiRequests";
 
 export const BranchScreen = ({ navigation }) => {
-  const { domain, branchid } = useContext(AuthContext);
+  const { setIsDataSet, domain, branchid } = useContext(AuthContext);
   const [branches, setBranches] = useState([]);
 
   const [branch, setBranch] = useState({ data: branches || null, error: "" });
@@ -20,6 +20,7 @@ export const BranchScreen = ({ navigation }) => {
 
   const [options, setOptions] = useState({}); // api options
   const [optionsIsLoaded, setOptionsIsLoaded] = useState(false); // check api options is loaded
+
 
   const branchApi = () => {
     setOptions({
@@ -44,7 +45,7 @@ export const BranchScreen = ({ navigation }) => {
   }, [domain]);
 
   useEffect(() => {
-    if (optionsIsLoaded) {
+    if (options) {
       axiosInstance.post(options.url).then((e) => {
         // console.log('------------------ response');
         // console.log(e);
@@ -59,7 +60,7 @@ export const BranchScreen = ({ navigation }) => {
         console.log(error.response);
       });
     }
-  }, [optionsIsLoaded]);
+  }, [options]);
 
   useEffect(() => {
     if (branches) {
@@ -71,6 +72,7 @@ export const BranchScreen = ({ navigation }) => {
   useEffect(() => {
     if (selected) {
       storeData("branch", selected);
+      setIsDataSet((data) => !data);
     }
   }, [selected]);
 

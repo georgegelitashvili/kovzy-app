@@ -2,6 +2,7 @@ import axios from "axios";
 import * as SecureStore from 'expo-secure-store';
 import { DevSettings } from "react-native";
 import * as RootNavigation from '../helpers/navigate';
+import { removeData } from "../helpers/storage";
 
 
 // Construct api config
@@ -46,10 +47,14 @@ import * as RootNavigation from '../helpers/navigate';
       }
 
       if (error.response.data) {
-        console.log(error.response);
+        console.log(error.response.status);
         if(error.response.data.error.status_code === 401) {
           RootNavigation.navigate('Login', { message: 'Not authorized' });
-          return DevSettings.reload();
+          DevSettings.reload();
+        }else if(error.response.status === 404) {
+          removeData();
+          RootNavigation.navigate('Domain', { message: 'Not allowed' });
+          DevSettings.reload();
         }
         return error.response.data;
       } else {
