@@ -52,20 +52,20 @@ export default function Products({ navigation }) {
   }, [domain]);
 
   useEffect(() => {
-    if (sendApi) {
-      fetchData();
-      setSendApi(false);
-      setLoading(false);
-    }
-  }, [sendApi]);
-
-  useEffect(() => {
     if (optionsIsLoaded && (page || userLanguage || selected)) {
       setProductData((prev) => ({ ...prev, data: { lang: userLanguage, page: page, categoryid: selected } }));
       setSendApi(true);
       setLoading(true);
     }
   }, [page, userLanguage, selected, optionsIsLoaded]);
+
+  useEffect(() => {
+    if (sendApi) {
+      fetchData();
+      setSendApi(false);
+      setLoading(false);
+    }
+  }, [sendApi]);
 
   useEffect(() => {
     if (value) {
