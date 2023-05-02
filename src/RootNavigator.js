@@ -1,11 +1,11 @@
 import React, { useContext, useState, useEffect } from "react";
 import { createDrawerNavigator } from "@react-navigation/drawer";
 import * as SecureStore from "expo-secure-store";
-import Loader from "./components/generate/loader";
 import { AuthContext, AuthProvider } from "./context/AuthProvider";
 import { HomeNavigator, AuthNavigator } from "./components/Stack";
 import DrawerContent from "./components/DrawerContent";
 import { String, LanguageContext } from "./components/Language";
+import Loader from "./components/generate/loader";
 
 const Drawer = createDrawerNavigator();
 
@@ -17,13 +17,9 @@ export default function RootNavigator() {
 
   useEffect(() => {
     SecureStore.getItemAsync("user").then((user) => {
-      console.log("-------------- user");
-      console.log(user);
-      console.log("--------------end user");
       if (user) {
         setUser(user);
       }
-      
       setIsLoading(false);
     });
   }, []);

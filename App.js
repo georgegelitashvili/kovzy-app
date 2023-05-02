@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useContext } from "react";
 import { DevSettings, Alert } from "react-native";
+import Toast from 'react-native-toast-message';
 import NetInfo from "@react-native-community/netinfo";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { Provider } from "react-redux";
@@ -29,10 +30,14 @@ export default function App() {
   }
 
   return (
+    <>
+    <Toast />
     <Provider store={store}>
       <SafeAreaProvider>
         <Main />
       </SafeAreaProvider>
     </Provider>
+    </>
+
   );
 }

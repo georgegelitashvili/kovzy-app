@@ -19,9 +19,6 @@ import { removeData } from "../helpers/storage";
     async (config) => {
       cookie = await SecureStore.getItemAsync('cookie');
       if (cookie) {
-        console.log('------------------ config axios');
-        console.log(JSON.parse(cookie));
-        console.log('------------------ config axios');
         config.headers['set-cookie'] = JSON.parse(cookie);
       }
 
@@ -34,9 +31,6 @@ import { removeData } from "../helpers/storage";
   
   axiosInstance.interceptors.response.use(
     (response) =>{
-      // console.log('------------------ response axios');
-      // console.log(response.config);
-      // console.log('------------------ end response axios');
       return response;
     },
     (error) => {

@@ -1,8 +1,8 @@
 import React, { createContext, useState, useEffect } from "react";
 import { DevSettings } from "react-native";
 import axiosInstance from "../apiConfig/apiRequests";
-import { removeData, getMultipleData } from "../helpers/storage";
 import * as SecureStore from 'expo-secure-store';
+import { removeData, getMultipleData } from "../helpers/storage";
 
 export const AuthContext = createContext();
 
@@ -66,10 +66,6 @@ export const AuthProvider = ({ children }) => {
                 return null;
               }
 
-              console.log('------------------ response');
-              console.log(e.headers['set-cookie']);
-              console.log('------------------ end response');
-
               SecureStore.setItemAsync('cookie', JSON.stringify(e.headers['set-cookie']));
               SecureStore.setItemAsync('user', JSON.stringify(e.data.data));
               setUser(e.data.data);
@@ -79,15 +75,12 @@ export const AuthProvider = ({ children }) => {
         },
         logout: () => {
           axiosInstance.get(options.url_logout).then((resp) => {
-            setTimeout(() => {
-              setIsDataSet(false);
-              setUser(null);
-              removeData();
-              SecureStore.deleteItemAsync('cookie');
-              SecureStore.deleteItemAsync('user');
-              DevSettings.reload();
-            }, 0);
-
+            setIsDataSet(false);
+            setUser(null);
+            removeData();
+            SecureStore.deleteItemAsync('cookie');
+            SecureStore.deleteItemAsync('user');
+            DevSettings.reload();
           })
         },
       }}
