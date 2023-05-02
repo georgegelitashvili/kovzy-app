@@ -2,7 +2,7 @@ import React, { useState, useContext, useEffect } from "react";
 import { View, StyleSheet } from "react-native";
 import { DrawerItem, DrawerContentScrollView } from "@react-navigation/drawer";
 import { Drawer, Text, TouchableRipple, Switch } from "react-native-paper";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { MaterialCommunityIcons, Fontisto } from "@expo/vector-icons";
 import { ToggleTheme, logout } from "../redux/Actions";
 import { useDispatch, useSelector } from "react-redux";
 import { AuthContext, AuthProvider } from "../context/AuthProvider";
@@ -13,7 +13,7 @@ import { String, LanguageContext } from "./Language";
 export default function DrawerContent(props) {
   const dispatch = useDispatch();
   const { isdarkTheme } = useSelector((state) => state.themeReducer);
-  const { domain, branchid, logout } = useContext(AuthContext);
+  const { domain, branchid, branchName, logout } = useContext(AuthContext);
   const { dictionary } = useContext(LanguageContext);
 
   const [options, setOptions] = useState({}); // api options
@@ -80,10 +80,12 @@ export default function DrawerContent(props) {
         setDeliveronEnabled(resp.data.data.status == 0 ? true : false);
       });
 
-      if(branchid) {
-        axiosInstance.post(options.url_branchStatus, {branchid : branchid}).then((resp) => {
-          setBranchEnabled(resp.data.data);
-        });
+      if (branchid) {
+        axiosInstance
+          .post(options.url_branchStatus, { branchid: branchid })
+          .then((resp) => {
+            setBranchEnabled(resp.data.data);
+          });
       }
     }
   }, [optionsIsLoaded, branchid]);
@@ -107,9 +109,28 @@ export default function DrawerContent(props) {
   return (
     <DrawerContentScrollView {...props}>
       <View style={styles.drawerContent}>
+          <View style={{
+            paddingHorizontal: 21,
+            paddingBottom: 10,
+            flexDirection: "row",
+            alignItems: "center"
+        }}>
+              <Fontisto
+                name="radio-btn-active"
+                color={branchEnabled ? "#2fa360" : "#f14c4c"}
+                style={{fontSize: 20}}
+              />
+              <Text
+              style={{ paddingLeft: 17, fontWeight: "bold" }}
+            >
+              {branchName}
+            </Text>
+          </View>
+
         <View style={{ paddingLeft: 17, paddingRight: 17 }}>
           <LanguageSelector />
         </View>
+
         <Drawer.Section style={styles.drawerSection}>
           <DrawerItem
             icon={({ color, size }) => (

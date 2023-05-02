@@ -56,6 +56,7 @@ export default function Products({ navigation }) {
       setProductData((prev) => ({ ...prev, data: { lang: userLanguage, page: page, categoryid: selected } }));
       setSendApi(true);
       setLoading(true);
+      setCategory([]);
     }
   }, [page, userLanguage, selected, optionsIsLoaded]);
 
@@ -63,7 +64,6 @@ export default function Products({ navigation }) {
     if (sendApi) {
       fetchData();
       setSendApi(false);
-      setLoading(false);
     }
   }, [sendApi]);
 
@@ -80,9 +80,9 @@ export default function Products({ navigation }) {
   useEffect(() => {
     if (sendEnabled) {
       axiosInstance.post(options.url_productActivity, activityOptions.data);
+      setLoading(true);
       setProductEnabled(true);
       setSendEnabled(false);
-      setLoading(true);
     }
   }, [sendEnabled]);
 
@@ -91,7 +91,6 @@ export default function Products({ navigation }) {
       fetchData();
       setProductEnabled(false);
       setSendApi(false);
-      setLoading(false);
     }
   }, [productEnabled]);
 
@@ -105,6 +104,7 @@ export default function Products({ navigation }) {
         { label: item.name, value: item.id },
       ])
     )
+    setLoading(false);
       setProducts(resp.data.data.data);
       setTotalPages(resp.data.data.total / resp.data.data.per_page);
     });
@@ -169,8 +169,8 @@ export default function Products({ navigation }) {
           onValueChange={(value) => {
             setSelected(value);
           }}
-          items={category || ""}
-          key={(item) => item?.id || ""}
+          items={category || []}
+          key={(item) => item?.id || 1}
         />
       </View>
       <FlatGrid

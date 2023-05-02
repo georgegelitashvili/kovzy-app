@@ -19,7 +19,7 @@ export default function App() {
     });
 
     return () => removeNetInfoSubscription();
-  }, []);
+  }, [isOffline]);
 
   if (isOffline) {
     Alert.alert(

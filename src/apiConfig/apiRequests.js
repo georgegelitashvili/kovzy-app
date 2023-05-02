@@ -45,7 +45,9 @@ import { removeData } from "../helpers/storage";
         if(error.response.data.error.status_code === 401) {
           RootNavigation.navigate('Login', { message: 'Not authorized' });
         }else if(error.response.status === 404) {
-          removeData();
+          removeData("domain");
+          removeData("branch");
+          removeData("branchName");
           RootNavigation.navigate('Domain', { message: 'Not allowed' });
           DevSettings.reload();
         }

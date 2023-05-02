@@ -15,18 +15,15 @@ export const BranchScreen = ({ navigation }) => {
 
   const [branch, setBranch] = useState({ data: branches || null, error: "" });
   const [selected, setSelected] = useState(branchid);
-
   const [isLoading, setIsLoading] = useState(true);
 
   const [options, setOptions] = useState({}); // api options
-  const [optionsIsLoaded, setOptionsIsLoaded] = useState(false); // check api options is loaded
 
 
   const branchApi = () => {
     setOptions({
       url: `https://${domain}/api/branches`,
     });
-    setOptionsIsLoaded(true);
   };
 
   const onCheckPressed = () => {
@@ -71,6 +68,11 @@ export const BranchScreen = ({ navigation }) => {
 
   useEffect(() => {
     if (selected) {
+      branches?.map((e) => {
+        if(e.value === selected) {
+          storeData("branchName", e.label);
+        }
+      })
       storeData("branch", selected);
       setIsDataSet((data) => !data);
     }

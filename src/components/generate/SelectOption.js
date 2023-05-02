@@ -10,7 +10,7 @@ export default function SelectOption({ errorText, description, ...props }) {
         <RNPickerSelect
           useNativeAndroidPickerStyle={false}
           style={{...pickerSelectStyles}}
-          {...props}
+          {...props || []}
         />
         {description && !errorText ? (
           <Text style={styles.description}>{description}</Text>
