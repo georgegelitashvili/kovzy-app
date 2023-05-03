@@ -1,5 +1,4 @@
 import React, { createContext, useState, useEffect } from "react";
-import { DevSettings } from "react-native";
 import axiosInstance from "../apiConfig/apiRequests";
 import * as SecureStore from 'expo-secure-store';
 import { removeData, getMultipleData } from "../helpers/storage";
@@ -15,6 +14,7 @@ export const AuthProvider = ({ children }) => {
   const [isDataSet, setIsDataSet] = useState(false);
   const [options, setOptions] = useState({});
   const [loginError, setLoginError] = useState([]);
+
 
   useEffect(() => {
     readData();
@@ -54,6 +54,7 @@ export const AuthProvider = ({ children }) => {
         loginError,
         isLoading,
         domain,
+        setDomain,
         branchid,
         setIsDataSet,
         branchName,
@@ -87,7 +88,6 @@ export const AuthProvider = ({ children }) => {
               removeData("branchName");
               SecureStore.deleteItemAsync('cookie');
               SecureStore.deleteItemAsync('user');
-              DevSettings.reload();
             }
           })
         },

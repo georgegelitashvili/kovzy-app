@@ -10,7 +10,7 @@ import { AuthContext, AuthProvider } from "../context/AuthProvider";
 import axiosInstance from "../apiConfig/apiRequests";
 
 export const BranchScreen = ({ navigation }) => {
-  const { setIsDataSet, domain, branchid } = useContext(AuthContext);
+  const { setIsDataSet, domain, setDomain, branchid } = useContext(AuthContext);
   const [branches, setBranches] = useState([]);
 
   const [branch, setBranch] = useState({ data: branches || null, error: "" });
@@ -44,9 +44,6 @@ export const BranchScreen = ({ navigation }) => {
   useEffect(() => {
     if (options) {
       axiosInstance.post(options.url).then((e) => {
-        // console.log('------------------ response');
-        // console.log(e);
-        // console.log('------------------ end response');
         e.data.data?.map((item) =>
           setBranches((prev) => [
             ...prev,
@@ -54,7 +51,11 @@ export const BranchScreen = ({ navigation }) => {
           ])
         );
       }).catch((error) => {
-        console.log(error.response);
+        if(error) {
+          setDomain(null);
+          setIsDataSet(false);
+          setBranches([]);
+        }
       });
     }
   }, [options]);

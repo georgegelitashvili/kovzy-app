@@ -11,6 +11,10 @@
       "resizeMode": "cover",
       "backgroundColor": "#ffffff"
     },
+    "permissions": [
+      "READ_EXTERNAL_STORAGE",
+      "WRITE_EXTERNAL_STORAGE"
+    ],
     "updates": {
       "fallbackToCacheTimeout": 0
     },

@@ -10,33 +10,39 @@ import { store } from "./src/redux/Store";
 import Main from "./src/Main";
 
 export default function App() {
-  const [isOffline, setOfflineStatus] = useState(false);
+  const [isConnected, setIsConnected] = useState(true);
 
   useEffect(() => {
     const removeNetInfoSubscription = NetInfo.addEventListener((state) => {
-      const offline = !(state.isConnected && state.isInternetReachable);
-      setOfflineStatus(offline);
+      const connect = (state.isConnected && state.isInternetReachable);
+      setIsConnected(connect);
     });
 
-    return () => removeNetInfoSubscription();
-  }, [isOffline]);
+    return () => {removeNetInfoSubscription()};
+  }, []);
 
-  if (isOffline) {
-    Alert.alert(
-      "Connection Error",
-      "Oops, Looks like your device is not connected to the internet",
-      [{ text: "retry", onPress: () => DevSettings.reload() }]
-    );
+  const checkConnection = async () => {
+    const state = await NetInfo.fetch();
+    setIsConnected(state.isConnected);
   }
 
   return (
     <>
-    <Toast />
-    <Provider store={store}>
-      <SafeAreaProvider>
-        <Main />
-      </SafeAreaProvider>
-    </Provider>
+      {
+        isConnected == false ? (
+          Alert.alert(
+            "Connection Error",
+            "Oops, Looks like your device is not connected to the internet",
+            [{ text: "retry", onPress: () => checkConnection() }]
+          )
+        ) : (
+          <Provider store={store}>
+          <SafeAreaProvider>
+            <Main />
+          </SafeAreaProvider>
+        </Provider>
+        )
+      }
     </>
 
   );
