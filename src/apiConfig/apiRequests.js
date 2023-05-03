@@ -7,6 +7,7 @@ import { removeData } from "../helpers/storage";
 
 // Construct api config
   let cookie = null;
+  let error = null;
   const axiosInstance = axios.create({
     headers: {
       'Accept': "application/json",
@@ -42,16 +43,21 @@ import { removeData } from "../helpers/storage";
 
       if (error.response.data) {
         console.log(error.response.status);
-        if(error.response.data.error.status_code === 401) {
-          RootNavigation.navigate('Login', { message: 'Not authorized' });
-        }else if(error.response.status === 404) {
+        if(error.response.status === 404) {
           removeData("domain");
           removeData("branch");
           removeData("branchName");
           RootNavigation.navigate('Domain', { message: 'Not allowed' });
-          DevSettings.reload();
+          return false;
+        }else if(error.response.data.error.status === 401) {
+          SecureStore.deleteItemAsync("cookie");
+          SecureStore.deleteItemAsync("user");
+          RootNavigation.navigate('Login', { message: 'Not authorized' });
+          return false;
         }
-        return error.response.data;
+
+        return error.response;
+        
       } else {
         return new Promise((resolve, reject) => {
           reject(error);

@@ -32,7 +32,7 @@ let temp = 0;
 
 // render entered orders function
 export const EnteredOrdersList = () => {
-  const { domain, branchid } = useContext(AuthContext);
+  const { setIsDataSet, domain, setDomain, branchid, setUser } = useContext(AuthContext);
   const [orders, setOrders] = useState([]);
 
   const [options, setOptions] = useState({}); // api options
@@ -133,6 +133,13 @@ export const EnteredOrdersList = () => {
           })
           .then((resp) => {
             setOrders(resp.data.data);
+          })
+          .catch((error) => {
+            if(error) {
+              setUser(null);
+              setOrders(null);
+              setIsDataSet(false);
+            }
           });
         setLoading(false);
       }

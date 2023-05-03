@@ -32,7 +32,7 @@ const cardSize = width / numColumns;
 
 // render accepted orders function
 export const AcceptedOrdersList = () => {
-  const { domain, branchid } = useContext(AuthContext);
+  const { setIsDataSet, domain, setDomain, branchid, setUser } = useContext(AuthContext);
   const [orders, setOrders] = useState([]);
 
   const [page, setPage] = useState(0);
@@ -112,6 +112,13 @@ export const AcceptedOrdersList = () => {
           }))
           .then((resp) => {
             setOrders(resp.data.data);
+          })
+          .catch((error) => {
+            if(error) {
+              setUser(null);
+              setOrders(null);
+              setIsDataSet(false);
+            }
           });
         setLoading(false);
       }

@@ -11,7 +11,7 @@ import axiosInstance from "./apiConfig/apiRequests";
 const width = Dimensions.get("window").width;
 
 export default function Products({ navigation }) {
-  const { domain } = useContext(AuthContext);
+  const { setIsDataSet, domain, setDomain, branchid, setUser } = useContext(AuthContext);
   const [products, setProducts] = useState([]);
   const [category, setCategory] = useState([]);
   const [productData, setProductData] = useState({});
@@ -107,6 +107,12 @@ export default function Products({ navigation }) {
     setLoading(false);
       setProducts(resp.data.data.data);
       setTotalPages(resp.data.data.total / resp.data.data.per_page);
+    }).catch((error) => {
+      if(error) {
+        setUser(null);
+        setOrders(null);
+        setIsDataSet(false);
+      }
     });
     setRefreshing(false);
   }
