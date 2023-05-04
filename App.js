@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useContext } from "react";
-import * as Updates from 'expo-updates';
-import { Alert } from "react-native";
-import Toast from 'react-native-toast-message';
-import NetInfo from "@react-native-community/netinfo";
+import { StyleSheet } from "react-native";
+import * as Updates from "expo-updates";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { Provider } from "react-redux";
+import Toast from './src/components/generate/Toast';
+import NetInfo from "@react-native-community/netinfo";
 import "react-native-gesture-handler";
 
 import { store } from "./src/redux/Store";
@@ -13,24 +13,19 @@ import Main from "./src/Main";
 export default function App() {
   const [isConnected, setIsConnected] = useState(true);
 
+  console.log(isConnected);
+
+  useEffect(() => {
+    const removeSubscription = NetInfo.addEventListener((state) => {
+      setIsConnected(state.isConnected);
+    });
+
+    return () => {removeSubscription()};
+  }, []);
+
   useEffect(() => {
     checkForUpdates();
   }, []);
-
-  useEffect(() => {
-    const removeNetInfoSubscription = NetInfo.addEventListener((state) => {
-      const connect = (state.isConnected && state.isInternetReachable);
-      setIsConnected(connect);
-    });
-
-    return () => {removeNetInfoSubscription()};
-  }, []);
-
-  const checkConnection = async () => {
-    const state = await NetInfo.fetch();
-    setIsConnected(state.isConnected);
-  }
-
 
   const checkForUpdates = async () => {
     try {
@@ -54,22 +49,26 @@ export default function App() {
 
   return (
     <>
-      {
-        isConnected == false ? (
-          Alert.alert(
-            "Connection Error",
-            "Oops, Looks like your device is not connected to the internet",
-            [{ text: "retry", onPress: () => checkConnection() }]
-          )
-        ) : (
-          <Provider store={store}>
-          <SafeAreaProvider>
-            <Main />
-          </SafeAreaProvider>
-        </Provider>
-        )
-      }
+    <Provider store={store}>
+      <SafeAreaProvider style={styles.container}>
+      <Main />
+      {!isConnected ? (<Toast
+        type="failed"
+        title="Connection Error"
+        subtitle="Oops, Looks like your device is not connected to the internet"
+        animate={false}
+      />) : null}
+      </SafeAreaProvider>
+    </Provider>
     </>
 
   );
 }
+
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    position: "relative"
+  },
+});

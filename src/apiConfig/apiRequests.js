@@ -49,14 +49,17 @@ import { removeData } from "../helpers/storage";
           removeData("branchName");
           RootNavigation.navigate('Domain', { message: 'Not allowed' });
           return false;
-        }else if(error.response.data.error.status === 401) {
-          SecureStore.deleteItemAsync("cookie");
-          SecureStore.deleteItemAsync("user");
-          RootNavigation.navigate('Login', { message: 'Not authorized' });
-          return false;
         }
+        // else if(error.response.data.error.status === 401) {
+        //   async() => {
+        //     await SecureStore.deleteItemAsync("cookie");
+        //     await SecureStore.deleteItemAsync("user");
+        //   }
+        //   RootNavigation.navigate('Login', { message: 'Not authorized' });
+        //   return false;
+        // }
 
-        return error.response;
+        return error.response.data;
         
       } else {
         return new Promise((resolve, reject) => {

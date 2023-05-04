@@ -110,7 +110,7 @@ export default function Products({ navigation }) {
     }).catch((error) => {
       if(error) {
         setUser(null);
-        setOrders(null);
+        setProducts([]);
         setIsDataSet(false);
       }
     });

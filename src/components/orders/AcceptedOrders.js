@@ -116,7 +116,7 @@ export const AcceptedOrdersList = () => {
           .catch((error) => {
             if(error) {
               setUser(null);
-              setOrders(null);
+              setOrders([]);
               setIsDataSet(false);
             }
           });

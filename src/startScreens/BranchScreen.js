@@ -19,7 +19,6 @@ export const BranchScreen = ({ navigation }) => {
 
   const [options, setOptions] = useState({}); // api options
 
-
   const branchApi = () => {
     setOptions({
       url: `https://${domain}/api/branches`,
@@ -38,6 +37,7 @@ export const BranchScreen = ({ navigation }) => {
   useEffect(() => {
     if (domain) {
       branchApi();
+      setBranches([]);
     }
   }, [domain]);
 
@@ -52,7 +52,6 @@ export const BranchScreen = ({ navigation }) => {
         );
       }).catch((error) => {
         if(error) {
-          setDomain(null);
           setIsDataSet(false);
           setBranches([]);
         }
@@ -93,8 +92,8 @@ export const BranchScreen = ({ navigation }) => {
           setSelected(value);
           setBranch({ ...branch, error: "" });
         }}
-        items={branch?.data || ""}
-        key={(item) => item?.id || ""}
+        items={branch?.data || []}
+        key={(item) => item?.id || 1}
         error={!!branch?.error}
         errorText={branch?.error || ""}
       />

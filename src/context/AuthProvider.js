@@ -15,6 +15,12 @@ export const AuthProvider = ({ children }) => {
   const [options, setOptions] = useState({});
   const [loginError, setLoginError] = useState([]);
 
+  // console.log('------------------------ aauth');
+  // console.log(domain);
+  // console.log(branchName);
+  // console.log(branchid);
+  // console.log('------------------------ end aauth');
+
 
   useEffect(() => {
     readData();
@@ -81,13 +87,18 @@ export const AuthProvider = ({ children }) => {
         logout: () => {
           axiosInstance.get(options.url_logout).then((resp) => {
             if(resp) {
-              setIsDataSet(false);
-              setUser(null);
               removeData("domain");
               removeData("branch");
               removeData("branchName");
-              SecureStore.deleteItemAsync('cookie');
-              SecureStore.deleteItemAsync('user');
+              setDomain(null);
+              setBranchid(null);
+              setBranchName(null);
+              setIsDataSet(false);
+              setUser(null);
+              async() => {
+                await SecureStore.deleteItemAsync('cookie');
+                await SecureStore.deleteItemAsync('user');
+              }
             }
           })
         },

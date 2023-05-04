@@ -109,23 +109,23 @@ export default function DrawerContent(props) {
   return (
     <DrawerContentScrollView {...props}>
       <View style={styles.drawerContent}>
-          <View style={{
+        <View
+          style={{
             paddingHorizontal: 21,
             paddingBottom: 10,
             flexDirection: "row",
-            alignItems: "center"
-        }}>
-              <Fontisto
-                name="radio-btn-active"
-                color={branchEnabled ? "#2fa360" : "#f14c4c"}
-                style={{fontSize: 20}}
-              />
-              <Text
-              style={{ paddingLeft: 17, fontWeight: "bold" }}
-            >
-              {branchName}
-            </Text>
-          </View>
+            alignItems: "center",
+          }}
+        >
+          <Fontisto
+            name="radio-btn-active"
+            color={branchEnabled ? "#2fa360" : "#f14c4c"}
+            style={{ fontSize: 20 }}
+          />
+          <Text style={{ paddingLeft: 17, fontWeight: "bold" }}>
+            {branchName}
+          </Text>
+        </View>
 
         <View style={{ paddingLeft: 17, paddingRight: 17 }}>
           <LanguageSelector />

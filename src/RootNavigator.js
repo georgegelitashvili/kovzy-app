@@ -7,6 +7,7 @@ import DrawerContent from "./components/DrawerContent";
 import { String, LanguageContext } from "./components/Language";
 import Loader from "./components/generate/loader";
 
+
 const Drawer = createDrawerNavigator();
 
 export default function RootNavigator() {
@@ -14,6 +15,8 @@ export default function RootNavigator() {
 
   const { user, setUser, domain, branchid } = useContext(AuthContext);
   const { dictionary } = useContext(LanguageContext);
+
+  console.log(user);
 
   useEffect(() => {
     SecureStore.getItemAsync("user").then((user) => {
