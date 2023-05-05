@@ -1,13 +1,12 @@
 import axios from "axios";
 import * as SecureStore from 'expo-secure-store';
-import { DevSettings } from "react-native";
 import * as RootNavigation from '../helpers/navigate';
 import { removeData } from "../helpers/storage";
 
 
 // Construct api config
   let cookie = null;
-  let error = null;
+
   const axiosInstance = axios.create({
     headers: {
       'Accept': "application/json",
@@ -24,6 +23,7 @@ import { removeData } from "../helpers/storage";
       }
 
       return config;
+
     },
     (error) => {
       return Promise.reject(error);
@@ -35,12 +35,6 @@ import { removeData } from "../helpers/storage";
       return response;
     },
     (error) => {
-      if (!error.response.data) {
-        return new Promise((resolve, reject) => {
-          reject(error);
-        });
-      }
-
       if (error.response.data) {
         console.log(error.response.status);
         if(error.response.status === 404) {
@@ -49,15 +43,15 @@ import { removeData } from "../helpers/storage";
           removeData("branchName");
           RootNavigation.navigate('Domain', { message: 'Not allowed' });
           return false;
+        } else if(error.response.data.error.status === 401) {
+          console.log(error.response.status.data);
+          async() => {
+            await SecureStore.deleteItemAsync("cookie");
+            await SecureStore.deleteItemAsync("user");
+          }
+          RootNavigation.navigate('Login', { message: 'Not authorized' });
+          return false;
         }
-        // else if(error.response.data.error.status === 401) {
-        //   async() => {
-        //     await SecureStore.deleteItemAsync("cookie");
-        //     await SecureStore.deleteItemAsync("user");
-        //   }
-        //   RootNavigation.navigate('Login', { message: 'Not authorized' });
-        //   return false;
-        // }
 
         return error.response.data;
         

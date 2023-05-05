@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useContext, useCallback } from "react";
 import { StyleSheet, View, TouchableOpacity, Dimensions, RefreshControl } from "react-native";
+import NetInfo from "@react-native-community/netinfo";
 import { Text, Button, Divider, Card } from "react-native-paper";
 import { FlatGrid } from "react-native-super-grid";
 import SelectOption from "./components/generate/SelectOption";
@@ -15,6 +16,7 @@ export default function Products({ navigation }) {
   const [products, setProducts] = useState([]);
   const [category, setCategory] = useState([]);
   const [productData, setProductData] = useState({});
+  const [isConnected, setIsConnected] = useState(true);
 
   const [selected, setSelected] = useState(null);
 
@@ -52,6 +54,14 @@ export default function Products({ navigation }) {
   }, [domain]);
 
   useEffect(() => {
+    const removeSubscription = NetInfo.addEventListener((state) => {
+      setIsConnected(state.isConnected);
+    });
+
+    return () => {removeSubscription()};
+  }, []);
+
+  useEffect(() => {
     if (optionsIsLoaded && (page || userLanguage || selected)) {
       setProductData((prev) => ({ ...prev, data: { lang: userLanguage, page: page, categoryid: selected } }));
       setSendApi(true);
@@ -61,11 +71,11 @@ export default function Products({ navigation }) {
   }, [page, userLanguage, selected, optionsIsLoaded]);
 
   useEffect(() => {
-    if (sendApi) {
+    if (sendApi || isConnected) {
       fetchData();
       setSendApi(false);
     }
-  }, [sendApi]);
+  }, [sendApi, isConnected]);
 
   useEffect(() => {
     if (value) {
@@ -78,21 +88,22 @@ export default function Products({ navigation }) {
   }, [value, enabled]);
 
   useEffect(() => {
-    if (sendEnabled) {
+    if (sendEnabled || isConnected) {
       axiosInstance.post(options.url_productActivity, activityOptions.data);
       setLoading(true);
       setProductEnabled(true);
       setSendEnabled(false);
     }
-  }, [sendEnabled]);
+  }, [sendEnabled, isConnected]);
 
   useEffect(() => {
-    if (productEnabled) {
+    if (productEnabled || isConnected) {
       fetchData();
       setProductEnabled(false);
       setSendApi(false);
     }
-  }, [productEnabled]);
+  }, [productEnabled, isConnected]);
+
 
   const fetchData = () => {
     axiosInstance
@@ -109,7 +120,6 @@ export default function Products({ navigation }) {
       setTotalPages(resp.data.data.total / resp.data.data.per_page);
     }).catch((error) => {
       if(error) {
-        setUser(null);
         setProducts([]);
         setIsDataSet(false);
       }

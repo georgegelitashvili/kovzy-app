@@ -16,7 +16,7 @@ export default function RootNavigator() {
   const { user, setUser, domain, branchid } = useContext(AuthContext);
   const { dictionary } = useContext(LanguageContext);
 
-  console.log(user);
+  // console.log(user);
 
   useEffect(() => {
     SecureStore.getItemAsync("user").then((user) => {

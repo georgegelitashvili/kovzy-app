@@ -18,7 +18,7 @@ const Toast = ({ type, title, subtitle, animate }) => {
   useEffect(() => {
     if(animate) {
       animateToast();
-      setValue(3000);
+      setValue(1200);
     }else {
       setValue(0);
     }

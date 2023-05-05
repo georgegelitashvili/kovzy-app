@@ -37,7 +37,6 @@ export default function OrdersDetail({ orderId }) {
         .then((resp) => setOrderCart(resp.data.data))
         .catch((error) => {
           if(error) {
-            setUser(null);
             setOrderCart([]);
             setIsDataSet(false);
           }

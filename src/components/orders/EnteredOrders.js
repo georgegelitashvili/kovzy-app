@@ -136,7 +136,6 @@ export const EnteredOrdersList = () => {
           })
           .catch((error) => {
             if(error) {
-              setUser(null);
               setOrders([]);
               setIsDataSet(false);
             }

@@ -13,8 +13,6 @@ import Main from "./src/Main";
 export default function App() {
   const [isConnected, setIsConnected] = useState(true);
 
-  console.log(isConnected);
-
   useEffect(() => {
     const removeSubscription = NetInfo.addEventListener((state) => {
       setIsConnected(state.isConnected);
