@@ -52,7 +52,7 @@ const Toast = ({ type, title, subtitle, animate }) => {
           name={ICON}
           size={24}
           color={COLOR[type]}
-          style={{ marginHorizontal: 8 }}
+          style={{ marginHorizontal: 5 }}
         />
 
         <View>

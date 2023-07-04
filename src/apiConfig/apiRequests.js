@@ -5,7 +5,20 @@ import { removeData } from "../helpers/storage";
 
 
 // Construct api config
-  let cookie = null;
+let cookie = null;
+  
+const deleteItem = async (key) => {
+  try {
+    const result = await SecureStore.deleteItemAsync(key);
+    if (result) {
+      console.log(key + ': Secure storage item deleted successfully.');
+    } else {
+      console.log(key + ': Secure storage item does not exist.');
+    }
+  } catch (error) {
+    console.log('Error occurred while deleting secure storage:', error);
+  }
+};
 
   const axiosInstance = axios.create({
     headers: {
@@ -44,11 +57,9 @@ import { removeData } from "../helpers/storage";
           RootNavigation.navigate('Domain', { message: 'Not allowed' });
           return false;
         } else if(error.response.data.error.status === 401) {
-          console.log(error.response.status.data);
-          async() => {
-            await SecureStore.deleteItemAsync("cookie");
-            await SecureStore.deleteItemAsync("user");
-          }
+          console.log(error.response.status);
+          deleteItem("user");
+          deleteItem("cookie");
           RootNavigation.navigate('Login', { message: 'Not authorized' });
           return false;
         }

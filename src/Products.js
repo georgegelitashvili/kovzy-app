@@ -58,7 +58,7 @@ export default function Products({ navigation }) {
       setIsConnected(state.isConnected);
     });
 
-    return () => {removeSubscription()};
+    return () => { removeSubscription() };
   }, []);
 
   useEffect(() => {
@@ -107,23 +107,27 @@ export default function Products({ navigation }) {
 
   const fetchData = () => {
     axiosInstance
-    .post(options.url_getProducts, productData.data)
-    .then((resp) => {
-      resp.data.category?.map((item) =>
-      setCategory((prev) => [
-        ...prev,
-        { label: item.name, value: item.id },
-      ])
-    )
-    setLoading(false);
-      setProducts(resp.data.data.data);
-      setTotalPages(resp.data.data.total / resp.data.data.per_page);
-    }).catch((error) => {
-      if(error) {
-        setProducts([]);
-        setIsDataSet(false);
-      }
-    });
+      .post(options.url_getProducts, productData.data)
+      .then((resp) => {
+        resp.data.category?.map((item) => {
+          console.log(item);
+          if (item.name != null) {
+            setCategory((prev) => [
+              ...prev,
+              { label: item.name, value: item.id },
+            ])
+          }
+        }
+        )
+        setLoading(false);
+        setProducts(resp.data.data.data);
+        setTotalPages(resp.data.data.total / resp.data.data.per_page);
+      }).catch((error) => {
+        if (error) {
+          setProducts([]);
+          setIsDataSet(false);
+        }
+      });
     setRefreshing(false);
   }
 
@@ -143,6 +147,15 @@ export default function Products({ navigation }) {
         </Card.Content>
 
         <Card.Actions>
+          <Button
+            textColor="white"
+            buttonColor="#3490dc"
+            style={styles.button}
+            onPress={() => navigation.navigate('ProductsDetail', { id: item.id })}
+          >
+            {dictionary["prod.ingredients"]}
+          </Button>
+
           {item.enabled == 1 ? (
             <Button
               textColor="white"
@@ -263,7 +276,7 @@ const styles = StyleSheet.create({
   button: {
     fontSize: 13,
     marginTop: 25,
-    padding: 10,
+    padding: 1,
   },
   cardContent: {
     flexDirection: "row",

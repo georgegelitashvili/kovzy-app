@@ -13,13 +13,12 @@ const Drawer = createDrawerNavigator();
 export default function RootNavigator() {
   const [isLoading, setIsLoading] = useState(true);
 
-  const { user, setUser, domain, branchid } = useContext(AuthContext);
+  const { user, setUser } = useContext(AuthContext);
   const { dictionary } = useContext(LanguageContext);
-
-  // console.log(user);
 
   useEffect(() => {
     SecureStore.getItemAsync("user").then((user) => {
+      console.log(user);
       if (user) {
         setUser(user);
       }
@@ -30,6 +29,10 @@ export default function RootNavigator() {
   if (isLoading) {
     return <Loader text="loading" />;
   }
+
+  console.log('-------------------- user');
+  console.log(user);
+  console.log('-------------------- end user');
 
   return (
     <>

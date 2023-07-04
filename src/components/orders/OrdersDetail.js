@@ -11,7 +11,7 @@ export default function OrdersDetail({ orderId }) {
   const handlePress = () => setExpanded(!expanded);
 
   const [orderCart, setOrderCart] = useState([]);
-  const { setIsDataSet, domain, setDomain, branchid, setUser } =
+  const { setIsDataSet, domain } =
     useContext(AuthContext);
 
   const [options, setOptions] = useState({}); // api options

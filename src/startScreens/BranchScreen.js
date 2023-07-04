@@ -10,7 +10,7 @@ import { AuthContext, AuthProvider } from "../context/AuthProvider";
 import axiosInstance from "../apiConfig/apiRequests";
 
 export const BranchScreen = ({ navigation }) => {
-  const { setIsDataSet, domain, setDomain, branchid } = useContext(AuthContext);
+  const { setIsDataSet, domain, branchid } = useContext(AuthContext);
   const [branches, setBranches] = useState([]);
 
   const [branch, setBranch] = useState({ data: branches || null, error: "" });
@@ -38,6 +38,7 @@ export const BranchScreen = ({ navigation }) => {
     if (domain) {
       branchApi();
       setBranches([]);
+      setBranch({ data: null, error: "" })
     }
   }, [domain]);
 
@@ -50,10 +51,13 @@ export const BranchScreen = ({ navigation }) => {
             { label: item.title, value: item.id, enabled: item.enabled },
           ])
         );
+        setIsLoading(false);
       }).catch((error) => {
-        if(error) {
+        if (error) {
           setIsDataSet(false);
           setBranches([]);
+          setBranch({ data: null, error: "" });
+          setIsLoading(true);
         }
       });
     }
@@ -62,14 +66,13 @@ export const BranchScreen = ({ navigation }) => {
   useEffect(() => {
     if (branches) {
       setBranch({ data: branches, error: "" });
-      setIsLoading(false);
     }
   }, [branches]);
 
   useEffect(() => {
     if (selected) {
       branches?.map((e) => {
-        if(e.value === selected) {
+        if (e.value === selected) {
           storeData("branchName", e.label);
         }
       })

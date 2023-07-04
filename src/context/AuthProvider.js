@@ -52,6 +52,19 @@ export const AuthProvider = ({ children }) => {
     });
   };
 
+  const deleteItem = async (key) => {
+  try {
+    const result = await SecureStore.deleteItemAsync(key);
+    if (result) {
+      console.log(key + ': Secure storage item deleted successfully.');
+    } else {
+      console.log(key + ': Secure storage item does not exist.');
+    }
+  } catch (error) {
+    console.log('Error occurred while deleting secure storage:', error);
+  }
+};
+
   return (
     <AuthContext.Provider
       value={{
@@ -95,10 +108,8 @@ export const AuthProvider = ({ children }) => {
               setBranchName(null);
               setIsDataSet(false);
               setUser(null);
-              async() => {
-                await SecureStore.deleteItemAsync('cookie');
-                await SecureStore.deleteItemAsync('user');
-              }
+              deleteItem("user");
+              deleteItem("cookie");
             }
           })
         },

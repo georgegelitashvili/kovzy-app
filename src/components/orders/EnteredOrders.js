@@ -32,7 +32,7 @@ let temp = 0;
 
 // render entered orders function
 export const EnteredOrdersList = () => {
-  const { setIsDataSet, domain, setDomain, branchid, setUser } = useContext(AuthContext);
+  const { setIsDataSet, domain, branchid } = useContext(AuthContext);
   const [orders, setOrders] = useState([]);
 
   const [options, setOptions] = useState({}); // api options
