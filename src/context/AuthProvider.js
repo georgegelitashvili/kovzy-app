@@ -21,13 +21,14 @@ export const AuthProvider = ({ children }) => {
   // console.log(branchid);
   // console.log('------------------------ end aauth');
 
-
   useEffect(() => {
     readData();
   }, [isDataSet]);
 
   useEffect(() => {
     if (domain) {
+      setBranchid(null);
+      setBranchName(null);
       apiOptions();
     }
   }, [domain]);
@@ -85,15 +86,13 @@ export const AuthProvider = ({ children }) => {
               username,
             })
             .then((e) => {
-              if (e.error) {
-                setLoginError(e.error.message);
-                return null;
+              if (e.data.error) {
+                setLoginError(e.data.error.message);
+                return;
               }
-
               SecureStore.setItemAsync('cookie', JSON.stringify(e.headers['set-cookie']));
               SecureStore.setItemAsync('user', JSON.stringify(e.data.data));
               setUser(e.data.data);
-
               setIsLoading(false);
             });
         },

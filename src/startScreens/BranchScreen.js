@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useContext } from "react";
+import { Text } from "react-native-paper";
 import Background from "../components/generate/Background";
 import Logo from "../components/generate/Logo";
 import Button from "../components/generate/Button";
 import SelectOption from "../components/generate/SelectOption";
 import { storeData } from "../helpers/storage";
+import Toast from '../components/generate/Toast';
 import Loader from "../components/generate/loader";
 import { AuthContext, AuthProvider } from "../context/AuthProvider";
 
@@ -18,6 +20,8 @@ export const BranchScreen = ({ navigation }) => {
   const [isLoading, setIsLoading] = useState(true);
 
   const [options, setOptions] = useState({}); // api options
+
+  const [errorText, setErrorText] = useState("");
 
   const branchApi = () => {
     setOptions({
@@ -36,15 +40,20 @@ export const BranchScreen = ({ navigation }) => {
 
   useEffect(() => {
     if (domain) {
-      branchApi();
       setBranches([]);
-      setBranch({ data: null, error: "" })
+      setBranch({ data: null, error: "" });
+      setSelected(null);
+      setErrorText("");
+      branchApi();
     }
   }, [domain]);
 
   useEffect(() => {
     if (options) {
       axiosInstance.post(options.url).then((e) => {
+        setBranch({ data: null, error: "" });
+        setBranches([]);
+        setErrorText("");
         e.data.data?.map((item) =>
           setBranches((prev) => [
             ...prev,
@@ -58,6 +67,7 @@ export const BranchScreen = ({ navigation }) => {
           setBranches([]);
           setBranch({ data: null, error: "" });
           setIsLoading(true);
+          setErrorText("Branch list not found or Domain is incorrect");
         }
       });
     }
@@ -81,8 +91,12 @@ export const BranchScreen = ({ navigation }) => {
     }
   }, [selected]);
 
+  // console.log("===================  branches list");
+  // console.log(branch.data);
+  // console.log("=================== end branches list");
+
   if (isLoading) {
-    return <Loader />;
+    return <Loader error={errorText} />;
   }
 
   return (

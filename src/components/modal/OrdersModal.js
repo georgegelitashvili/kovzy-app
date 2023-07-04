@@ -45,7 +45,7 @@ export default function OrdersModal({
             items={
               deliveron.status === 0 ? deliveron.content?.map((item) => ({
                 label: item.companyName + ' - ' + item.price,
-                value: item.companyId,
+                value: item.companyId ?? item.type,
               })) : null
             }
             hideModal={hideModal}

@@ -15,7 +15,7 @@ export const DomainScreen = ({ navigation }) => {
 
   const readData = async () => {
     try {
-      await getData("domain").then(value => {setDomain({ value: value, error: "" })})
+      await getData("domain").then(value => {setDomain({value: value, error: ""})})
     } catch (e) {
       console.log('Failed to fetch the input from storage');
     }

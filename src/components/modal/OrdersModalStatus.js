@@ -55,8 +55,12 @@ export default function OrdersModalContent(props) {
       if(status) {
         axiosInstance.post(options, statusData.data).then(resp => {
           setText(resp.data.data.content);
+          if (resp.data.data.status == 2 || resp.data.data.status == -1) {
+            setDisabled(false);
+          } else {
+            setDisabled(true);
+          }
         });
-        setDisabled(true);
         setStatus(false);
       }
     }, [status])

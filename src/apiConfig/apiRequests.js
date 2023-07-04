@@ -48,24 +48,23 @@ const deleteItem = async (key) => {
       return response;
     },
     (error) => {
-      if (error.response.data) {
-        console.log(error.response.status);
+      // console.log("---------------------------- error api");
+      // console.log(error);
+      // console.log("----------------------------end error api");
+      if (error.response) {
         if(error.response.status === 404) {
           removeData("domain");
           removeData("branch");
           removeData("branchName");
           RootNavigation.navigate('Domain', { message: 'Not allowed' });
-          return false;
         } else if(error.response.data.error.status === 401) {
-          console.log(error.response.status);
+          console.log(error.response.data.error);
           deleteItem("user");
           deleteItem("cookie");
           RootNavigation.navigate('Login', { message: 'Not authorized' });
-          return false;
         }
 
-        return error.response.data;
-        
+        return error.response;
       } else {
         return new Promise((resolve, reject) => {
           reject(error);

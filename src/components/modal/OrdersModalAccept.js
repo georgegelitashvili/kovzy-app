@@ -54,7 +54,7 @@ export default function OrdersModalContent(props) {
   useEffect(() => {
     if (selected) {
       props.deliveron.content?.map((item) => {
-        if (item.companyId == selected) {
+        if (item.companyId == selected || item.type == selected) {
           setOrderData({
             ...orderData,
             data: {
@@ -82,6 +82,9 @@ export default function OrdersModalContent(props) {
       });
     }
   }, [selected, forClient]);
+
+  console.log(orderData);
+  console.log(selected);
 
   return (
     <>

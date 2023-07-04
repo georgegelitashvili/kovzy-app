@@ -4,10 +4,9 @@ import Icon from "react-native-vector-icons/Ionicons";
 
 const WIDTH = Dimensions.get("screen").width;
 
-const Toast = ({ type, title, subtitle, animate }) => {
+const Toast = ({ type, title, subtitle, animate, addStyles }) => {
   const [value, setValue] = useState(0);
   const ICON = type === "success" ? "checkmark-circle" : "alert-circle";
-  console.log(value);
 
   const COLOR = {
     "success" : "#21A67A",
@@ -46,7 +45,7 @@ const Toast = ({ type, title, subtitle, animate }) => {
     <Animated.View
       style={{ transform: [{ translateY: slideAnim }], marginBottom: 25 }}
     >
-      <View style={[styles.toastBox]}>
+      <View style={[styles.toastBox, addStyles]}>
         <View style={[styles.uiLine, { backgroundColor: COLOR }]} />
         <Icon
           name={ICON}
