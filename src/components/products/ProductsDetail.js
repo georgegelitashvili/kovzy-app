@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useContext, useCallback } from "react";
 import { StyleSheet, View, TouchableOpacity, Dimensions, RefreshControl } from "react-native";
+import NetInfo from "@react-native-community/netinfo";
 import { Text, Button, Divider, Card } from "react-native-paper";
 import { FlatGrid } from "react-native-super-grid";
 import { MaterialCommunityIcons, SimpleLineIcons } from "@expo/vector-icons";
@@ -12,10 +13,16 @@ const width = Dimensions.get("window").width;
 
 export default function ProductsDetail({ navigation, route }) {
   const { id } = route.params;
-  const [customizable, setCustomizable] = useState([]);
+
   const { setIsDataSet, domain } = useContext(AuthContext);
+  const [customizable, setCustomizable] = useState([]);
   const [options, setOptions] = useState({}); // api options
   const [optionsIsLoaded, setOptionsIsLoaded] = useState(false); // api options
+  const [activityOptions, setActivityOptions] = useState({});
+  const [productEnabled, setProductEnabled] = useState(false);
+  const [isConnected, setIsConnected] = useState(true);
+  const [sendEnabled, setSendEnabled] = useState(false);
+  const [sendApi, setSendApi] = useState(false);
 
   const [isOpen, setOpenState] = useState([]); // my accordion state
   const [loading, setLoading] = useState(true);
@@ -27,48 +34,81 @@ export default function ProductsDetail({ navigation, route }) {
   const apiOptions = () => {
     setOptions({
       url_customizable: `https://${domain}/api/getCustomizablePack`,
-      url_toggle: `https://${domain}/api/toggleCustomizablePack`,
+      url_toggle: `https://${domain}/api/customizablePackActivity`,
     });
     setOptionsIsLoaded(true);
   };
 
 
-  // useEffect(() => {
-  //   apiOptions();
-  //   if (optionsIsLoaded) {
-  //     axiosInstance
-  //       .post(options.url_customizable, {
-  //         pid: orderId,
-  //         lang: userLanguage,
-  //       })
-  //       .then((resp) => setCustomizable(resp.data.data))
-  //       .catch((error) => {
-  //         if (error) {
-  //           setCustomizable([]);
-  //           setIsDataSet(false);
-  //         }
-  //       });
-  //   }
-  // }, [optionsIsLoaded, userLanguage, id]);
+  useEffect(() => {
+    const removeSubscription = NetInfo.addEventListener((state) => {
+      setIsConnected(state.isConnected);
+    });
+
+    return () => { removeSubscription() };
+  }, []);
 
   useEffect(() => {
-    setCustomizable([
-      {
-        id: 1, product_id: 1, name: "სოუსი", packs: [
-          { id: 1, name: 'კეჩუპი', enabled: 0 },
-          { id: 2, name: 'მდოგვი', enabled: 0 },
-          { id: 3, name: 'მაიონეზი', enabled: 1 },
-        ]
-      },
-      {
-        id: 2, product_id: 1, name: "სოუსი 2", packs: [
-          { id: 4, name: 'კეჩუპი', enabled: 0 },
-          { id: 5, name: 'მდოგვი', enabled: 1 },
-          { id: 6, name: 'მაიონეზი', enabled: 1 },
-        ]
-      },
-    ])
-  }, []);
+    apiOptions();
+    if (optionsIsLoaded) {
+      setSendApi(true);
+    }
+  }, [optionsIsLoaded, userLanguage, id]);
+
+
+  useEffect(() => {
+    if (sendApi || isConnected) {
+      fetchData();
+      setSendApi(false);
+    }
+  }, [sendApi, isConnected]);
+
+  useEffect(() => {
+    if (value) {
+      setActivityOptions((prev) => ({
+        ...prev,
+        data: { customizablePackid: value, enabled: enabled },
+      }));
+      setSendEnabled(true);
+    }
+  }, [value, enabled]);
+
+  useEffect(() => {
+    if (sendEnabled || isConnected) {
+      axiosInstance.post(options.url_toggle, activityOptions.data);
+      setLoading(true);
+      setProductEnabled(true);
+      setSendEnabled(false);
+    }
+  }, [sendEnabled, isConnected]);
+
+  useEffect(() => {
+    if (productEnabled || isConnected) {
+      fetchData();
+      setProductEnabled(false);
+      setSendApi(false);
+    }
+  }, [productEnabled, isConnected]);
+
+
+  const fetchData = () => {    
+    axiosInstance
+      .post(options.url_customizable, {
+        pid: id,
+        lang: userLanguage,
+      })
+      .then((resp) => {
+        setCustomizable(resp.data.customizable);
+        setLoading(false);
+      })
+      .catch((error) => {
+        if (error) {
+          setCustomizable([]);
+          setIsDataSet(false);
+        }
+      });
+  }
+
 
   const toggleContent = (value) => {
     setOpenState([...isOpen, value]);
@@ -113,7 +153,7 @@ export default function ProductsDetail({ navigation, route }) {
                         buttonColor="#f14c4c"
                         style={styles.button}
                         onPress={() => {
-                          setValue(item.id);
+                          setValue(child.id);
                           setEnabled(0);
                         }}
                       >
@@ -125,7 +165,7 @@ export default function ProductsDetail({ navigation, route }) {
                         buttonColor="#2fa360"
                         style={styles.button}
                         onPress={() => {
-                          setValue(item.id);
+                          setValue(child.id);
                           setEnabled(1);
                         }}
                       >
@@ -144,9 +184,9 @@ export default function ProductsDetail({ navigation, route }) {
     );
   };
 
-  // if (loading) {
-  //   return <Loader />;
-  // }
+  if (loading) {
+    return <Loader />;
+  }
 
   return (
     <>

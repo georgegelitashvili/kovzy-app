@@ -83,9 +83,6 @@ export default function OrdersModalContent(props) {
     }
   }, [selected, forClient]);
 
-  console.log(orderData);
-  console.log(selected);
-
   return (
     <>
       <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>

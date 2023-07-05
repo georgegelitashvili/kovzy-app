@@ -10,8 +10,7 @@ export default function Loader(props) {
   console.log(WIDTH);
 
   return (
-    <View style={styles.container}>
-
+    <>
       <View style={styles.indicatorWrapper}>
         <ActivityIndicator animating={true} size="large" style={styles.indicator} />
         <Text style={styles.indicatorText}>{dictionary['loading']}</Text>
@@ -26,7 +25,7 @@ export default function Loader(props) {
           addStyles={{ top: WIDTH, }}
         />
         ) : null}
-      </View>
+      </>
     );
   }
 

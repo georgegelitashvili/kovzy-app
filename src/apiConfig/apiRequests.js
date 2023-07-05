@@ -48,9 +48,9 @@ const deleteItem = async (key) => {
       return response;
     },
     (error) => {
-      // console.log("---------------------------- error api");
-      // console.log(error);
-      // console.log("----------------------------end error api");
+      console.log("---------------------------- error api");
+      console.log(error);
+      console.log("----------------------------end error api");
       if (error.response) {
         if(error.response.status === 404) {
           removeData("domain");

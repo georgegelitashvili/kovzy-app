@@ -110,7 +110,7 @@ export default function Products({ navigation }) {
       .post(options.url_getProducts, productData.data)
       .then((resp) => {
         resp.data.category?.map((item) => {
-          console.log(item);
+          // console.log(item);
           if (item.name != null) {
             setCategory((prev) => [
               ...prev,

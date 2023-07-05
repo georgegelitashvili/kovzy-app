@@ -114,7 +114,10 @@ export const AcceptedOrdersList = () => {
             setOrders(resp.data.data);
           })
           .catch((error) => {
-            if(error) {
+            if (error) {
+              console.log("----------------- accepted orders error");
+              console.log(error);
+              console.log("----------------- end accepted orders error");
               setOrders([]);
               setIsDataSet(false);
             }

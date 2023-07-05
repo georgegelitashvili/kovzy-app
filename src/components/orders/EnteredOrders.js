@@ -32,7 +32,7 @@ let temp = 0;
 
 // render entered orders function
 export const EnteredOrdersList = () => {
-  const { setIsDataSet, domain, branchid } = useContext(AuthContext);
+  const { setIsDataSet, isDataSet, domain, branchid } = useContext(AuthContext);
   const [orders, setOrders] = useState([]);
 
   const [options, setOptions] = useState({}); // api options
@@ -135,7 +135,10 @@ export const EnteredOrdersList = () => {
             setOrders(resp.data.data);
           })
           .catch((error) => {
-            if(error) {
+            console.log("----------------- entered orders error");
+            console.log(error);
+            console.log("----------------- end entered orders error");
+            if (error) {
               setOrders([]);
               setIsDataSet(false);
             }
@@ -265,7 +268,7 @@ export const EnteredOrdersList = () => {
   // console.log(orders);
 
   return (
-    <View style={{ flex: 1 }}>
+    <View>
       {loadingOptions ? <Loader /> : null}
       <ScrollView horizontal={true} showsVerticalScrollIndicator={false}>
         {visible ? (

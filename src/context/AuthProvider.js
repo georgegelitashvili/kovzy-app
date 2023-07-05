@@ -19,6 +19,7 @@ export const AuthProvider = ({ children }) => {
   // console.log(domain);
   // console.log(branchName);
   // console.log(branchid);
+  // console.log(isDataSet);
   // console.log('------------------------ end aauth');
 
   useEffect(() => {
@@ -27,8 +28,8 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     if (domain) {
-      setBranchid(null);
-      setBranchName(null);
+      // setBranchid(null);
+      // setBranchName(null);
       apiOptions();
     }
   }, [domain]);
@@ -43,6 +44,11 @@ export const AuthProvider = ({ children }) => {
       setDomain(domain);
       setBranchid(branchid);
       setBranchName(branchName);
+      if (domain != null && branchid != null && branchName != null) {
+        setIsDataSet(true);
+      } else {
+        setIsDataSet(false);
+      }
     });
   };
 
@@ -77,6 +83,7 @@ export const AuthProvider = ({ children }) => {
         setDomain,
         branchid,
         setIsDataSet,
+        isDataSet,
         branchName,
         login: (username, password) => {
           setIsLoading(true);

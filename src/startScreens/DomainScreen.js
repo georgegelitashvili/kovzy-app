@@ -28,7 +28,7 @@ export const DomainScreen = ({ navigation }) => {
       return
     }
     storeData("domain", domain.value);
-    setIsDataSet((data) => !data);
+    setIsDataSet(true);
 
     navigation.navigate("Branch");
   };
@@ -46,7 +46,7 @@ export const DomainScreen = ({ navigation }) => {
         editable={true}
         clearButtonMode='always'
         value={domain?.value || ''}
-        onChangeText={(text) => setDomain({ value: text, error: '' })}
+        onChangeText={(text) => { setDomain({ value: text, error: '' }); }}
         error={!!domain?.error}
         errorText={domain?.error || ''}
         autoCapitalize="none"

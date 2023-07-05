@@ -11,9 +11,8 @@ import Loader from "./components/generate/loader";
 const Drawer = createDrawerNavigator();
 
 export default function RootNavigator() {
-  const [isLoading, setIsLoading] = useState(true);
-
   const { user, setUser } = useContext(AuthContext);
+  const [isLoading, setIsLoading] = useState(true);
   const { dictionary } = useContext(LanguageContext);
 
   useEffect(() => {

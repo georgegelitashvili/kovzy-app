@@ -54,6 +54,7 @@ export const BranchScreen = ({ navigation }) => {
         setBranch({ data: null, error: "" });
         setBranches([]);
         setErrorText("");
+        setIsDataSet(false);
         e.data.data?.map((item) =>
           setBranches((prev) => [
             ...prev,
