@@ -7,7 +7,6 @@ import OrdersModalReject from "./OrdersModalReject";
 import OrdersModalStatus from "./OrdersModalStatus";
 
 const deviceWidth = Dimensions.get("window").width;
-
 const deviceHeight = Dimensions.get("window").height;
 
 export default function OrdersModal({
@@ -18,8 +17,7 @@ export default function OrdersModal({
   deliveron,
   deliveronOptions,
   type,
-  accept,
-  reject
+  options
 }) {
   const [visible, setVisible] = useState(isVisible); // modal state
 
@@ -32,7 +30,7 @@ export default function OrdersModal({
   });
 
   // console.log('---------- type');
-  // console.log(type);
+  // console.log(options);
   // console.log('---------- end type');
 
   const loadModalComponent = () => {
@@ -43,11 +41,11 @@ export default function OrdersModal({
             itemId={hasItemId}
             deliveron={deliveron}
             deliveronOptions={deliveronOptions}
-            accept={accept}
+            options={options}
             items={
               deliveron.status === 0 ? deliveron.content?.map((item) => ({
                 label: item.companyName + ' - ' + item.price,
-                value: item.companyId,
+                value: item.companyId ?? item.type,
               })) : null
             }
             hideModal={hideModal}
@@ -57,7 +55,7 @@ export default function OrdersModal({
         return (
           <OrdersModalReject
             itemId={hasItemId}
-            reject={reject}
+            options={options}
             hideModal={hideModal}
           />
         )
@@ -67,7 +65,7 @@ export default function OrdersModal({
             itemId={hasItemId}
             orders={orders}
             deliveron={deliveron}
-            accept={accept}
+            options={options}
             deliveronOptions={deliveronOptions}
             hideModal={hideModal}
           />

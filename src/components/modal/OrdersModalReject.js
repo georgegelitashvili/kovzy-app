@@ -1,35 +1,31 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { Text, Button } from 'react-native-paper';
-import TextField from '../generate/TextField';
-import SelectOption from '../generate/SelectOption';
-import { StyleSheet, View, Keyboard, TouchableWithoutFeedback } from 'react-native';
-import { Request } from "../../axios/apiRequests";
+import { StyleSheet, View, Keyboard, TouchableWithoutFeedback, Alert } from 'react-native';
+import axiosInstance from "../../apiConfig/apiRequests";
 import { String, LanguageContext } from '../Language';
 
 
 export default function OrdersModalContent(props) {
-    const [options, setOptions] = useState(props.reject);
+    const [options, setOptions] = useState(props.options.url_rejectOrder);
+    const [orderData, setOrderData] = useState({});
 
     const { dictionary } = useContext(LanguageContext);
 
     const rejectOrder = () => {
-      if(options) {
-        console.log(options);
-        Request(options).then(resp => {
-          if(resp.status == 0) {
-            alert(dictionary['orders.declined']);
-          }
-        });
-      }
+      axiosInstance.post(options, orderData.data).then(resp => {
+        if(resp.data.data.status == 0) {
+          Alert.alert("ALERT", dictionary['orders.declined'], [
+            {text: 'OK', onPress: () => props.hideModal()},
+          ]);
+        }
+      });
     };
 
     useEffect(() => {
-        if(options) {
-            setOptions({...options, data: {
-                Orderid: props.itemId,
-            }})
-        }
-    }, [])
+      setOrderData({...orderData, data: {
+        Orderid: props.itemId,
+    }})
+    }, [props.itemId])
 
     return (
         <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
@@ -38,7 +34,7 @@ export default function OrdersModalContent(props) {
 
             <View style={styles.buttonModal}>
               <Button mode="contained" textColor="white" style={styles.buttonReject} onPress={rejectOrder}>{dictionary['orders.reject']}</Button>
-              <Button mode="contained" textColor="white" style={styles.buttonClose} onPress={props. hideModal}>{dictionary['close']}</Button>
+              <Button mode="contained" textColor="white" style={styles.buttonClose} onPress={props.hideModal}>{dictionary['close']}</Button>
           </View>
         </View>
         </TouchableWithoutFeedback>

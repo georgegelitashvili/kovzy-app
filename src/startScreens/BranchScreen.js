@@ -1,97 +1,128 @@
-import React, { useState, useMemo, useEffect, useCallback } from "react";
-import { useSelector, useDispatch } from "react-redux";
-import Background from '../components/generate/Background';
-import Header from '../components/generate/Header';
-import Logo from '../components/generate/Logo';
-import Button from '../components/generate/Button';
-import Paragraph from '../components/generate/Paragraph';
-import SelectOption from '../components/generate/SelectOption';
-import { storeData, getData } from '../helpers/storage';
-import { getBranches, getDeliveron } from '../redux/Actions'
+import React, { useState, useEffect, useContext } from "react";
+import { Text } from "react-native-paper";
+import Background from "../components/generate/Background";
+import Logo from "../components/generate/Logo";
+import Button from "../components/generate/Button";
+import SelectOption from "../components/generate/SelectOption";
+import { storeData } from "../helpers/storage";
+import Toast from '../components/generate/Toast';
+import Loader from "../components/generate/loader";
+import { AuthContext, AuthProvider } from "../context/AuthProvider";
+
+import axiosInstance from "../apiConfig/apiRequests";
 
 export const BranchScreen = ({ navigation }) => {
-  const { branches } = useSelector((state) => state.branchesReducer);
-  const [branch, setBranch] = useState({data: branches, error: ''});
-  const [selected, setSelected] = useState(null);
+  const { setIsDataSet, domain, branchid } = useContext(AuthContext);
+  const [branches, setBranches] = useState([]);
+
+  const [branch, setBranch] = useState({ data: branches || null, error: "" });
+  const [selected, setSelected] = useState(branchid);
+  const [isLoading, setIsLoading] = useState(true);
+
   const [options, setOptions] = useState({}); // api options
-  const [optionsIsLoaded, setOptionsIsLoaded] = useState(false); // check api options is loaded
 
-  const branchApi = async (endPoint) => {
-    await getData("domain").then(data => {
-      // console.log(data);
-      setOptions({
-        method: "POST",
-        url: `https://${data.value}/api/branches`
-      });
-      setOptionsIsLoaded(true);
-    })
-  };
+  const [errorText, setErrorText] = useState("");
 
-  const readBranch = async () => {
-    try {
-      await getData("branch").then(value => value ? setSelected(value) : '')
-    } catch (e) {
-      console.log('Failed to fetch the input from storage');
-    }
+  const branchApi = () => {
+    setOptions({
+      url: `https://${domain}/api/branches`,
+    });
   };
 
   const onCheckPressed = () => {
     if (selected === null) {
-      setBranch({ ...branch, error: 'Branch must choose!'});
+      setBranch({ ...branch, error: "Branch must choose!" });
       return;
     }
-    console.log(selected);
 
     navigation.navigate("Login");
   };
 
-  const dispatch = useDispatch();
-  const fetchBranches = () => {dispatch(getBranches(options))};
-
   useEffect(() => {
-    branchApi();
-    readBranch();
-
-    if(optionsIsLoaded) {
-      fetchBranches();
+    if (domain) {
+      setBranches([]);
+      setBranch({ data: null, error: "" });
+      setSelected(null);
+      setErrorText("");
+      branchApi();
     }
-  }, [optionsIsLoaded]);
+  }, [domain]);
 
   useEffect(() => {
-    if(branches) {
-      setBranch({data: branches, error: ''})
+    if (options) {
+      axiosInstance.post(options.url).then((e) => {
+        setBranch({ data: null, error: "" });
+        setBranches([]);
+        setErrorText("");
+        setIsDataSet(false);
+        e.data.data?.map((item) =>
+          setBranches((prev) => [
+            ...prev,
+            { label: item.title, value: item.id, enabled: item.enabled },
+          ])
+        );
+        setIsLoading(false);
+      }).catch((error) => {
+        if (error) {
+          setIsDataSet(false);
+          setBranches([]);
+          setBranch({ data: null, error: "" });
+          setIsLoading(true);
+          setErrorText("Branch list not found or Domain is incorrect");
+        }
+      });
+    }
+  }, [options]);
+
+  useEffect(() => {
+    if (branches) {
+      setBranch({ data: branches, error: "" });
     }
   }, [branches]);
 
   useEffect(() => {
-    storeData("branch", selected);
+    if (selected) {
+      branches?.map((e) => {
+        if (e.value === selected) {
+          storeData("branchName", e.label);
+        }
+      })
+      storeData("branch", selected);
+      setIsDataSet((data) => !data);
+    }
   }, [selected]);
 
+  // console.log("===================  branches list");
+  // console.log(branch.data);
+  // console.log("=================== end branches list");
 
-  if(branches?.length == 0){
-    return null;
+  if (isLoading) {
+    return <Loader error={errorText} />;
   }
 
   return (
     <Background>
-        <Logo />
+      <Logo />
 
       <SelectOption
         value={selected}
-        onValueChange={(value) => {setSelected(value);setBranch({ ...branch, error: '' });}}
-        items={branch?.data || ''}
-        key={(item)=> item?.id || ''}
+        onValueChange={(value) => {
+          setSelected(value);
+          setBranch({ ...branch, error: "" });
+        }}
+        items={branch?.data || []}
+        key={(item) => item?.id || 1}
         error={!!branch?.error}
-        errorText={branch?.error || ''}
+        errorText={branch?.error || ""}
       />
 
       <Button
         mode="contained"
-        style={{backgroundColor: '#000'}}
+        style={{ backgroundColor: "#000" }}
         onPress={onCheckPressed}
       >
         accept
       </Button>
     </Background>
-  )
-}
+  );
+};

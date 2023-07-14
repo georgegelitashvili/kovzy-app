@@ -16,9 +16,11 @@ import {
   SimpleLineIcons,
 } from "@expo/vector-icons";
 
+import { AuthContext, AuthProvider } from "../../context/AuthProvider";
 import { storeData, getData, getMultipleData } from "../../helpers/storage";
+import Loader from "../generate/loader";
 import { String, LanguageContext } from "../Language";
-import { Request } from "../../axios/apiRequests";
+import axiosInstance from "../../apiConfig/apiRequests";
 import OrdersDetail from "./OrdersDetail";
 import OrdersModal from "../modal/OrdersModal";
 import printRows from "../../PrintRows";
@@ -29,32 +31,37 @@ const numColumns = printRows(width);
 const cardSize = width / numColumns;
 
 // render accepted orders function
-export const AcceptedOrdersList = (auth) => {
+export const AcceptedOrdersList = () => {
+  const { setIsDataSet, domain, setDomain, branchid, setUser } = useContext(AuthContext);
   const [orders, setOrders] = useState([]);
+
+  const [page, setPage] = useState(0);
 
   const [options, setOptions] = useState({}); // api options
   const [optionsIsLoaded, setOptionsIsLoaded] = useState(false); // api options
   const [deliveronOptions, setDeliveronOptions] = useState({});
-  const [deliveronStatus, setDeliveronStatus] = useState({});
   const [isDeliveronOptions, setIsDeliveronOptions] = useState(false);
-  const [acceptOrderOptions, setAcceptOrderOptions] = useState({});
-  const [rejectOrderOptions, setRejectOrderOptions] = useState({});
-  const [deliveronData, setDeliveronData] = useState({});
 
   const [deliveron, setDeliveron] = useState([]);
   const [visible, setVisible] = useState(false); // modal state
   const [itemId, setItemId] = useState(null); //item id for modal
   const [isOpen, setOpenState] = useState([]); // my accordion state
-  const [lang, setLang] = useState("");
   const [modalType, setModalType] = useState("");
 
-  const { dictionary } = useContext(LanguageContext);
+  const [loading, setLoading] = useState(true);
+  const [loadingOptions, setLoadingOptions] = useState(false);
+
+  const { dictionary, userLanguage } = useContext(LanguageContext);
+
+  const increment = () => {setPage(c => c + 1);setLoading(true)};
+  const decrement = () => {setPage(c => c - 1);setLoading(true)};
 
   const onChangeModalState = useCallback((newState) => {
     setTimeout(() => {
       setVisible(newState);
       setIsDeliveronOptions(newState);
       setItemId(null);
+      setDeliveron([]);
     }, 0);
   });
 
@@ -65,58 +72,15 @@ export const AcceptedOrdersList = (auth) => {
     if (index > -1) setOpenState([...isOpen.filter((i) => i !== value)]);
   });
 
-  const readData = async () => {
-    await getMultipleData(["domain", "branch"]).then((data) => {
-      let domain = [JSON.parse(data[0][1])].map((e) => e.value);
-      let branchid = data[1][1];
-
-      setOptions({
-        method: "POST",
-        data: {
-          type: 0,
-          page: 1,
-          branchid: branchid,
-        },
-        url: `https://${domain[0]}/api/getAcceptedOrders`,
-      });
-      setOptionsIsLoaded(true);
+  const apiOptions = () => {
+    setOptions({
+      url_getAcceptedOrders: `https://${domain}/api/getAcceptedOrders`,
+      url_deliveronStatus: `https://${domain}/api/deliveronStatus`,
+      url_checkOrderStatus: `https://${domain}/api/checkOrderStatus`,
+      url_orderPrepared: `https://${domain}/api/orderPrepared`,
+      url_rejectOrder: `https://${domain}/api/rejectOrder`,
     });
-  };
-
-  const readDeliveronStatus = async (endPoint) => {
-    await getData("domain").then(data => {
-      setDeliveronStatus({
-        method: "POST",
-        url: `https://${data.value}/api/deliveronStatus`
-      });
-    })
-  };
-
-  const readDataDeliveron = async () => {
-    await getData("domain").then((data) => {
-      setDeliveronOptions({
-        method: "POST",
-        url: `https://${data.value}/api/checkOrderStatus`,
-      });
-    });
-  };
-
-  const readDataPreparedOrder = async () => {
-    await getData("domain").then((data) => {
-      setAcceptOrderOptions({
-        method: "POST",
-        url: `https://${data.value}/api/orderPrepared`,
-      });
-    });
-  };
-
-  const readDataRejectOrder = async () => {
-    await getData("domain").then((data) => {
-      setRejectOrderOptions({
-        method: "POST",
-        url: `https://${data.value}/api/rejectOrder`,
-      });
-    });
+    setOptionsIsLoaded(true);
   };
 
   // modal show
@@ -125,45 +89,69 @@ export const AcceptedOrdersList = (auth) => {
     setVisible(true);
   };
 
-  getData("rcml-lang").then((lang) => setLang(lang || "ka"));
-
   useEffect(() => {
-    readData();
-    readDeliveronStatus();
-    readDataDeliveron();
-    readDataPreparedOrder();
-    readDataRejectOrder();
-  }, []);
-
-  useEffect(() => {
-    if(auth === true) {
-      const interval = setInterval(() => {
-        if (optionsIsLoaded) {
-          Request(options).then((resp) => setOrders(resp));
-        }
-      }, 5000);
-
-      return () => {
-        clearInterval(interval);
-      };
+    if (domain && branchid) {
+      apiOptions();
+    } else if (domain || branchid) {
+      setOptionsIsLoaded(false);
+      setOrders([]);
     }
-  }, [optionsIsLoaded, auth]);
+  }, [domain, branchid]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (optionsIsLoaded || page) {
+        axiosInstance
+          .post(options.url_getAcceptedOrders, JSON.stringify({
+            Pagination: {
+              limit: 12,
+              page: page
+            },
+            branchid: branchid,
+            type: 0
+          }))
+          .then((resp) => {
+            setOrders(resp.data.data);
+          })
+          .catch((error) => {
+            if (error) {
+              console.log("----------------- accepted orders error");
+              console.log(error);
+              console.log("----------------- end accepted orders error");
+              setOrders([]);
+              setIsDataSet(false);
+            }
+          });
+        setLoading(false);
+      }
+    }, 5000);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [optionsIsLoaded, page]);
 
 
   useEffect(() => {
     if (itemId) {
-      setDeliveronStatus({ ...deliveronStatus });
       setIsDeliveronOptions(true);
+      setLoadingOptions(true);
     }
   }, [itemId]);
 
+  useEffect(() => {
+    if (deliveron) {
+      setLoadingOptions(false);
+    }
+  }, [deliveron]);
 
   useEffect(() => {
     if (isDeliveronOptions) {
-      Request(deliveronStatus).then((resp) => setDeliveron(resp));
+      axiosInstance.post(options.url_deliveronStatus).then((resp) => {
+        setDeliveron(resp.data.data);
+      });
     }
   }, [isDeliveronOptions]);
-
 
   const renderEnteredOrdersList = ({ item }) => {
     return (
@@ -204,7 +192,7 @@ export const AcceptedOrdersList = (auth) => {
             </Text>
 
             <Divider />
-            <OrdersDetail orderId={item.id} lang={lang} />
+            <OrdersDetail orderId={item.id} />
             <Divider />
 
             <Text variant="titleLarge">{item.price} GEL</Text>
@@ -215,15 +203,19 @@ export const AcceptedOrdersList = (auth) => {
                 buttonColor="#2fa360"
                 onPress={() => {
                   setItemId(item.id);
-                  showModal('status');
+                  showModal("status");
                 }}
               >
                 {dictionary["orders.finish"]}
               </Button>
-              <Button textColor="white" buttonColor="#f14c4c" onPress={() => {
+              <Button
+                textColor="white"
+                buttonColor="#f14c4c"
+                onPress={() => {
                   setItemId(item.id);
-                  showModal('reject');
-                }}>
+                  showModal("reject");
+                }}
+              >
                 {dictionary["orders.reject"]}
               </Button>
             </Card.Actions>
@@ -233,12 +225,13 @@ export const AcceptedOrdersList = (auth) => {
     );
   };
 
-  if (orders?.length == 0 || orders == null) {
-    return null;
+  if (loading) {
+    return <Loader />;
   }
 
   return (
-    <View>
+    <View style={{ flex: 1 }}>
+      {loadingOptions ? <Loader /> : null}
       <ScrollView horizontal={true} showsVerticalScrollIndicator={false}>
         {visible ? (
           <OrdersModal
@@ -249,8 +242,7 @@ export const AcceptedOrdersList = (auth) => {
             deliveron={deliveron}
             deliveronOptions={deliveronOptions}
             type={modalType}
-            accept={acceptOrderOptions}
-            reject={rejectOrderOptions}
+            options={options}
           />
         ) : null}
         <FlatGrid
@@ -262,6 +254,39 @@ export const AcceptedOrdersList = (auth) => {
           keyExtractor={(item) => item.id}
         />
       </ScrollView>
+      <View style={styles.paginationContainer}>
+        <TouchableOpacity
+          onPress={() => {
+            decrement();
+          }}
+          disabled={page === 0}
+        >
+          <Text
+            style={[
+              styles.paginationButton,
+              page === 0 && styles.paginationButtonDisabled,
+            ]}
+          >
+            Prev
+          </Text>
+        </TouchableOpacity>
+        <Text style={styles.paginationText}>{page}</Text>
+        <TouchableOpacity
+          onPress={() => {
+            increment();
+          }}
+          disabled={page === Math.ceil(increment)}
+        >
+          <Text
+            style={[
+              styles.paginationButton,
+              page === Math.ceil(increment) && styles.paginationButtonDisabled,
+            ]}
+          >
+            Next
+          </Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 };
@@ -304,5 +329,26 @@ const styles = StyleSheet.create({
   },
   title: {
     paddingVertical: 10,
+  },
+  paginationContainer: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 15,
+    marginBottom: 15,
+  },
+  paginationButton: {
+    backgroundColor: "#ccc",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    marginHorizontal: 5,
+    borderRadius: 5,
+  },
+  paginationButtonDisabled: {
+    opacity: 0.5,
+  },
+  paginationText: {
+    fontSize: 17,
+    fontWeight: "bold",
   },
 });

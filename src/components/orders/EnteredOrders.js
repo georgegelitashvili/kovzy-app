@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback, useContext } from "react";
-import { useSelector, useDispatch } from "react-redux";
 import {
   StyleSheet,
   Dimensions,
@@ -7,20 +6,18 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
-  Alert
+  Alert,
+  ActivityIndicator,
 } from "react-native";
 import { Text, Button, Divider, Card } from "react-native-paper";
 import { FlatGrid } from "react-native-super-grid";
-import {
-  MaterialCommunityIcons,
-  FontAwesome,
-  SimpleLineIcons,
-} from "@expo/vector-icons";
+import { MaterialCommunityIcons, SimpleLineIcons } from "@expo/vector-icons";
 import { Audio } from "expo-av";
 
-import { storeData, getData, getMultipleData } from "../../helpers/storage";
+import { AuthContext, AuthProvider } from "../../context/AuthProvider";
+import Loader from "../generate/loader";
 import { String, LanguageContext } from "../Language";
-import { Request } from "../../axios/apiRequests";
+import axiosInstance from "../../apiConfig/apiRequests";
 import OrdersDetail from "./OrdersDetail";
 import OrdersModal from "../modal/OrdersModal";
 import printRows from "../../PrintRows";
@@ -34,170 +31,157 @@ let ordersCount;
 let temp = 0;
 
 // render entered orders function
-export const EnteredOrdersList = (auth) => {
+export const EnteredOrdersList = () => {
+  const { setIsDataSet, isDataSet, domain, branchid } = useContext(AuthContext);
   const [orders, setOrders] = useState([]);
 
   const [options, setOptions] = useState({}); // api options
   const [optionsIsLoaded, setOptionsIsLoaded] = useState(false); // api options
   const [deliveronOptions, setDeliveronOptions] = useState({});
   const [isDeliveronOptions, setIsDeliveronOptions] = useState(false);
-  const [acceptOrderOptions, setAcceptOrderOptions] = useState({});
-  const [rejectOrderOptions, setRejectOrderOptions] = useState({});
 
   const [deliveron, setDeliveron] = useState([]);
   const [visible, setVisible] = useState(false); // modal state
   const [itemId, setItemId] = useState(null); //item id for modal
   const [isOpen, setOpenState] = useState([]); // my accordion state
-  const [lang, setLang] = useState("");
   const [modalType, setModalType] = useState("");
   const [sound, setSound] = useState(new Audio.Sound());
 
-  const { dictionary } = useContext(LanguageContext);
-  // console.log(auth);
+  const [loading, setLoading] = useState(true);
+  const [loadingOptions, setLoadingOptions] = useState(false);
 
-  const onChangeModalState = useCallback((newState) => {
+  const { dictionary, userLanguage } = useContext(LanguageContext);
+
+  const onChangeModalState = (newState) => {
     setTimeout(() => {
       setVisible(newState);
       setIsDeliveronOptions(newState);
       setItemId(null);
+      setDeliveron([]);
     }, 0);
-  });
+  };
 
-  const toggleContent = useCallback((value) => {
+  const toggleContent = (value) => {
     setOpenState([...isOpen, value]);
 
     let index = isOpen.indexOf(value);
     if (index > -1) setOpenState([...isOpen.filter((i) => i !== value)]);
-  });
+  };
 
   const onStopPlaySound = async () => {
     sound.stopAsync();
-  }
+  };
 
   const onPlaySound = async () => {
     const source = require("../../assets/audio/alert.mp3");
     try {
       await sound.loadAsync(source);
-      await sound.playAsync().then(async PlaybackStatus => {
-        setTimeout(() => {
-          sound.unloadAsync();
-        }, PlaybackStatus.playableDurationMillis)
-      }).catch(error => {
-        console.log(error)
-      })
+      await sound
+        .playAsync()
+        .then(async (PlaybackStatus) => {
+          setTimeout(() => {
+            sound.unloadAsync();
+          }, PlaybackStatus.playableDurationMillis);
+        })
+        .catch((error) => {
+          console.log(error);
+        });
     } catch (error) {
-      console.log(error)
+      console.log(error);
     }
-  }
+  };
 
   const orderReceived = () => {
     Alert.alert("ALERT", "***New Order Received***", [
-      {text: 'OK', onPress: () => onStopPlaySound()},
+      { text: "OK", onPress: () => onStopPlaySound() },
     ]);
-  }
-
-  const readData = async () => {
-    await getMultipleData(["domain", "branch"]).then((data) => {
-      // console.log(data);
-      let domain = [JSON.parse(data[0][1])].map((e) => e.value);
-      let branchid = data[1][1];
-
-      setOptions({
-        method: "POST",
-        data: {
-          type: 0,
-          page: 1,
-          branchid: branchid,
-        },
-        url: `https://${domain[0]}/api/getUnansweredOrders`,
-      });
-      setOptionsIsLoaded(true);
-    });
   };
 
-  const readDataDeliveron = async () => {
-    await getData("domain").then((data) => {
-      setDeliveronOptions({
-        method: "POST",
-        url: `https://${data.value}/api/deliveronRecheck`,
-      });
+  const apiOptions = () => {
+    setOptions({
+      url_unansweredOrders: `https://${domain}/api/getUnansweredOrders`,
+      url_deliveronRecheck: `https://${domain}/api/deliveronRecheck`,
+      url_acceptOrder: `https://${domain}/api/acceptOrder`,
+      url_rejectOrder: `https://${domain}/api/rejectOrder`,
     });
-  };
-
-  const readDataAcceptOrder = async () => {
-    await getData("domain").then((data) => {
-      setAcceptOrderOptions({
-        method: "POST",
-        url: `https://${data.value}/api/acceptOrder`,
-      });
-    });
-  };
-
-  const readDataRejectOrder = async () => {
-    await getData("domain").then((data) => {
-      setRejectOrderOptions({
-        method: "POST",
-        url: `https://${data.value}/api/rejectOrder`,
-      });
-    });
+    setOptionsIsLoaded(true);
   };
 
   // modal show
   const showModal = (type) => {
     setModalType(type);
-    console.log(deliveron);
     setVisible(true);
   };
 
-  getData("rcml-lang").then((lang) => setLang(lang || "ka"));
-
-
   useEffect(() => {
-      readData();
-      readDataDeliveron();
-      readDataAcceptOrder();
-      readDataRejectOrder();
-  }, []);
-
-  useEffect(() => {
-    if(auth === true) {
-      const interval = setInterval(() => {
-        if (optionsIsLoaded) {
-          Request(options).then((resp) => {setOrders(resp);});
-        }
-      }, 5000);
-
-      return () => {
-        clearInterval(interval);
-      };
+    if (domain && branchid) {
+      apiOptions();
+    } else if (domain || branchid) {
+      setOptionsIsLoaded(false);
+      setOrders([]);
     }
-  }, [optionsIsLoaded, auth]);
+  }, [domain, branchid]);
 
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (optionsIsLoaded) {
+        axiosInstance
+          .post(options.url_unansweredOrders, {
+            type: 0,
+            page: 1,
+            branchid: branchid,
+          })
+          .then((resp) => {
+            setOrders(resp.data.data);
+          })
+          .catch((error) => {
+            console.log("----------------- entered orders error");
+            console.log(error);
+            console.log("----------------- end entered orders error");
+            if (error) {
+              setOrders([]);
+              setIsDataSet(false);
+            }
+          });
+        setLoading(false);
+      }
+    }, 5000);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [optionsIsLoaded]);
 
   useEffect(() => {
     if (itemId) {
-      setDeliveronOptions({ ...deliveronOptions, data: { orderId: itemId } });
+      setDeliveronOptions((prev) => ({ ...prev, data: { orderId: itemId } }));
       setIsDeliveronOptions(true);
+      setLoadingOptions(true);
     }
   }, [itemId]);
 
-
   useEffect(() => {
     if (isDeliveronOptions) {
-      Request(deliveronOptions).then((resp) => setDeliveron(resp));
+      axiosInstance
+        .post(options.url_deliveronRecheck, deliveronOptions.data)
+        .then((resp) => {setDeliveron(resp.data.data)});
     }
   }, [isDeliveronOptions]);
 
+  useEffect(() => {
+    if (deliveron) {
+      setLoadingOptions(false);
+    }
+  }, [deliveron]);
 
   useEffect(() => {
     ordersCount = Object.keys(orders).length;
-    if(ordersCount > temp) {
+    if (ordersCount > temp) {
       onPlaySound();
       orderReceived();
     }
     temp = ordersCount;
-  }, [orders])
-
+  }, [orders]);
 
   const renderEnteredOrdersList = ({ item }) => {
     return (
@@ -238,7 +222,7 @@ export const EnteredOrdersList = (auth) => {
             </Text>
 
             <Divider />
-            <OrdersDetail orderId={item.id} lang={lang} />
+            <OrdersDetail orderId={item.id} />
             <Divider />
 
             <Text variant="titleLarge">{item.price} GEL</Text>
@@ -249,15 +233,19 @@ export const EnteredOrdersList = (auth) => {
                 buttonColor="#2fa360"
                 onPress={() => {
                   setItemId(item.id);
-                  showModal('accept');
+                  showModal("accept");
                 }}
               >
                 {dictionary["orders.accept"]}
               </Button>
-              <Button textColor="white" buttonColor="#f14c4c" onPress={() => {
+              <Button
+                textColor="white"
+                buttonColor="#f14c4c"
+                onPress={() => {
                   setItemId(item.id);
-                  showModal('reject');
-                }}>
+                  showModal("reject");
+                }}
+              >
                 {dictionary["orders.reject"]}
               </Button>
             </Card.Actions>
@@ -267,18 +255,21 @@ export const EnteredOrdersList = (auth) => {
     );
   };
 
-  if (orders?.length == 0 || orders == null) {
-    return null;
+  if (loading) {
+    return <Loader />;
   }
 
   // console.log('------------ entered orders');
   // console.log(orders);
+  // console.log(branchid);
+  // console.log(optionsIsLoaded);
   // console.log('------------ end entered orders');
 
   // console.log(orders);
 
   return (
     <View>
+      {loadingOptions ? <Loader /> : null}
       <ScrollView horizontal={true} showsVerticalScrollIndicator={false}>
         {visible ? (
           <OrdersModal
@@ -289,8 +280,7 @@ export const EnteredOrdersList = (auth) => {
             deliveron={deliveron}
             deliveronOptions={deliveronOptions}
             type={modalType}
-            accept={acceptOrderOptions}
-            reject={rejectOrderOptions}
+            options={options}
           />
         ) : null}
         <FlatGrid

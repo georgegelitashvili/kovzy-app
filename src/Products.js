@@ -1,20 +1,25 @@
 import React, { useState, useEffect, useContext, useCallback } from "react";
-import {
-  StyleSheet,
-  View,
-  TouchableOpacity,
-  Dimensions,
-} from "react-native";
+import { StyleSheet, View, TouchableOpacity, Dimensions, RefreshControl } from "react-native";
+import NetInfo from "@react-native-community/netinfo";
 import { Text, Button, Divider, Card } from "react-native-paper";
 import { FlatGrid } from "react-native-super-grid";
-import { getData } from "./helpers/storage";
+import SelectOption from "./components/generate/SelectOption";
+import { AuthContext, AuthProvider } from "./context/AuthProvider";
+import Loader from "./components/generate/loader";
 import { String, LanguageContext } from "./components/Language";
-import { Request } from "./axios/apiRequests";
+import axiosInstance from "./apiConfig/apiRequests";
 
 const width = Dimensions.get("window").width;
 
 export default function Products({ navigation }) {
+  const { setIsDataSet, domain, branchid } = useContext(AuthContext);
   const [products, setProducts] = useState([]);
+  const [category, setCategory] = useState([]);
+  const [excluded, setExcluded] = useState([]);
+  const [productData, setProductData] = useState({});
+  const [isConnected, setIsConnected] = useState(true);
+
+  const [selected, setSelected] = useState(null);
 
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
@@ -22,132 +27,208 @@ export default function Products({ navigation }) {
   const [options, setOptions] = useState({}); // api options
   const [optionsIsLoaded, setOptionsIsLoaded] = useState(false); // api options
   const [activityOptions, setActivityOptions] = useState({});
-  const [activityOptionsIsLoaded, setActivityOptionsIsLoaded] = useState(false); // api options
   const [sendApi, setSendApi] = useState(false);
   const [sendEnabled, setSendEnabled] = useState(false);
   const [value, setValue] = useState("");
-  const [enabled, setEnabled] = useState("");
   const [productEnabled, setProductEnabled] = useState(false);
-  const [lang, setLang] = useState("");
 
-  const { dictionary } = useContext(LanguageContext);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  getData("rcml-lang").then((lang) => setLang(lang || "ka"));
+  const { dictionary, userLanguage } = useContext(LanguageContext);
 
-  const readDomain = async () => {
-    await getData("domain").then((data) => {
-      setOptions({
-        method: "POST",
-        url: `https://${data.value}/api/getProducts`,
-      });
-      setOptionsIsLoaded(true);
+  const apiOptions = () => {
+    setOptions({
+      url_getProducts: `https://${domain}/api/getProducts`,
+      url_productActivity: `https://${domain}/api/productActivity`,
     });
-  };
 
-  const productActivity = async () => {
-    await getData("domain").then((data) => {
-      setActivityOptions({
-        method: "POST",
-        url: `https://${data.value}/api/productActivity`,
-      });
-      setActivityOptionsIsLoaded(true);
-    });
+    setOptionsIsLoaded(true);
   };
 
   useEffect(() => {
-    readDomain();
-    productActivity();
-  }, [])
+    if (domain) {
+      apiOptions();
+    }
+  }, [domain]);
 
   useEffect(() => {
-    if (optionsIsLoaded && (page || lang)) {
-      setOptions({ ...options, data: { lang: lang, page: page } });
+    const removeSubscription = NetInfo.addEventListener((state) => {
+      setIsConnected(state.isConnected);
+    });
+
+    return () => { removeSubscription() };
+  }, []);
+
+  useEffect(() => {
+    if (optionsIsLoaded && (page || userLanguage || selected)) {
+      setProductData((prev) => ({
+        ...prev,
+        data: {
+          lang: userLanguage,
+          page: page,
+          categoryid: selected,
+          branchid: branchid
+        }
+      }));
       setSendApi(true);
+      setLoading(true);
+      setCategory([]);
     }
-  }, [page, lang, optionsIsLoaded]);
+  }, [page, userLanguage, selected, optionsIsLoaded]);
 
   useEffect(() => {
-    if (sendApi) {
-      Request(options).then((resp) => {
-        // console.log(resp);
-        setProducts(resp);
-        setTotalPages(resp.total / resp.per_page);
-      });
+    if (sendApi || isConnected) {
+      fetchData();
       setSendApi(false);
-      // console.log(options);
     }
-  }, [sendApi]);
-
+  }, [sendApi, isConnected]);
 
   useEffect(() => {
-    if(activityOptionsIsLoaded && value) {
-      setActivityOptions({...activityOptions, data: {pid: value, enabled: enabled}});
+    if (value) {
+      setActivityOptions((prev) => ({
+        ...prev,
+        data: { pid: value, branchid: branchid },
+      }));
       setSendEnabled(true);
     }
-  }, [activityOptionsIsLoaded, value, enabled])
+  }, [value, branchid]);
 
   useEffect(() => {
-    if(sendEnabled) {
-      console.log(activityOptions)
-      Request(activityOptions).then((resp) => {
-        console.log(resp);
-      });
+    if (sendEnabled || isConnected) {
+      axiosInstance.post(options.url_productActivity, activityOptions.data);
+      setLoading(true);
       setProductEnabled(true);
       setSendEnabled(false);
     }
-  }, [sendEnabled])
-
+  }, [sendEnabled, isConnected]);
 
   useEffect(() => {
-    if (productEnabled) {
-      Request(options).then((resp) => {
-        // console.log(resp);
-        setProducts(resp);
-        setTotalPages(resp.total / resp.per_page);
-      });
+    if (productEnabled || isConnected) {
+      fetchData();
       setProductEnabled(false);
       setSendApi(false);
-      // console.log(options);
     }
-  }, [productEnabled]);
+  }, [productEnabled, isConnected]);
 
 
-  const renderProductList = (items) => {
+  const fetchData = () => {
+    axiosInstance
+      .post(options.url_getProducts, productData.data)
+      .then((resp) => {
+        resp.data.category?.map((item) => {
+          if (item.name != null) {
+            setCategory((prev) => [
+              ...prev,
+              { label: item.name, value: item.id },
+            ])
+          }
+        });
+
+        if (resp.data.excluded) {
+          resp.data.excluded?.map((item) => {
+            setExcluded((prev) => [...prev, item.productid])
+          });
+        }
+
+        setLoading(false);
+        setProducts(resp.data.data.data);
+        setTotalPages(resp.data.data.total / resp.data.data.per_page);
+      }).catch((error) => {
+        if (error) {
+          setProducts([]);
+          setIsDataSet(false);
+        }
+      });
+    setRefreshing(false);
+  }
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    setLoading(true);
+    setProducts([]);
+    setExcluded([]);
+    fetchData();
+    setSendApi(false);
+  };
+
+  console.log(activityOptions);
+
+  const renderProductList = ({ item }) => {
     return (
-      <Card key={items.index}>
+      <Card key={item.index}>
         <Card.Content style={styles.cardContent}>
           <Text variant="titleMedium" style={styles.title}>
-            {items.item.name}
+            {item.name}
           </Text>
         </Card.Content>
 
-          <Card.Actions>
-                {items.item.enabled == 1 ? (
-                  <Button textColor="white" buttonColor="#f14c4c" style={styles.button} onPress={() => {setValue(items.item.id);setEnabled(0)}}>{dictionary['prod.disableProduct']}</Button>
-                ) : (
-                  <Button textColor="white" buttonColor="#2fa360" style={styles.button} onPress={() => {setValue(items.item.id);setEnabled(1)}}>{dictionary['prod.enableProduct']}</Button>
-                )}
-            </Card.Actions>
+        <Card.Actions>
+          <Button
+            textColor="white"
+            buttonColor="#3490dc"
+            style={styles.button}
+            onPress={() => navigation.navigate('ProductsDetail', { id: item.id })}
+          >
+            {dictionary["prod.ingredients"]}
+          </Button>
+
+          {excluded.includes(item.id) ? (
+              <Button
+                textColor="white"
+                buttonColor="#2fa360"
+                style={styles.button}
+                onPress={() => {
+                  setValue(item.id);
+                }}
+              >
+                {dictionary["prod.enableProduct"]}
+              </Button>
+            ) : (
+              <Button
+                textColor="white"
+                buttonColor="#f14c4c"
+                style={styles.button}
+                onPress={() => {
+                  setValue(item.id);
+                }}
+              >
+                {dictionary["prod.disableProduct"]}
+              </Button>
+            )
+          }
+        </Card.Actions>
       </Card>
     );
   };
 
-
-
-  if (products == null || products?.data?.length == 0) {
-    return null;
+  if (loading) {
+    return <Loader />;
   }
 
   return (
     <>
+      <View style={{ paddingLeft: 10, paddingRight: 10 }}>
+        <SelectOption
+          value={selected}
+          onValueChange={(value) => {
+            setSelected(value);
+          }}
+          items={category || []}
+          key={(item) => item?.id || 1}
+        />
+      </View>
       <FlatGrid
         itemDimension={width}
-        data={products.data || []}
+        data={products || []}
+        maxItemsPerRow={4}
         renderItem={renderProductList}
         adjustGridToStyles={true}
         contentContainerStyle={{ justifyContent: "flex-start" }}
         keyExtractor={(item) => item.id}
-        onEndReachedThreshold={0.5}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
       />
 
       <View style={styles.paginationContainer}>
@@ -211,7 +292,7 @@ const styles = StyleSheet.create({
   button: {
     fontSize: 13,
     marginTop: 25,
-    padding: 10
+    padding: 1,
   },
   cardContent: {
     flexDirection: "row",

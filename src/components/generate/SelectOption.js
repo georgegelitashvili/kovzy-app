@@ -8,8 +8,9 @@ export default function SelectOption({ errorText, description, ...props }) {
     <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
       <View style={styles.container}>
         <RNPickerSelect
-          style={styles.pickerSelect}
-          {...props}
+          useNativeAndroidPickerStyle={false}
+          style={{...pickerSelectStyles}}
+          {...props || []}
         />
         {description && !errorText ? (
           <Text style={styles.description}>{description}</Text>
@@ -23,18 +24,8 @@ export default function SelectOption({ errorText, description, ...props }) {
 const styles = StyleSheet.create({
   container: {
     width: '100%',
+    height: 50,
     marginVertical: 12,
-  },
-  pickerSelect: {
-    backgroundColor: theme.colors.surface,
-    fontSize: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 10,
-    borderWidth: 1,
-    borderColor: 'gray',
-    borderRadius: 4,
-    color: 'black',
-    paddingRight: 30,
   },
   description: {
     fontSize: 13,
@@ -47,3 +38,28 @@ const styles = StyleSheet.create({
     paddingTop: 8,
   },
 });
+
+
+const pickerSelectStyles = StyleSheet.create({
+  inputIOS: {
+    fontSize: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderRadius: 4,
+    borderColor: 'gray',
+    paddingRight: 30,
+    backgroundColor: theme.colors.surface,
+  },
+  inputAndroid: {
+      fontSize: 16,
+      paddingVertical: 12,
+      paddingHorizontal: 10,
+      borderRadius: 4,
+      borderWidth: 1,
+      borderColor: 'gray',
+      color: 'black',
+      paddingRight: 30,
+      backgroundColor: theme.colors.surface,
+  },
+  })

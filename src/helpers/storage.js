@@ -37,10 +37,12 @@ export const storeData = async (key, value) => {
     };
 
   // remove all data from Async Storage
-  export const removeData = async () => {
+  export const removeData = async (key) => {
     try {
-      await AsyncStorage.clear();
+      await AsyncStorage.removeItem(key);
+      return true;
     } catch (e) {
       console.log(e.message);
+      return false;
     }
   };
