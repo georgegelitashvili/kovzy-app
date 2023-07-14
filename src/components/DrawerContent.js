@@ -43,6 +43,7 @@ export default function DrawerContent(props) {
   };
 
   const onLogoutPressed = () => {
+    dispatch(ToggleTheme(false));
     props.navigation.closeDrawer();
     logout();
   };

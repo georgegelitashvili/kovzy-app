@@ -7,7 +7,6 @@ const WIDTH = Dimensions.get("screen").width;
 
 export default function Loader(props) {
   const { dictionary } = useContext(LanguageContext);
-  console.log(WIDTH);
 
   return (
     <>

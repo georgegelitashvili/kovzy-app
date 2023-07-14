@@ -12,9 +12,10 @@ import axiosInstance from "./apiConfig/apiRequests";
 const width = Dimensions.get("window").width;
 
 export default function Products({ navigation }) {
-  const { setIsDataSet, domain, setDomain, branchid, setUser } = useContext(AuthContext);
+  const { setIsDataSet, domain, branchid } = useContext(AuthContext);
   const [products, setProducts] = useState([]);
   const [category, setCategory] = useState([]);
+  const [excluded, setExcluded] = useState([]);
   const [productData, setProductData] = useState({});
   const [isConnected, setIsConnected] = useState(true);
 
@@ -29,14 +30,12 @@ export default function Products({ navigation }) {
   const [sendApi, setSendApi] = useState(false);
   const [sendEnabled, setSendEnabled] = useState(false);
   const [value, setValue] = useState("");
-  const [enabled, setEnabled] = useState("");
   const [productEnabled, setProductEnabled] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const { dictionary, userLanguage } = useContext(LanguageContext);
-
 
   const apiOptions = () => {
     setOptions({
@@ -63,7 +62,15 @@ export default function Products({ navigation }) {
 
   useEffect(() => {
     if (optionsIsLoaded && (page || userLanguage || selected)) {
-      setProductData((prev) => ({ ...prev, data: { lang: userLanguage, page: page, categoryid: selected } }));
+      setProductData((prev) => ({
+        ...prev,
+        data: {
+          lang: userLanguage,
+          page: page,
+          categoryid: selected,
+          branchid: branchid
+        }
+      }));
       setSendApi(true);
       setLoading(true);
       setCategory([]);
@@ -81,11 +88,11 @@ export default function Products({ navigation }) {
     if (value) {
       setActivityOptions((prev) => ({
         ...prev,
-        data: { pid: value, enabled: enabled },
+        data: { pid: value, branchid: branchid },
       }));
       setSendEnabled(true);
     }
-  }, [value, enabled]);
+  }, [value, branchid]);
 
   useEffect(() => {
     if (sendEnabled || isConnected) {
@@ -110,15 +117,20 @@ export default function Products({ navigation }) {
       .post(options.url_getProducts, productData.data)
       .then((resp) => {
         resp.data.category?.map((item) => {
-          // console.log(item);
           if (item.name != null) {
             setCategory((prev) => [
               ...prev,
               { label: item.name, value: item.id },
             ])
           }
+        });
+
+        if (resp.data.excluded) {
+          resp.data.excluded?.map((item) => {
+            setExcluded((prev) => [...prev, item.productid])
+          });
         }
-        )
+
         setLoading(false);
         setProducts(resp.data.data.data);
         setTotalPages(resp.data.data.total / resp.data.data.per_page);
@@ -131,11 +143,16 @@ export default function Products({ navigation }) {
     setRefreshing(false);
   }
 
-  const onRefresh = useCallback(() => {
+  const onRefresh = () => {
     setRefreshing(true);
+    setLoading(true);
+    setProducts([]);
+    setExcluded([]);
     fetchData();
     setSendApi(false);
-  });
+  };
+
+  console.log(activityOptions);
 
   const renderProductList = ({ item }) => {
     return (
@@ -156,31 +173,30 @@ export default function Products({ navigation }) {
             {dictionary["prod.ingredients"]}
           </Button>
 
-          {item.enabled == 1 ? (
-            <Button
-              textColor="white"
-              buttonColor="#f14c4c"
-              style={styles.button}
-              onPress={() => {
-                setValue(item.id);
-                setEnabled(0);
-              }}
-            >
-              {dictionary["prod.disableProduct"]}
-            </Button>
-          ) : (
-            <Button
-              textColor="white"
-              buttonColor="#2fa360"
-              style={styles.button}
-              onPress={() => {
-                setValue(item.id);
-                setEnabled(1);
-              }}
-            >
-              {dictionary["prod.enableProduct"]}
-            </Button>
-          )}
+          {excluded.includes(item.id) ? (
+              <Button
+                textColor="white"
+                buttonColor="#2fa360"
+                style={styles.button}
+                onPress={() => {
+                  setValue(item.id);
+                }}
+              >
+                {dictionary["prod.enableProduct"]}
+              </Button>
+            ) : (
+              <Button
+                textColor="white"
+                buttonColor="#f14c4c"
+                style={styles.button}
+                onPress={() => {
+                  setValue(item.id);
+                }}
+              >
+                {dictionary["prod.disableProduct"]}
+              </Button>
+            )
+          }
         </Card.Actions>
       </Card>
     );

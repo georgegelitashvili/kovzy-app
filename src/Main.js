@@ -34,11 +34,9 @@ const CombinedDarkTheme = {
   },
 };
 
-
 export default function Main() {
   const { isdarkTheme } = useSelector((state) => state.themeReducer);
   const themeMode = isdarkTheme ? CombinedDarkTheme : CombinedDefaultTheme;
-
 
   return (
     <AuthProvider>
