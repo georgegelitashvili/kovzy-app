@@ -21,7 +21,7 @@ export default function OrdersDetail({ orderId }) {
 
   const apiOptions = () => {
     setOptions({
-      url_orderCart: `https://${domain}/api/getOrderCart`,
+      url_orderCart: `https://${domain}/api/v1/admin/getOrderCart`,
     });
     setOptionsIsLoaded(true);
   };

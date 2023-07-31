@@ -33,8 +33,8 @@ export default function ProductsDetail({ navigation, route }) {
 
   const apiOptions = () => {
     setOptions({
-      url_customizable: `https://${domain}/api/getCustomizablePack`,
-      url_toggle: `https://${domain}/api/customizablePackActivity`,
+      url_customizable: `https://${domain}/api/v1/admin/getCustomizablePack`,
+      url_toggle: `https://${domain}/api/v1/admin/customizablePackActivity`,
     });
     setOptionsIsLoaded(true);
   };

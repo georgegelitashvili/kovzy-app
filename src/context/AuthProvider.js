@@ -54,8 +54,8 @@ export const AuthProvider = ({ children }) => {
 
   const apiOptions = () => {
     setOptions({
-      url_login: `https://${domain}/api/auth/login`,
-      url_logout: `https://${domain}/api/auth/logout`,
+      url_login: `https://${domain}/api/v1/admin/auth/login`,
+      url_logout: `https://${domain}/api/v1/admin/auth/logout`,
     });
   };
 

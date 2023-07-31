@@ -34,10 +34,10 @@ export default function DrawerContent(props) {
 
   const apiOptions = () => {
     setOptions({
-      url_branchActivity: `https://${domain}/api/branchActivity`,
-      url_deliveronStatus: `https://${domain}/api/deliveronStatus`,
-      url_branchStatus: `https://${domain}/api/branchStatus`,
-      url_deliveronActivity: `https://${domain}/api/deliveronActivity`,
+      url_branchActivity: `https://${domain}/api/v1/admin/branchActivity`,
+      url_deliveronStatus: `https://${domain}/api/v1/admin/deliveronStatus`,
+      url_branchStatus: `https://${domain}/api/v1/admin/branchStatus`,
+      url_deliveronActivity: `https://${domain}/api/v1/admin/deliveronActivity`,
     });
     setOptionsIsLoaded(true);
   };

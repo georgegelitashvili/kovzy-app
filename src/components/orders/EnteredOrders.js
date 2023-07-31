@@ -99,10 +99,10 @@ export const EnteredOrdersList = () => {
 
   const apiOptions = () => {
     setOptions({
-      url_unansweredOrders: `https://${domain}/api/getUnansweredOrders`,
-      url_deliveronRecheck: `https://${domain}/api/deliveronRecheck`,
-      url_acceptOrder: `https://${domain}/api/acceptOrder`,
-      url_rejectOrder: `https://${domain}/api/rejectOrder`,
+      url_unansweredOrders: `https://${domain}/api/v1/admin/getUnansweredOrders`,
+      url_deliveronRecheck: `https://${domain}/api/v1/admin/deliveronRecheck`,
+      url_acceptOrder: `https://${domain}/api/v1/admin/acceptOrder`,
+      url_rejectOrder: `https://${domain}/api/v1/admin/rejectOrder`,
     });
     setOptionsIsLoaded(true);
   };
