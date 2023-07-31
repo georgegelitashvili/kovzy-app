@@ -102,6 +102,7 @@ export default function Products({ navigation }) {
       setLoading(true);
       setProductEnabled(true);
       setSendEnabled(false);
+      setActivityOptions({});
     }
   }, [sendEnabled, isConnected]);
 
@@ -130,7 +131,6 @@ export default function Products({ navigation }) {
 
         if (resp.data.excluded) {
           resp.data.excluded?.map((item) => {
-            // console.log(item);
             setExcluded((prev) => [...prev, item.productid])
           });
         }
@@ -156,9 +156,14 @@ export default function Products({ navigation }) {
     fetchData();
     setSendApi(false);
   };
+  // console.log("--------------- excluded");
+  // console.log(excluded);
+  // console.log("--------------- end excluded");
 
-  console.log(enabled);
-  console.log(value);
+
+  // console.log("--------------- acrivity options");
+  // console.log(activityOptions.data);
+  // console.log("--------------- acrivity options");
 
   const renderProductList = ({ item }) => {
     return (

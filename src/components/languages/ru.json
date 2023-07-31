@@ -206,6 +206,7 @@
     "orders.discountedPrice": "Со скидкой",
     "orders.couponCode": "Код Купона",
     "orders.branch": "Филиал",
+    "orders.branchEnabled": "Филиал отключен",
     "orders.type": "Тип заказа",
     "orders.orderReceivedTitle": "Вы получили новый заказ!",
     "orders.soundPermissionDescription": "Чтобы получать звуковые уведомления при поступлении нового заказа, нам необходимо разрешение на доступ к звуковым устройствам.",
