@@ -10,7 +10,7 @@ export default function OrdersModalContent(props) {
     const [acceptOptions, setAcceptOptions] = useState(props.options.url_orderPrepared);
     const [statusData, setStatusDate] = useState({});
     const [status, setStatus] = useState(false);
-    const [isDisabled, setDisabled] = useState(false);
+    const [isDisabled, setIsDisabled] = useState(false);
     const [text, setText] = useState("");
 
     const { dictionary } = useContext(LanguageContext);
@@ -47,7 +47,7 @@ export default function OrdersModalContent(props) {
         setStatusDate({...statusData, data: {
           Orderid: props.itemId,
         }});
-        setDisabled(false);
+        setIsDisabled(false);
       }
     }, [props.itemId, props.deliveron.status])
 
@@ -56,9 +56,9 @@ export default function OrdersModalContent(props) {
         axiosInstance.post(options, statusData.data).then(resp => {
           setText(resp.data.data.content);
           if (resp.data.data.status == 2 || resp.data.data.status == -1) {
-            setDisabled(false);
+            setIsDisabled(false);
           } else {
-            setDisabled(true);
+            setIsDisabled(true);
           }
         });
         setStatus(false);
