@@ -25,7 +25,7 @@ export default function OrdersModalContent(props) {
 
   const [orderData, setOrderData] = useState({});
   const [deliveron, setDeliveron] = useState({ data: props.items, error: "" });
-  const [selected, setSelected] = useState(props.items[0].value || null);
+  const [selected, setSelected] = useState(props.items ? props.items[0]?.value : null);
   const [loading, setLoading] = useState(false);
   const { dictionary } = useContext(LanguageContext);
 
@@ -54,7 +54,7 @@ export default function OrdersModalContent(props) {
 
   useEffect(() => {
     if (selected) {
-      props.deliveron.content?.map((item) => {
+      props.deliveron?.content?.map((item) => {
         if (item.companyId == selected || item.type == selected) {
           setOrderData({
             ...orderData,
