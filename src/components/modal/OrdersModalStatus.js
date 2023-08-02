@@ -57,6 +57,11 @@ export default function OrdersModalContent(props) {
           setText(resp.data.data.content);
           if (resp.data.data.status == 2 || resp.data.data.status == -1) {
             setIsDisabled(false);
+            setStatusData({
+              ...statusData, data: {
+                Orderid: props.itemId,
+              }
+            });
           } else {
             setIsDisabled(true);
           }
