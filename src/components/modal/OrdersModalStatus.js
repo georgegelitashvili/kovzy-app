@@ -8,9 +8,9 @@ import { String, LanguageContext } from '../Language';
 export default function OrdersModalContent(props) {
     const [options, setOptions] = useState(props.options.url_checkOrderStatus);
     const [acceptOptions, setAcceptOptions] = useState(props.options.url_orderPrepared);
-    const [statusData, setStatusDate] = useState({});
+    const [statusData, setStatusData] = useState({});
     const [status, setStatus] = useState(false);
-    const [isDisabled, setIsDisabled] = useState(false);
+    const [isDisabled, setIsDisabled] = useState(true);
     const [text, setText] = useState("");
 
     const { dictionary } = useContext(LanguageContext);
@@ -31,20 +31,20 @@ export default function OrdersModalContent(props) {
           if(item.id == props.itemId) {
             const deliveronId = JSON.parse(item.deliveron_data);
             if(deliveronId?.length == 0 || deliveronId['order_id_deliveron'] == null) {
-              setStatusDate({...statusData, data: {
+              setStatusData({...statusData, data: {
                 Orderid: props.itemId,
-            }})
+              }})
             }else {
-              setStatusDate({...statusData, data: {
+              setStatusData({...statusData, data: {
                 deliveronOrderId: deliveronId['order_id_deliveron'],
-            }})
+              }})
               setStatus(true);
             }
 
           }
         })
       }else {
-        setStatusDate({...statusData, data: {
+        setStatusData({...statusData, data: {
           Orderid: props.itemId,
         }});
         setIsDisabled(false);
