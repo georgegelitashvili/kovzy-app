@@ -9,6 +9,11 @@
     "web": "expo start --web"
   },
   "dependencies": {
+    "@babel/plugin-proposal-nullish-coalescing-operator": "^7.0.0-0",
+    "@babel/plugin-proposal-optional-chaining": "^7.0.0-0",
+    "@babel/plugin-transform-arrow-functions": "^7.0.0-0",
+    "@babel/plugin-transform-shorthand-properties": "^7.0.0-0",
+    "@babel/plugin-transform-template-literals": "^7.0.0-0",
     "@expo/prebuild-config": "~6.2.4",
     "@expo/vector-icons": "^13.0.0",
     "@react-native-async-storage/async-storage": "1.18.2",
