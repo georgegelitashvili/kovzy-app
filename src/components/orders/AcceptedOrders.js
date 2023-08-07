@@ -251,7 +251,7 @@ export const AcceptedOrdersList = () => {
           renderItem={renderEnteredOrdersList}
           adjustGridToStyles={true}
           contentContainerStyle={{ justifyContent: "flex-start" }}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item) => item.id.toString()}
         />
       </ScrollView>
       <View style={styles.paginationContainer}>

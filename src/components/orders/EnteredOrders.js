@@ -52,6 +52,8 @@ export const EnteredOrdersList = () => {
 
   const { dictionary, userLanguage } = useContext(LanguageContext);
 
+  let num = 0;
+
   const onChangeModalState = (newState) => {
     setTimeout(() => {
       setVisible(newState);
@@ -183,6 +185,10 @@ export const EnteredOrdersList = () => {
     temp = ordersCount;
   }, [orders]);
 
+  const handleEndReached = () => {
+    console.log("reach: " + num++);
+  };
+
   const renderEnteredOrdersList = ({ item }) => {
     return (
       <Card key={item.id}>
@@ -289,7 +295,9 @@ export const EnteredOrdersList = () => {
           renderItem={renderEnteredOrdersList}
           adjustGridToStyles={true}
           contentContainerStyle={{ justifyContent: "flex-start" }}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item) => item.id.toString()}
+          onEndReached={handleEndReached}
+          onEndReachedThreshold={0.5}
         />
       </ScrollView>
     </View>

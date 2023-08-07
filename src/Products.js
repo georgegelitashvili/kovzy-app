@@ -238,7 +238,7 @@ export default function Products({ navigation }) {
         renderItem={renderProductList}
         adjustGridToStyles={true}
         contentContainerStyle={{ justifyContent: "flex-start" }}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item.id.toString()}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
