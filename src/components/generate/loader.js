@@ -36,7 +36,6 @@ const styles = StyleSheet.create({
   indicatorWrapper: {
     width: 200,
     height: 300,
-    aspectRatio: 1,
     borderRadius: 13,
     position: 'absolute',
     top: '50%',
