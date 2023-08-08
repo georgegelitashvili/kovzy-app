@@ -88,17 +88,19 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const interval = setInterval(() => {
-      axiosInstance.post(options.url_deliveronStatus).then((resp) => {
-        setDeliveronEnabled(resp.data.data.status == 0 ? true : false);
-      });
+      if (domain) {
+        axiosInstance.post(options.url_deliveronStatus).then((resp) => {
+          setDeliveronEnabled(resp.data.data.status == 0 ? true : false);
+        });
 
-      if (branchid) {
-        axiosInstance
-          .post(options.url_branchStatus, { branchid: branchid })
-          .then((resp) => {
-            setBranchEnabled(resp.data.data);
-            setIsVisible(resp.data.data);
-          });
+        if (branchid) {
+          axiosInstance
+            .post(options.url_branchStatus, { branchid: branchid })
+            .then((resp) => {
+              setBranchEnabled(resp.data.data);
+              setIsVisible(resp.data.data);
+            });
+        }
       }
     }, 5000);
 
@@ -106,7 +108,7 @@ export const AuthProvider = ({ children }) => {
       clearInterval(interval);
     };
 
-  }, [branchid]);
+  }, [domain, branchid]);
 
   return (
     <AuthContext.Provider
