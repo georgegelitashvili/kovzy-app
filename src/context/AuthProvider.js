@@ -1,7 +1,10 @@
-import React, { createContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect } from "react";
+import { View, Text, TouchableOpacity, Alert } from 'react-native';
 import axiosInstance from "../apiConfig/apiRequests";
 import * as SecureStore from 'expo-secure-store';
 import { removeData, getMultipleData } from "../helpers/storage";
+import Toast from '../components/generate/Toast';
+import { String, LanguageContext } from "../components/Language";
 
 export const AuthContext = createContext();
 
@@ -14,6 +17,11 @@ export const AuthProvider = ({ children }) => {
   const [isDataSet, setIsDataSet] = useState(false);
   const [options, setOptions] = useState({});
   const [loginError, setLoginError] = useState([]);
+  const [isVisible, setIsVisible] = useState(true);
+  const [branchEnabled, setBranchEnabled] = useState(false);
+  const [deliveronEnabled, setDeliveronEnabled] = useState(false);
+
+  const { dictionary } = useContext(LanguageContext);
 
   // console.log('------------------------ aauth');
   // console.log(domain);
@@ -35,6 +43,10 @@ export const AuthProvider = ({ children }) => {
   }, [domain]);
 
 
+  const handleClick = () => {
+    setIsVisible(true);
+  };
+
   const readData = async () => {
     await getMultipleData(["domain", "branch", "branchName"]).then((data) => {
       let domain = JSON.parse(data[0][1]);
@@ -54,8 +66,10 @@ export const AuthProvider = ({ children }) => {
 
   const apiOptions = () => {
     setOptions({
-      url_login: `https://${domain}/api/auth/login`,
-      url_logout: `https://${domain}/api/auth/logout`,
+      url_login: `https://${domain}/api/v1/admin/auth/login`,
+      url_logout: `https://${domain}/api/v1/admin/auth/logout`,
+      url_branchStatus: `https://${domain}/api/v1/admin/branchStatus`,
+      url_deliveronStatus: `https://${domain}/api/v1/admin/deliveronStatus`,
     });
   };
 
@@ -70,7 +84,31 @@ export const AuthProvider = ({ children }) => {
   } catch (error) {
     console.log('Error occurred while deleting secure storage:', error);
   }
-};
+  };
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (domain) {
+        axiosInstance.post(options.url_deliveronStatus).then((resp) => {
+          setDeliveronEnabled(resp.data.data.status == 0 ? true : false);
+        });
+
+        if (branchid) {
+          axiosInstance
+            .post(options.url_branchStatus, { branchid: branchid })
+            .then((resp) => {
+              setBranchEnabled(resp.data.data);
+              setIsVisible(resp.data.data);
+            });
+        }
+      }
+    }, 5000);
+
+    return () => {
+      clearInterval(interval);
+    };
+
+  }, [domain, branchid]);
 
   return (
     <AuthContext.Provider
@@ -85,6 +123,10 @@ export const AuthProvider = ({ children }) => {
         setIsDataSet,
         isDataSet,
         branchName,
+        branchEnabled,
+        setBranchEnabled,
+        deliveronEnabled,
+        setDeliveronEnabled,
         login: (username, password) => {
           setIsLoading(true);
           axiosInstance
@@ -122,6 +164,18 @@ export const AuthProvider = ({ children }) => {
       }}
     >
       {children}
+
+      {isVisible == false && (
+        <TouchableOpacity onPress={handleClick}>
+          <Toast
+            type="failed"
+            title="Branch Error"
+            subtitle={dictionary["orders.branchEnabled"]}
+            animate={false}
+          />
+        </TouchableOpacity>
+      )}
+
     </AuthContext.Provider>
   );
 };

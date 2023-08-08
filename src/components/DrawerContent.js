@@ -13,13 +13,11 @@ import { String, LanguageContext } from "./Language";
 export default function DrawerContent(props) {
   const dispatch = useDispatch();
   const { isdarkTheme } = useSelector((state) => state.themeReducer);
-  const { domain, branchid, branchName, logout } = useContext(AuthContext);
+  const { domain, branchid, branchName, branchEnabled, setBranchEnabled, setDeliveronEnabled, deliveronEnabled, logout } = useContext(AuthContext);
   const { dictionary } = useContext(LanguageContext);
 
   const [options, setOptions] = useState({}); // api options
   const [optionsIsLoaded, setOptionsIsLoaded] = useState(false); // check api options is loaded
-  const [branchEnabled, setBranchEnabled] = useState(false);
-  const [deliveronEnabled, setDeliveronEnabled] = useState(false);
   const [branchChangeOptions, setBranchChangeOptions] = useState({});
   const [deliveronChangeOptions, setDeliveronChangeOptions] = useState({});
 
@@ -34,10 +32,10 @@ export default function DrawerContent(props) {
 
   const apiOptions = () => {
     setOptions({
-      url_branchActivity: `https://${domain}/api/branchActivity`,
-      url_deliveronStatus: `https://${domain}/api/deliveronStatus`,
-      url_branchStatus: `https://${domain}/api/branchStatus`,
-      url_deliveronActivity: `https://${domain}/api/deliveronActivity`,
+      url_branchActivity: `https://${domain}/api/v1/admin/branchActivity`,
+      url_deliveronStatus: `https://${domain}/api/v1/admin/deliveronStatus`,
+      url_branchStatus: `https://${domain}/api/v1/admin/branchStatus`,
+      url_deliveronActivity: `https://${domain}/api/v1/admin/deliveronActivity`,
     });
     setOptionsIsLoaded(true);
   };
@@ -74,22 +72,6 @@ export default function DrawerContent(props) {
       apiOptions();
     }
   }, [domain]);
-
-  useEffect(() => {
-    if (optionsIsLoaded) {
-      axiosInstance.post(options.url_deliveronStatus).then((resp) => {
-        setDeliveronEnabled(resp.data.data.status == 0 ? true : false);
-      });
-
-      if (branchid) {
-        axiosInstance
-          .post(options.url_branchStatus, { branchid: branchid })
-          .then((resp) => {
-            setBranchEnabled(resp.data.data);
-          });
-      }
-    }
-  }, [optionsIsLoaded, branchid]);
 
   useEffect(() => {
     setBranchChangeOptions((prev) => ({

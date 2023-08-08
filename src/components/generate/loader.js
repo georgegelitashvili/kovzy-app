@@ -10,7 +10,7 @@ export default function Loader(props) {
 
   return (
     <>
-      <View style={styles.indicatorWrapper}>
+      <View style={[styles.indicatorWrapper]}>
         <ActivityIndicator animating={true} size="large" style={styles.indicator} />
         <Text style={styles.indicatorText}>{dictionary['loading']}</Text>
       </View>
@@ -35,7 +35,7 @@ const styles = StyleSheet.create({
   },
   indicatorWrapper: {
     width: 200,
-    height: 200,
+    height: 300,
     borderRadius: 13,
     position: 'absolute',
     top: '50%',

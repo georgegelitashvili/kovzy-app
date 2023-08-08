@@ -25,7 +25,7 @@ export const BranchScreen = ({ navigation }) => {
 
   const branchApi = () => {
     setOptions({
-      url: `https://${domain}/api/branches`,
+      url: `https://${domain}/api/v1/admin/branches`,
     });
   };
 

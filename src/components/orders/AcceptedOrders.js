@@ -74,11 +74,11 @@ export const AcceptedOrdersList = () => {
 
   const apiOptions = () => {
     setOptions({
-      url_getAcceptedOrders: `https://${domain}/api/getAcceptedOrders`,
-      url_deliveronStatus: `https://${domain}/api/deliveronStatus`,
-      url_checkOrderStatus: `https://${domain}/api/checkOrderStatus`,
-      url_orderPrepared: `https://${domain}/api/orderPrepared`,
-      url_rejectOrder: `https://${domain}/api/rejectOrder`,
+      url_getAcceptedOrders: `https://${domain}/api/v1/admin/getAcceptedOrders`,
+      url_deliveronStatus: `https://${domain}/api/v1/admin/deliveronStatus`,
+      url_checkOrderStatus: `https://${domain}/api/v1/admin/checkOrderStatus`,
+      url_orderPrepared: `https://${domain}/api/v1/admin/orderPrepared`,
+      url_rejectOrder: `https://${domain}/api/v1/admin/rejectOrder`,
     });
     setOptionsIsLoaded(true);
   };
@@ -251,7 +251,7 @@ export const AcceptedOrdersList = () => {
           renderItem={renderEnteredOrdersList}
           adjustGridToStyles={true}
           contentContainerStyle={{ justifyContent: "flex-start" }}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item) => item.id.toString()}
         />
       </ScrollView>
       <View style={styles.paginationContainer}>

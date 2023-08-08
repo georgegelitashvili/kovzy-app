@@ -29,7 +29,8 @@ export default function Products({ navigation }) {
   const [activityOptions, setActivityOptions] = useState({});
   const [sendApi, setSendApi] = useState(false);
   const [sendEnabled, setSendEnabled] = useState(false);
-  const [value, setValue] = useState("");
+  const [enabled, setEnabled] = useState(null);
+  const [value, setValue] = useState(null);
   const [productEnabled, setProductEnabled] = useState(false);
 
   const [loading, setLoading] = useState(true);
@@ -39,8 +40,8 @@ export default function Products({ navigation }) {
 
   const apiOptions = () => {
     setOptions({
-      url_getProducts: `https://${domain}/api/getProducts`,
-      url_productActivity: `https://${domain}/api/productActivity`,
+      url_getProducts: `https://${domain}/api/v1/admin/getProducts`,
+      url_productActivity: `https://${domain}/api/v1/admin/productActivity`,
     });
 
     setOptionsIsLoaded(true);
@@ -85,14 +86,15 @@ export default function Products({ navigation }) {
   }, [sendApi, isConnected]);
 
   useEffect(() => {
-    if (value) {
+    setExcluded([]);
+    if (value || enabled) {
       setActivityOptions((prev) => ({
         ...prev,
         data: { pid: value, branchid: branchid },
       }));
       setSendEnabled(true);
     }
-  }, [value, branchid]);
+  }, [value, enabled, branchid]);
 
   useEffect(() => {
     if (sendEnabled || isConnected) {
@@ -100,6 +102,7 @@ export default function Products({ navigation }) {
       setLoading(true);
       setProductEnabled(true);
       setSendEnabled(false);
+      setActivityOptions({});
     }
   }, [sendEnabled, isConnected]);
 
@@ -113,6 +116,7 @@ export default function Products({ navigation }) {
 
 
   const fetchData = () => {
+    setExcluded([]);
     axiosInstance
       .post(options.url_getProducts, productData.data)
       .then((resp) => {
@@ -137,6 +141,7 @@ export default function Products({ navigation }) {
       }).catch((error) => {
         if (error) {
           setProducts([]);
+          setExcluded([]);
           setIsDataSet(false);
         }
       });
@@ -151,8 +156,14 @@ export default function Products({ navigation }) {
     fetchData();
     setSendApi(false);
   };
+  // console.log("--------------- excluded");
+  // console.log(excluded);
+  // console.log("--------------- end excluded");
 
-  console.log(activityOptions);
+
+  // console.log("--------------- acrivity options");
+  // console.log(activityOptions.data);
+  // console.log("--------------- acrivity options");
 
   const renderProductList = ({ item }) => {
     return (
@@ -180,6 +191,7 @@ export default function Products({ navigation }) {
                 style={styles.button}
                 onPress={() => {
                   setValue(item.id);
+                  setEnabled(1);
                 }}
               >
                 {dictionary["prod.enableProduct"]}
@@ -191,6 +203,7 @@ export default function Products({ navigation }) {
                 style={styles.button}
                 onPress={() => {
                   setValue(item.id);
+                  setEnabled(0);
                 }}
               >
                 {dictionary["prod.disableProduct"]}
@@ -225,7 +238,7 @@ export default function Products({ navigation }) {
         renderItem={renderProductList}
         adjustGridToStyles={true}
         contentContainerStyle={{ justifyContent: "flex-start" }}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item.id.toString()}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
