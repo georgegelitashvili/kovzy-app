@@ -18,8 +18,6 @@ export default function DrawerContent(props) {
 
   const [options, setOptions] = useState({}); // api options
   const [optionsIsLoaded, setOptionsIsLoaded] = useState(false); // check api options is loaded
-  // const [branchEnabled, setBranchEnabled] = useState(false);
-  // const [deliveronEnabled, setDeliveronEnabled] = useState(false);
   const [branchChangeOptions, setBranchChangeOptions] = useState({});
   const [deliveronChangeOptions, setDeliveronChangeOptions] = useState({});
 

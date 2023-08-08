@@ -17,7 +17,6 @@ export default function RootNavigator() {
 
   useEffect(() => {
     SecureStore.getItemAsync("user").then((user) => {
-      console.log(user);
       if (user) {
         setUser(user);
       }
