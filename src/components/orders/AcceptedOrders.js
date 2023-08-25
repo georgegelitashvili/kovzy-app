@@ -153,6 +153,7 @@ export const AcceptedOrdersList = () => {
     }
   }, [isDeliveronOptions]);
 
+
   const renderEnteredOrdersList = ({ item }) => {
     return (
       <Card key={item.id}>
@@ -191,6 +192,12 @@ export const AcceptedOrdersList = () => {
               {dictionary["orders.address"]}: {item.address}
             </Text>
 
+            {item.comment ? (
+              <Text variant="titleSmall" style={styles.title}>
+                {dictionary["orders.comment"]}: {item.comment}
+              </Text>
+            ) : null}
+            
             <Divider />
             <OrdersDetail orderId={item.id} />
             <Divider />

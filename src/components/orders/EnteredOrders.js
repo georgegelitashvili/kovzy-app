@@ -222,6 +222,12 @@ export const EnteredOrdersList = () => {
               {dictionary["orders.address"]}: {item.address}
             </Text>
 
+            {item.comment ? (
+              <Text variant="titleSmall" style={styles.title}>
+                {dictionary["orders.comment"]}: {item.comment}
+              </Text>
+            ) : null}
+
             <Divider />
             <OrdersDetail orderId={item.id} />
             <Divider />
