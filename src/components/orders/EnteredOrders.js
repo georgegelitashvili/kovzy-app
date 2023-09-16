@@ -169,10 +169,10 @@ export const EnteredOrdersList = () => {
   }, [isDeliveronOptions]);
 
   useEffect(() => {
-    if (deliveron) {
+    if (deliveron || deliveron.original) {
       setLoadingOptions(false);
     }
-  }, [deliveron]);
+  }, [deliveron, deliveron.original]);
 
   useEffect(() => {
     ordersCount = Object.keys(orders).length;
@@ -284,7 +284,7 @@ export const EnteredOrdersList = () => {
             onChangeState={onChangeModalState}
             orders={orders}
             hasItemId={itemId}
-            deliveron={deliveron}
+            deliveron={deliveron ?? null}
             deliveronOptions={deliveronOptions}
             type={modalType}
             options={options}

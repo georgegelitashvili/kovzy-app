@@ -49,7 +49,7 @@ const deleteItem = async (key) => {
     },
     (error) => {
       console.log("---------------------------- error api");
-      console.log(error);
+      console.log(error.response.data);
       console.log("----------------------------end error api");
       if (error.response) {
         if(error.response.status === 404) {

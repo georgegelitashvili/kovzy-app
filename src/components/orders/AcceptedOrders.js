@@ -6,6 +6,8 @@ import {
   View,
   ScrollView,
   TouchableOpacity,
+  Linking,
+  Alert,
   RefreshControl,
 } from "react-native";
 import { Text, Button, Divider, Card } from "react-native-paper";
@@ -17,7 +19,7 @@ import {
 } from "@expo/vector-icons";
 
 import { AuthContext, AuthProvider } from "../../context/AuthProvider";
-import { storeData, getData, getMultipleData } from "../../helpers/storage";
+
 import Loader from "../generate/loader";
 import { String, LanguageContext } from "../Language";
 import axiosInstance from "../../apiConfig/apiRequests";
@@ -153,8 +155,22 @@ export const AcceptedOrdersList = () => {
     }
   }, [isDeliveronOptions]);
 
+  const openURLInBrowser = async (url) => {
+    const supported = await Linking.canOpenURL(url);
+
+    if (supported) {
+      await Linking.openURL(url);
+    } else {
+      Alert.alert(`Don't know how to open this URL: ${url}`);
+    }
+  };
+
 
   const renderEnteredOrdersList = ({ item }) => {
+    const trackLink = [JSON.parse(item.deliveron_data)]?.map(link => {
+      return link.trackLink;
+    });
+
     return (
       <Card key={item.id}>
         <TouchableOpacity onPress={() => toggleContent(item.id)}>
@@ -191,6 +207,14 @@ export const AcceptedOrdersList = () => {
             <Text variant="titleSmall" style={styles.title}>
               {dictionary["orders.address"]}: {item.address}
             </Text>
+
+            {trackLink[0] ? (
+              <TouchableOpacity onPress={() => openURLInBrowser(trackLink[0].toString())}>
+                <Text variant="titleSmall" style={styles.title}>
+                  {"Tracking link:"} <Text style={[styles.title, { color: '#3490dc' }]}>{trackLink[0]}</Text>
+                </Text>
+              </TouchableOpacity>
+            ) : null}
 
             {item.comment ? (
               <Text variant="titleSmall" style={styles.title}>

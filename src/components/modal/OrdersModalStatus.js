@@ -13,7 +13,7 @@ export default function OrdersModalContent(props) {
     const [isDisabled, setIsDisabled] = useState(true);
     const [text, setText] = useState("");
 
-    const { dictionary } = useContext(LanguageContext);
+  const { dictionary } = useContext(LanguageContext);
 
     const finishOrder = () => {
       axiosInstance.post(acceptOptions, statusData.data).then(resp => {
@@ -25,8 +25,8 @@ export default function OrdersModalContent(props) {
       });
     };
 
-    useEffect(() => {
-      if(props.deliveron.status == 0) {
+  useEffect(() => {
+    if (props.deliveron?.status !== -2 && props.deliveron?.status !== -4) {
         props.orders?.map((item) => {
           if(item.id == props.itemId) {
             const deliveronId = JSON.parse(item.deliveron_data);
@@ -40,16 +40,16 @@ export default function OrdersModalContent(props) {
               }})
               setStatus(true);
             }
-
           }
         })
-      }else {
+      } else {
         setStatusData({...statusData, data: {
           Orderid: props.itemId,
-        }});
+        }
+        });
         setIsDisabled(false);
       }
-    }, [props.itemId, props.deliveron.status])
+    }, [props.itemId, props.deliveron?.status])
 
     useEffect(() => {
       if(status) {
@@ -62,7 +62,7 @@ export default function OrdersModalContent(props) {
                 Orderid: props.itemId,
               }
             });
-          } else {
+          }else {
             setIsDisabled(true);
           }
         });

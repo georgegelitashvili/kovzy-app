@@ -4,6 +4,10 @@ import RNPickerSelect from "react-native-picker-select";
 import { theme } from '../../core/theme';
 
 export default function SelectOption({ errorText, description, ...props }) {
+  if (!props) {
+    return null;
+  }
+  
   return (
     <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
       <View style={styles.container}>

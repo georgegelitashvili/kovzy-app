@@ -18,6 +18,9 @@
     "assetBundlePatterns": [
       "**/*"
     ],
+    "permissions": [
+      "SYSTEM_ALERT_WINDOW"
+    ],
     "ios": {
       "supportsTablet": true
     },

@@ -9,9 +9,9 @@ export default function OrdersModalContent(props) {
     const [options, setOptions] = useState(props.options.url_rejectOrder);
     const [orderData, setOrderData] = useState({});
 
-    const { dictionary } = useContext(LanguageContext);
+  const { dictionary } = useContext(LanguageContext);
 
-    const rejectOrder = () => {
+  const rejectOrder = () => {
       axiosInstance.post(options, orderData.data).then(resp => {
         if(resp.data.data.status == 0) {
           Alert.alert("ALERT", dictionary['orders.declined'], [
@@ -21,11 +21,37 @@ export default function OrdersModalContent(props) {
       });
     };
 
-    useEffect(() => {
-      setOrderData({...orderData, data: {
-        Orderid: props.itemId,
-    }})
-    }, [props.itemId])
+  useEffect(() => {
+    if (props.deliveron?.status !== -2) {
+      props.orders?.map((item) => {
+        if (item.id == props.itemId) {
+          const deliveronId = JSON.parse(item.deliveron_data);
+          if (deliveronId?.length == 0 || deliveronId['order_id_deliveron'] == null) {
+            setOrderData({
+              ...orderData, data: {
+                Orderid: props.itemId,
+                deliveronOrderId: deliveronId['order_id_deliveron'],
+              }
+            })
+          } else {
+            setOrderData({
+              ...orderData, data: {
+                Orderid: props.itemId,
+                deliveronOrderId: deliveronId['order_id_deliveron'],
+              }
+            })
+          }
+
+        }
+      })
+    } else {
+      setOrderData({
+        ...orderData, data: {
+          Orderid: props.itemId,
+        }
+      })
+    }
+  }, [props.itemId, props.deliveron.status])
 
     return (
         <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>

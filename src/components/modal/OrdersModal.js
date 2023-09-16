@@ -1,5 +1,4 @@
 import React, { useCallback, useState } from "react";
-import { Text, Button } from "react-native-paper";
 import { StyleSheet, View, Dimensions } from "react-native";
 import Modal from "react-native-modal";
 import OrdersModalAccept from "./OrdersModalAccept";
@@ -39,13 +38,13 @@ export default function OrdersModal({
         return (
           <OrdersModalAccept
             itemId={hasItemId}
-            deliveron={deliveron}
+            deliveron={deliveron.original}
             deliveronOptions={deliveronOptions}
             options={options}
             items={
-              deliveron.status === 0 ? deliveron.content?.map((item) => ({
-                label: item.companyName + ' - ' + item.price,
-                value: item.companyId ?? item.type,
+              deliveron.original?.status !== -2 ? deliveron.original?.content?.map((item) => ({
+                label: !item.name ? item.companyName + ' - ' + item.price : item.name + ' - ' + item.price,
+                value: !item.id ? item.companyId ?? item.type : item.id,
               })) : null
             }
             hideModal={hideModal}
@@ -55,6 +54,8 @@ export default function OrdersModal({
         return (
           <OrdersModalReject
             itemId={hasItemId}
+            deliveron={deliveron.original ?? deliveron}
+            orders={orders}
             options={options}
             hideModal={hideModal}
           />
@@ -64,7 +65,7 @@ export default function OrdersModal({
           <OrdersModalStatus
             itemId={hasItemId}
             orders={orders}
-            deliveron={deliveron}
+            deliveron={deliveron.original ?? deliveron}
             options={options}
             deliveronOptions={deliveronOptions}
             hideModal={hideModal}
@@ -73,7 +74,7 @@ export default function OrdersModal({
     }
   }
 
-  if (deliveron?.length == 0) {
+  if (deliveron.length == 0 || deliveron.original?.content.length == 0) {
     return null;
   }
 
