@@ -36,6 +36,9 @@ export default function OrdersModalContent(props) {
       return;
     }
 
+    // console.log(orderData.data);
+    // return;
+
     if(options) {
       setLoading(true);
       axiosInstance.post(options, orderData.data).then(resp => {
@@ -76,8 +79,8 @@ export default function OrdersModalContent(props) {
               companyId: item.companyId,
               companyName: item.name ?? item.companyName,
               type: item.type == "glovo" || item.type == "wolt" ? item.type : item.type,
-              orderDelyTime: forDelivery.value,
-              orderPrepTime: forClient.value,
+              orderDelyTime: forClient.value,
+              orderPrepTime: forDelivery.value,
             },
           });
 
@@ -85,7 +88,8 @@ export default function OrdersModalContent(props) {
             ...acceptData,
             data: {
               Orderid: props.itemId,
-              orderPrepTime: forClient.value,
+              orderPrepTime: forDelivery.value,
+              orderDelyTime: forClient.value,
             },
           })
         }
@@ -95,7 +99,7 @@ export default function OrdersModalContent(props) {
         ...orderData,
         data: {
           Orderid: props.itemId,
-          orderPrepTime: forClient.value,
+          orderPrepTime: forDelivery.value,
         },
       });
     }

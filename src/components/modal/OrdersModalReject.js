@@ -12,8 +12,9 @@ export default function OrdersModalContent(props) {
   const { dictionary } = useContext(LanguageContext);
 
   const rejectOrder = () => {
-      axiosInstance.post(options, orderData.data).then(resp => {
-        if(resp.data.data.status == 0) {
+    axiosInstance.post(options, orderData.data).then(resp => {
+      console.log(resp.data);
+      if (resp.data.data.status == 0 || resp.data.data.status == -1) {
           Alert.alert("ALERT", dictionary['orders.declined'], [
             {text: 'OK', onPress: () => props.hideModal()},
           ]);
@@ -22,7 +23,7 @@ export default function OrdersModalContent(props) {
     };
 
   useEffect(() => {
-    if (props.deliveron?.status !== -2) {
+    if (props.deliveron?.status !== -2 && props.deliveron?.status !== -4) {
       props.orders?.map((item) => {
         if (item.id == props.itemId) {
           const deliveronId = JSON.parse(item.deliveron_data);

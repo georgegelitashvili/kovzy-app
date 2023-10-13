@@ -216,6 +216,12 @@ export const AcceptedOrdersList = () => {
               </TouchableOpacity>
             ) : null}
 
+            {item.delivery_scheduled ? (
+              <Text variant="titleSmall" style={styles.title}>
+                {dictionary["orders.scheduledDeliveryTime"]}: {item.delivery_scheduled}
+              </Text>
+            ) : null}
+
             {item.comment ? (
               <Text variant="titleSmall" style={styles.title}>
                 {dictionary["orders.comment"]}: {item.comment}
