@@ -15,6 +15,9 @@ export default function OrdersModalContent(props) {
 
   const { dictionary } = useContext(LanguageContext);
 
+  // console.log(statusData.data);
+  console.log(status);
+
     const finishOrder = () => {
       axiosInstance.post(acceptOptions, statusData.data).then(resp => {
         if(resp.data.data.status == 0) {
@@ -22,6 +25,8 @@ export default function OrdersModalContent(props) {
             {text: 'OK', onPress: () => props.hideModal()},
           ]);
         }
+      }).catch((error) => {
+        console.log(error);
       });
     };
 
@@ -62,11 +67,13 @@ export default function OrdersModalContent(props) {
                 Orderid: props.itemId,
               }
             });
-          }else {
+          } else {
             setIsDisabled(true);
           }
         });
         setStatus(false);
+      } else {
+        setIsDisabled(false);
       }
     }, [status])
 

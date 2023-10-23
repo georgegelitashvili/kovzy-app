@@ -42,22 +42,31 @@ export default function OrdersModalContent(props) {
     if(options) {
       setLoading(true);
       axiosInstance.post(options, orderData.data).then(resp => {
+        if (resp.data.data?.original?.status === -2 && resp.data.data?.original?.error !== '') {
+          console.log(resp.data.data.original.error);
+          setLoading(false);
+          Alert.alert("ALERT", resp.data.data.original.error, [
+            { text: 'OK', onPress: () => props.hideModal() },
+          ]);
+          return false;
+        }
+        
         if (resp.data.data.status !== -2 || resp.data.data.status !== -1) {
           setLoading(false);
           Alert.alert("ALERT", dictionary['dv.orderSuccess'], [
             {text: 'OK', onPress: () => props.hideModal()},
           ]);
         }
+
+        if (props.deliveron?.status !== -2) {
+          axiosInstance.post(props.options.url_acceptOrder, acceptData.data)
+            .catch((error) => {
+              console.log(error);
+            });
+        }
       }).catch((error) => {
         console.log(error);
       });
-
-      if (props.deliveron?.status !== -2) {
-        axiosInstance.post(props.options.url_acceptOrder, acceptData.data)
-          .catch((error) => {
-          console.log(error);
-        });
-      }
     }
   };
 

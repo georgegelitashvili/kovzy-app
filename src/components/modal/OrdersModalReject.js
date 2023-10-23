@@ -14,7 +14,7 @@ export default function OrdersModalContent(props) {
   const rejectOrder = () => {
     axiosInstance.post(options, orderData.data).then(resp => {
       console.log(resp.data);
-      if (resp.data.data.status == 0 || resp.data.data.status == -1) {
+      if (resp.data.data?.status == 0 || resp.data.data?.status == -1) {
           Alert.alert("ALERT", dictionary['orders.declined'], [
             {text: 'OK', onPress: () => props.hideModal()},
           ]);

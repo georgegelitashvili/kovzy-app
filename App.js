@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from "react";
-import { StyleSheet } from "react-native";
 import * as Updates from "expo-updates";
+import { StyleSheet, Alert } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { Provider } from "react-redux";
 import Toast from './src/components/generate/Toast';
@@ -22,28 +22,31 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    checkForUpdates();
-  }, []);
-
-  const checkForUpdates = async () => {
-    try {
+    const checkForUpdate = async () => {
       const update = await Updates.checkForUpdateAsync();
       if (update.isAvailable) {
-        await Updates.fetchUpdateAsync();
-        reloadApp();
+        Alert.alert(
+          'Update Available',
+          'A new version of the app is available. Do you want to update?',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Update',
+              onPress: async () => {
+                // Perform the update
+                await Updates.fetchUpdateAsync();
+                Updates.reloadAsync();
+              },
+            },
+          ]
+        );
       }
-    } catch (error) {
-      // Handle error
-    }
-  };
+    };
 
-  const reloadApp = async () => {
-    try {
-      await Updates.reloadAsync();
-    } catch (error) {
-      // Handle error
-    }
-  };
+    checkForUpdate();
+  }, []);
+
+
 
   return (
     <>
