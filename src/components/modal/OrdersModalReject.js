@@ -2,19 +2,23 @@ import React, { useState, useEffect, useContext } from 'react';
 import { Text, Button } from 'react-native-paper';
 import { StyleSheet, View, Keyboard, TouchableWithoutFeedback, Alert } from 'react-native';
 import axiosInstance from "../../apiConfig/apiRequests";
+import Loader from "../generate/loader";
 import { String, LanguageContext } from '../Language';
 
 
 export default function OrdersModalContent(props) {
-    const [options, setOptions] = useState(props.options.url_rejectOrder);
-    const [orderData, setOrderData] = useState({});
+  const [options, setOptions] = useState(props.options.url_rejectOrder);
+  const [orderData, setOrderData] = useState({});
+
+  const [loading, setLoading] = useState(false);
 
   const { dictionary } = useContext(LanguageContext);
 
   const rejectOrder = () => {
+    setLoading(true);
     axiosInstance.post(options, orderData.data).then(resp => {
-      console.log(resp.data);
       if (resp.data.data?.status == 0 || resp.data.data?.status == -1) {
+        setLoading(false);
           Alert.alert("ALERT", dictionary['orders.declined'], [
             {text: 'OK', onPress: () => props.hideModal()},
           ]);
@@ -27,22 +31,12 @@ export default function OrdersModalContent(props) {
       props.orders?.map((item) => {
         if (item.id == props.itemId) {
           const deliveronId = JSON.parse(item.deliveron_data);
-          if (deliveronId?.length == 0 || deliveronId['order_id_deliveron'] == null) {
-            setOrderData({
-              ...orderData, data: {
-                Orderid: props.itemId,
-                deliveronOrderId: deliveronId['order_id_deliveron'],
-              }
-            })
-          } else {
-            setOrderData({
-              ...orderData, data: {
-                Orderid: props.itemId,
-                deliveronOrderId: deliveronId['order_id_deliveron'],
-              }
-            })
-          }
-
+          setOrderData({
+            ...orderData, data: {
+              Orderid: props.itemId,
+              deliveronOrderId: deliveronId['order_id_deliveron'] ?? null,
+            }
+          })
         }
       })
     } else {
@@ -57,6 +51,7 @@ export default function OrdersModalContent(props) {
     return (
         <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
         <View style={styles.content}>
+          {loading ? <Loader /> : null}
           <Text textColor="black" style={styles.contentTitle}>{dictionary['orders.rejectionWarning']}</Text>
 
             <View style={styles.buttonModal}>

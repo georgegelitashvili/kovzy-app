@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext, useRef } from "react";
 import { Text, Button } from "react-native-paper";
 import TextField from "../generate/TextField";
 import SelectOption from "../generate/SelectOption";
@@ -28,47 +28,60 @@ export default function OrdersModalContent(props) {
   const [deliveron, setDeliveron] = useState({ data: [], error: "" });
   const [selected, setSelected] = useState(props.items ? props.items[0]?.value : null);
   const [loading, setLoading] = useState(false);
+  const [ready, setReady] = useState(false);
   const { dictionary } = useContext(LanguageContext);
+
+  const deliveronOff = () => {
+    console.log(ready);
+
+    if (ready === false) {
+      return false;
+    }
+    
+    if (props.deliveron?.status !== -2) {
+      axiosInstance.post(props.options.url_acceptOrder, acceptData.data)
+        .catch((error) => {
+          console.log(error);
+        });
+    }
+  };
 
   const acceptOrder = () => {
     if (deliveron?.data != null && selected === null) {
       setDeliveron({ ...deliveron, error: "delivery option must choose!" });
-      return;
+      return false;
     }
-
-    // console.log(orderData.data);
-    // return;
 
     if(options) {
       setLoading(true);
       axiosInstance.post(options, orderData.data).then(resp => {
-        if (resp.data.data?.original?.status === -2 && resp.data.data?.original?.error !== '') {
-          console.log(resp.data.data.original.error);
+        if (resp.data.data?.original?.status === -2 && resp.data.data?.original?.error !== "") {
           setLoading(false);
+          setReady(false);
           Alert.alert("ALERT", resp.data.data.original.error, [
             { text: 'OK', onPress: () => props.hideModal() },
           ]);
+
           return false;
         }
-        
+
         if (resp.data.data.status !== -2 || resp.data.data.status !== -1) {
           setLoading(false);
+          setReady(true);
           Alert.alert("ALERT", dictionary['dv.orderSuccess'], [
             {text: 'OK', onPress: () => props.hideModal()},
           ]);
-        }
-
-        if (props.deliveron?.status !== -2) {
-          axiosInstance.post(props.options.url_acceptOrder, acceptData.data)
-            .catch((error) => {
-              console.log(error);
-            });
         }
       }).catch((error) => {
         console.log(error);
       });
     }
   };
+
+  useEffect(() => {
+    deliveronOff();
+    setReady(false);
+  }, [ready]);
 
   useEffect(() => {
     setDeliveron({ data: props.items, error: "" });

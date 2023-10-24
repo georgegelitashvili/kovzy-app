@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from "react";
 import * as Updates from "expo-updates";
-import { StyleSheet, Alert } from "react-native";
+import { StyleSheet, Alert, Linking } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { Provider } from "react-redux";
 import Toast from './src/components/generate/Toast';
@@ -34,8 +34,7 @@ export default function App() {
               text: 'Update',
               onPress: async () => {
                 // Perform the update
-                await Updates.fetchUpdateAsync();
-                Updates.reloadAsync();
+                Linking.openURL("http://play.google.com/store/apps/details?id=com.kovzy.app")
               },
             },
           ]
@@ -43,9 +42,8 @@ export default function App() {
       }
     };
 
-    checkForUpdate();
+    return () => { checkForUpdate() };
   }, []);
-
 
 
   return (
