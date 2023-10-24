@@ -32,8 +32,6 @@ export default function OrdersModalContent(props) {
   const { dictionary } = useContext(LanguageContext);
 
   const deliveronOff = () => {
-    console.log(ready);
-
     if (ready === false) {
       return false;
     }
