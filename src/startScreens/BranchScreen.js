@@ -50,20 +50,24 @@ export const BranchScreen = ({ navigation }) => {
 
   useEffect(() => {
     if (options) {
-      axiosInstance.post(options.url).then((e) => {
-        setBranch({ data: null, error: "" });
-        setBranches([]);
-        setErrorText("");
-        setIsDataSet(false);
-        e.data.data?.map((item) =>
-          setBranches((prev) => [
-            ...prev,
-            { label: item.title, value: item.id, enabled: item.enabled },
-          ])
-        );
-        setIsLoading(false);
-      }).catch((error) => {
-        if (error) {
+      axiosInstance.post(options.url)
+        .then((e) => e.data.data)
+        .then((data) => {
+          setBranch({ data: null, error: "" });
+          setBranches([]);
+          setErrorText("");
+          setIsDataSet(false);
+          data?.map((item) =>
+            setBranches((prev) => [
+              ...prev,
+              { label: item.title, value: item.id, enabled: item.enabled },
+            ])
+          );
+          setIsLoading(false);
+        })
+        .catch((error) => {
+        console.log('error branch', error.status);
+          if (error.status == 500 || error.status == 404) {
           setIsDataSet(false);
           setBranches([]);
           setBranch({ data: null, error: "" });

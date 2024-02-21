@@ -81,17 +81,3 @@ export const AuthNavigator = () => {
     </Stack.Navigator>
   );
 }
-
-
-export const UnauthorizedNavigator = () => {
-  return (
-    <Stack.Navigator
-      screenOptions={{
-        headerMode: "screen",
-        header: (props) => <Header {...props} />,
-      }}
-    >
-      <Stack.Screen name="Login" component={LoginScreen} />
-    </Stack.Navigator>
-  );
-}

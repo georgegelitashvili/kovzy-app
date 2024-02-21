@@ -39,7 +39,6 @@ export default function ProductsDetail({ navigation, route }) {
     setOptionsIsLoaded(true);
   };
 
-
   useEffect(() => {
     const removeSubscription = NetInfo.addEventListener((state) => {
       setIsConnected(state.isConnected);

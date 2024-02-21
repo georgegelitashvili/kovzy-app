@@ -7,6 +7,8 @@ const Tab = createMaterialTopTabNavigator();
 
 export default function TabContent(props) {
   const { dictionary } = useContext(LanguageContext);
+
+
   return (
     <Tab.Navigator
       initialRouteName="Orders"
@@ -15,17 +17,16 @@ export default function TabContent(props) {
           fontSize: 14,
         },
       }}
-      {...props}
     >
       <Tab.Screen
         name="Orders"
-        children={() => props.tabsObject.tab1}
-        options={{ tabBarLabel: dictionary["nav.pendingOrders"] }}
+        children={() => props.tab1}
+        options={{ tabBarLabel: dictionary["nav.pendingOrders"], unmountOnBlur: true }}
       />
       <Tab.Screen
         name="AcceptedOrders"
-        children={() => props.tabsObject.tab2}
-        options={{ tabBarLabel: dictionary["nav.acceptedOrders"] }}
+        children={() => props.tab2}
+        options={{ tabBarLabel: dictionary["nav.acceptedOrders"], unmountOnBlur: true }}
       />
     </Tab.Navigator>
   );

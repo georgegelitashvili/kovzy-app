@@ -16,13 +16,15 @@ export default function RootNavigator() {
   const { dictionary } = useContext(LanguageContext);
 
   useEffect(() => {
-    SecureStore.getItemAsync("user").then((user) => {
-      if (user) {
-        setUser(user);
-      }
-      setIsLoading(false);
-    });
-  }, []);
+    if (!user) {
+      SecureStore.getItemAsync("cookie").then((cookie) => {
+        if (cookie) {
+          setUser(cookie);
+        }
+        setIsLoading(false);
+      });
+    }
+  }, [user]);
 
   if (isLoading) {
     return <Loader text="loading" />;

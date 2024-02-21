@@ -11,8 +11,7 @@ export default function OrdersDetail({ orderId }) {
   const handlePress = () => setExpanded(!expanded);
 
   const [orderCart, setOrderCart] = useState([]);
-  const { setIsDataSet, domain } =
-    useContext(AuthContext);
+  const { domain } = useContext(AuthContext);
 
   const [options, setOptions] = useState({}); // api options
   const [optionsIsLoaded, setOptionsIsLoaded] = useState(false); // api options
@@ -26,21 +25,25 @@ export default function OrdersDetail({ orderId }) {
     setOptionsIsLoaded(true);
   };
 
+  const fetchOrdersDetail = async () => {
+    await axiosInstance
+      .post(options.url_orderCart, {
+        Orderid: orderId,
+        lang: userLanguage,
+      })
+      .then((resp) => resp.data.data)
+      .then((data) => setOrderCart(data))
+      .catch((error) => {
+        if (error) {
+          setOrderCart([]);
+        }
+      });
+  }
+
   useEffect(() => {
     apiOptions();
     if (optionsIsLoaded) {
-      axiosInstance
-        .post(options.url_orderCart, {
-          Orderid: orderId,
-          lang: userLanguage,
-        })
-        .then((resp) => setOrderCart(resp.data.data))
-        .catch((error) => {
-          if(error) {
-            setOrderCart([]);
-            setIsDataSet(false);
-          }
-        });
+      fetchOrdersDetail();
     }
   }, [optionsIsLoaded, userLanguage, orderId]);
 

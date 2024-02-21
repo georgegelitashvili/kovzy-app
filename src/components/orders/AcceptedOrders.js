@@ -33,8 +33,8 @@ const numColumns = printRows(width);
 const cardSize = width / numColumns;
 
 // render accepted orders function
-export const AcceptedOrdersList = () => {
-  const { setIsDataSet, domain, setDomain, branchid, setUser } = useContext(AuthContext);
+export const AcceptedOrdersList = (navigation) => {
+  const { domain, setDomain, branchid, setUser } = useContext(AuthContext);
   const [orders, setOrders] = useState([]);
 
   const [page, setPage] = useState(0);
@@ -52,6 +52,7 @@ export const AcceptedOrdersList = () => {
 
   const [loading, setLoading] = useState(true);
   const [loadingOptions, setLoadingOptions] = useState(false);
+  const [unauthorized, setUnauthorized] = useState(false);
 
   const { dictionary, userLanguage } = useContext(LanguageContext);
 
@@ -64,6 +65,7 @@ export const AcceptedOrdersList = () => {
       setIsDeliveronOptions(newState);
       setItemId(null);
       setDeliveron([]);
+      setOrders([]);
     }, 0);
   });
 
@@ -91,7 +93,40 @@ export const AcceptedOrdersList = () => {
     setVisible(true);
   };
 
+  const fetchAcceptedOrders = async () => {
+    setOptionsIsLoaded(true);
+    await axiosInstance
+      .post(options.url_getAcceptedOrders, JSON.stringify({
+        Pagination: {
+          limit: 12,
+          page: page
+        },
+        branchid: branchid,
+        type: 0
+      }))
+      .then((resp) => resp.data.data)
+      .then((data) => {
+        setOrders(data);
+        setUnauthorized(false);
+      })
+      .catch((error) => {
+        console.log('Error fetching accepted orders:', error);
+        if (error.status == 401) {
+          setOrders([]);
+          setOptionsIsLoaded(false);
+          setUnauthorized(true);
+          Alert.alert("ALERT", "somthing went wrong", [
+            { text: "OK", onPress: () => console.log('click') },
+          ]);
+          setUnauthorized(true);
+        }
+        return false;
+      });
+    setLoading(false);
+  }
+
   useEffect(() => {
+
     if (domain && branchid) {
       apiOptions();
     } else if (domain || branchid) {
@@ -101,37 +136,12 @@ export const AcceptedOrdersList = () => {
   }, [domain, branchid]);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      if (optionsIsLoaded || page) {
-        axiosInstance
-          .post(options.url_getAcceptedOrders, JSON.stringify({
-            Pagination: {
-              limit: 12,
-              page: page
-            },
-            branchid: branchid,
-            type: 0
-          }))
-          .then((resp) => {
-            setOrders(resp.data.data);
-          })
-          .catch((error) => {
-            if (error) {
-              console.log("----------------- accepted orders error");
-              console.log(error);
-              console.log("----------------- end accepted orders error");
-              setOrders([]);
-              setIsDataSet(false);
-            }
-          });
-        setLoading(false);
+    if (!unauthorized) {
+      if (optionsIsLoaded || orders || page) {
+        fetchAcceptedOrders();
       }
-    }, 5000);
-
-    return () => {
-      clearInterval(interval);
-    };
-  }, [optionsIsLoaded, page]);
+    }
+  }, [optionsIsLoaded, orders, page, unauthorized]);
 
 
   useEffect(() => {
@@ -171,7 +181,7 @@ export const AcceptedOrdersList = () => {
       return link.trackLink;
     });
 
-    return (
+    return data = (
       <Card key={item.id}>
         <TouchableOpacity onPress={() => toggleContent(item.id)}>
           <Card.Content style={styles.head}>
@@ -227,7 +237,7 @@ export const AcceptedOrdersList = () => {
                 {dictionary["orders.comment"]}: {item.comment}
               </Text>
             ) : null}
-            
+
             <Divider />
             <OrdersDetail orderId={item.id} />
             <Divider />
@@ -265,6 +275,15 @@ export const AcceptedOrdersList = () => {
   if (loading) {
     return <Loader />;
   }
+
+  console.log('------------ accepted orders');
+  // console.log(domain);
+  // console.log(options.url_getAcceptedOrders);
+  // console.log(orders);
+  // console.log(branchid);
+  // console.log(optionsIsLoaded);
+  console.log(unauthorized);
+  console.log('------------ end accepted orders');
 
   return (
     <View style={{ flex: 1 }}>

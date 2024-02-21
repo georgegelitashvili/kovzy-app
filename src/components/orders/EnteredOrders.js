@@ -5,10 +5,10 @@ import {
   View,
   ScrollView,
   TouchableOpacity,
-  RefreshControl,
   Alert,
-  ActivityIndicator,
+  AppState
 } from "react-native";
+import * as SecureStore from "expo-secure-store";
 import { Text, Button, Divider, Card } from "react-native-paper";
 import { FlatGrid } from "react-native-super-grid";
 import { MaterialCommunityIcons, SimpleLineIcons } from "@expo/vector-icons";
@@ -31,9 +31,12 @@ let ordersCount;
 let temp = 0;
 
 // render entered orders function
-export const EnteredOrdersList = () => {
-  const { setIsDataSet, isDataSet, domain, branchid } = useContext(AuthContext);
+export const EnteredOrdersList = (navigation) => {
+  const { domain, branchid, login } = useContext(AuthContext);
   const [orders, setOrders] = useState([]);
+
+  const [appState, setAppState] = useState(AppState.currentState);
+  const [intervalId, setIntervalId] = useState(null);
 
   const [options, setOptions] = useState({}); // api options
   const [optionsIsLoaded, setOptionsIsLoaded] = useState(false); // api options
@@ -49,6 +52,9 @@ export const EnteredOrdersList = () => {
 
   const [loading, setLoading] = useState(true);
   const [loadingOptions, setLoadingOptions] = useState(false);
+
+  const [unauthorized, setUnauthorized] = useState(false);
+  const [credentials, setCredentials] = useState({});
 
   const { dictionary, userLanguage } = useContext(LanguageContext);
 
@@ -113,45 +119,85 @@ export const EnteredOrdersList = () => {
     setVisible(true);
   };
 
+  const fetchEnteredOrders = async () => {
+    await axiosInstance
+      .post(options.url_unansweredOrders, {
+        type: 0,
+        page: 1,
+        branchid: branchid,
+      })
+      .then((resp) => resp.data.data)
+      .then((data) => {
+        setOrders(data);
+        setUnauthorized(false);
+      })
+      .catch((error) => {
+        console.log('Error fetching entered orders:', error);
+        if (error.status == 401) {
+          setOrders([]);
+          setOptionsIsLoaded(false);
+          setUnauthorized(true);
+          if (credentials) {
+            Alert.alert("ALERT", "something went wrong", [
+              { text: "login", onPress: () => login(credentials.username, credentials.password) },
+            ]);
+            setUnauthorized(false);
+          }
+        }
+      });
+    setLoading(false);
+  }
+
+  const startInterval = () => {
+    const id = setInterval(async () => {
+      if (optionsIsLoaded) {
+        fetchEnteredOrders();
+      }
+    }, 5000);
+
+    setIntervalId(id);
+  };
+
+  const handleAppStateChange = (nextAppState) => {
+    if (appState.match(/inactive|background/) && nextAppState === 'active') {
+      startInterval();
+    } else {
+      // App is in the background or inactive, clear or pause your interval
+      clearInterval(intervalId)
+    }
+    setAppState(nextAppState);
+  };
+
   useEffect(() => {
     if (domain && branchid) {
       apiOptions();
+      SecureStore.getItemAsync("credentials").then((obj) => {
+        if (obj) {
+          setCredentials(JSON.parse(obj));
+        }
+      });
     } else if (domain || branchid) {
       setOptionsIsLoaded(false);
       setOrders([]);
     }
   }, [domain, branchid]);
 
+  // setinterval
   useEffect(() => {
-    const interval = setInterval(() => {
-      if (optionsIsLoaded) {
-        axiosInstance
-          .post(options.url_unansweredOrders, {
-            type: 0,
-            page: 1,
-            branchid: branchid,
-          })
-          .then((resp) => {
-            setOrders(resp.data.data);
-          })
-          .catch((error) => {
-            console.log("----------------- entered orders error");
-            console.log(error);
-            console.log("----------------- end entered orders error");
-            if (error) {
-              setOrders([]);
-              setIsDataSet(false);
-            }
-          });
-        setLoading(false);
-      }
-    }, 5000);
+    if (!unauthorized) {
+    // Subscribe to app state changes
+      const subscribe = AppState.addEventListener('change', handleAppStateChange);
+      startInterval();
 
+    // Clear the interval and remove the event listener when component unmounts
     return () => {
-      clearInterval(interval);
-    };
-  }, [optionsIsLoaded]);
+      clearInterval(intervalId);
+      subscribe.remove();
+      };
+    }
+  }, [optionsIsLoaded, unauthorized, appState]);
 
+  // set deliveron data
   useEffect(() => {
     if (itemId) {
       setDeliveronOptions((prev) => ({ ...prev, data: { orderId: itemId } }));
@@ -175,12 +221,14 @@ export const EnteredOrdersList = () => {
   }, [deliveron, deliveron.original]);
 
   useEffect(() => {
-    ordersCount = Object.keys(orders).length;
-    if (ordersCount > temp) {
-      onPlaySound();
-      orderReceived();
+    if (orders) {
+      ordersCount = Object.keys(orders).length;
+      if (ordersCount > temp) {
+        onPlaySound();
+        orderReceived();
+      }
+      temp = ordersCount;
     }
-    temp = ordersCount;
   }, [orders]);
 
 
@@ -265,20 +313,21 @@ export const EnteredOrdersList = () => {
           </Card.Content>
         ) : null}
       </Card>
-    );
+    )
   };
 
   if (loading) {
     return <Loader />;
   }
 
-  // console.log('------------ entered orders');
+  console.log('------------ entered orders');
+  // console.log(domain);
   // console.log(orders);
   // console.log(branchid);
   // console.log(optionsIsLoaded);
-  // console.log('------------ end entered orders');
-
-  // console.log(orders);
+  console.log(unauthorized);
+  console.log(appState);
+  console.log('------------ end entered orders');
 
   return (
     <View>

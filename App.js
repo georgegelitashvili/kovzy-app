@@ -21,29 +21,33 @@ export default function App() {
     return () => {removeSubscription()};
   }, []);
 
-  useEffect(() => {
-    const checkForUpdate = async () => {
-      const update = await Updates.checkForUpdateAsync();
-      if (update.isAvailable) {
-        Alert.alert(
-          'Update Available',
-          'A new version of the app is available. Do you want to update?',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            {
-              text: 'Update',
-              onPress: async () => {
-                // Perform the update
-                Linking.openURL("http://play.google.com/store/apps/details?id=com.kovzy.app")
-              },
-            },
-          ]
-        );
-      }
-    };
+  // useEffect(() => {
+  //   async function checkForUpdates() {
+  //     try {
+  //       const { isAvailable } = await Updates.checkForUpdateAsync();
+  //       if (isAvailable) {
+  //         Alert.alert(
+  //           'Update Available',
+  //           'A new version of the app is available. Do you want to update?',
+  //           [
+  //             { text: 'Cancel', style: 'cancel' },
+  //             {
+  //               text: 'Update',
+  //               onPress: async () => {
+  //                 // Perform the update
+  //                 Linking.openURL("http://play.google.com/store/apps/details?id=com.kovzy.app")
+  //               },
+  //             },
+  //           ]
+  //         );
+  //       }
+  //     } catch (error) {
+  //       console.error('Error checking for updates:', error);
+  //     }
+  //   }
 
-    return () => { checkForUpdate() };
-  }, []);
+  //   checkForUpdates();
+  // }, []);
 
 
   return (

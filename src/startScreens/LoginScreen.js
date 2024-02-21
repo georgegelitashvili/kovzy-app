@@ -9,8 +9,7 @@ import { nameValidator } from "../helpers/nameValidator";
 import { passwordValidator } from "../helpers/passwordValidator";
 import { AuthContext, AuthProvider } from "../context/AuthProvider";
 
-// 'alexander.tsintsadze'
-// '700309
+
 
 export const LoginScreen = ({ navigation }) => {
   const { login, loginError } = useContext(AuthContext);

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext, useCallback } from "react";
 import { StyleSheet, View, TouchableOpacity, Dimensions, RefreshControl } from "react-native";
 import NetInfo from "@react-native-community/netinfo";
 import { Text, Button, Divider, Card } from "react-native-paper";
+import { useIsFocused } from '@react-navigation/native';
 import { FlatGrid } from "react-native-super-grid";
 import SelectOption from "./components/generate/SelectOption";
 import { AuthContext, AuthProvider } from "./context/AuthProvider";
@@ -13,6 +14,7 @@ const width = Dimensions.get("window").width;
 
 export default function Products({ navigation }) {
   const { setIsDataSet, domain, branchid } = useContext(AuthContext);
+  const isFocused = useIsFocused();
   const [products, setProducts] = useState([]);
   const [category, setCategory] = useState([]);
   const [excluded, setExcluded] = useState([]);
@@ -48,6 +50,14 @@ export default function Products({ navigation }) {
   };
 
   useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      onRefresh();
+    });
+
+    return unsubscribe;
+  }, [navigation]);
+
+  useEffect(() => {
     if (domain) {
       apiOptions();
     }
@@ -79,11 +89,11 @@ export default function Products({ navigation }) {
   }, [page, userLanguage, selected, optionsIsLoaded]);
 
   useEffect(() => {
-    if (sendApi || isConnected) {
+    if (isFocused && sendApi || isConnected) {
       fetchData();
       setSendApi(false);
     }
-  }, [sendApi, isConnected]);
+  }, [sendApi, isConnected, isFocused]);
 
   useEffect(() => {
     setExcluded([]);
@@ -119,7 +129,7 @@ export default function Products({ navigation }) {
     setExcluded([]);
     axiosInstance
       .post(options.url_getProducts, productData.data)
-      .then((resp) => {
+      .then(resp => {
         resp.data.category?.map((item) => {
           if (item.name != null) {
             setCategory((prev) => [
@@ -139,7 +149,8 @@ export default function Products({ navigation }) {
         setProducts(resp.data.data.data);
         setTotalPages(resp.data.data.total / resp.data.data.per_page);
       }).catch((error) => {
-        if (error) {
+        console.log('Error fetching products:', error)
+        if (error.status == 401) {
           setProducts([]);
           setExcluded([]);
           setIsDataSet(false);
@@ -156,14 +167,7 @@ export default function Products({ navigation }) {
     fetchData();
     setSendApi(false);
   };
-  // console.log("--------------- excluded");
-  // console.log(excluded);
-  // console.log("--------------- end excluded");
 
-
-  // console.log("--------------- acrivity options");
-  // console.log(activityOptions.data);
-  // console.log("--------------- acrivity options");
 
   const renderProductList = ({ item }) => {
     return (
@@ -233,7 +237,7 @@ export default function Products({ navigation }) {
       </View>
       <FlatGrid
         itemDimension={width}
-        data={products || []}
+        data={products}
         maxItemsPerRow={4}
         renderItem={renderProductList}
         adjustGridToStyles={true}

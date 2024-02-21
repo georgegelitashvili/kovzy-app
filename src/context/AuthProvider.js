@@ -23,25 +23,11 @@ export const AuthProvider = ({ children }) => {
 
   const { dictionary } = useContext(LanguageContext);
 
-  // console.log('------------------------ aauth');
+  // console.log('------------------------ auth');
   // console.log(domain);
   // console.log(branchName);
   // console.log(branchid);
-  // console.log(isDataSet);
-  // console.log('------------------------ end aauth');
-
-  useEffect(() => {
-    readData();
-  }, [isDataSet]);
-
-  useEffect(() => {
-    if (domain) {
-      // setBranchid(null);
-      // setBranchName(null);
-      apiOptions();
-    }
-  }, [domain]);
-
+  // console.log('------------------------ end auth');
 
   const handleClick = () => {
     setIsVisible(true);
@@ -87,14 +73,24 @@ export const AuthProvider = ({ children }) => {
   };
 
   useEffect(() => {
-    const interval = setInterval(() => {
+    readData();
+  }, [isDataSet]);
+
+  useEffect(() => {
+    if (domain) {
+      apiOptions();
+    }
+  }, [domain]);
+
+  useEffect(() => {
+    const interval = setInterval(async () => {
       if (domain) {
-        axiosInstance.post(options.url_deliveronStatus).then((resp) => {
+        await axiosInstance.post(options.url_deliveronStatus).then((resp) => {
           setDeliveronEnabled(resp.data.data.status == 0 ? true : false);
         });
 
         if (branchid) {
-          axiosInstance
+          await axiosInstance
             .post(options.url_branchStatus, { branchid: branchid })
             .then((resp) => {
               setBranchEnabled(resp.data.data);
@@ -127,9 +123,9 @@ export const AuthProvider = ({ children }) => {
         setBranchEnabled,
         deliveronEnabled,
         setDeliveronEnabled,
-        login: (username, password) => {
+        login: async (username, password) => {
           setIsLoading(true);
-          axiosInstance
+          await axiosInstance
             .post(options.url_login, {
               password,
               username,
@@ -139,15 +135,20 @@ export const AuthProvider = ({ children }) => {
                 setLoginError(e.data.error.message);
                 return;
               }
+              SecureStore.setItemAsync('credentials', JSON.stringify({ username: username, password: password }));
+
               SecureStore.setItemAsync('cookie', JSON.stringify(e.headers['set-cookie']));
-              SecureStore.setItemAsync('user', JSON.stringify(e.data.data));
-              setUser(e.data.data);
+              setUser(JSON.stringify(e.headers['set-cookie']));
               setIsLoading(false);
             });
         },
-        logout: () => {
-          axiosInstance.get(options.url_logout).then((resp) => {
-            if(resp) {
+        logout: async () => {
+          setIsLoading(true);
+          await axiosInstance.get(options.url_logout)
+            .then((resp) => resp.data)
+            .then((data) => {
+              deleteItem("cookie");
+              deleteItem("credentials");
               removeData("domain");
               removeData("branch");
               removeData("branchName");
@@ -156,9 +157,7 @@ export const AuthProvider = ({ children }) => {
               setBranchName(null);
               setIsDataSet(false);
               setUser(null);
-              deleteItem("user");
-              deleteItem("cookie");
-            }
+              setIsLoading(false);
           })
         },
       }}
