@@ -21,10 +21,11 @@ export default function RootNavigator() {
         if (cookie) {
           setUser(cookie);
         }
-        setIsLoading(false);
       });
     }
-  }, [user]);
+
+    setIsLoading(false);
+  }, [user, setUser]);
 
   if (isLoading) {
     return <Loader text="loading" />;
