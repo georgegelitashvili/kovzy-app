@@ -2,12 +2,10 @@ import React, { useState, useEffect, useContext } from "react";
 import * as Updates from "expo-updates";
 import { StyleSheet, Alert, Linking } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { Provider } from "react-redux";
 import Toast from './src/components/generate/Toast';
 import NetInfo from "@react-native-community/netinfo";
 import "react-native-gesture-handler";
 
-import { store } from "./src/redux/Store";
 import Main from "./src/Main";
 
 export default function App() {
@@ -51,9 +49,7 @@ export default function App() {
 
 
   return (
-    <>
-    <Provider store={store}>
-      <SafeAreaProvider style={styles.container}>
+    <SafeAreaProvider style={styles.container}>
       <Main />
       {!isConnected ? (<Toast
         type="failed"
@@ -61,10 +57,7 @@ export default function App() {
         subtitle="Oops, Looks like your device is not connected to the internet"
         animate={false}
       />) : null}
-      </SafeAreaProvider>
-    </Provider>
-    </>
-
+    </SafeAreaProvider>
   );
 }
 

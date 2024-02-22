@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from "react";
-import { StyleSheet, View, Dimensions } from "react-native";
+import { StyleSheet, View, Dimensions, Platform } from "react-native";
 import Modal from "react-native-modal";
 import OrdersModalAccept from "./OrdersModalAccept";
 import OrdersModalReject from "./OrdersModalReject";

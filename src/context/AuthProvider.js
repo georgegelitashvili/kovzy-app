@@ -15,19 +15,18 @@ export const AuthProvider = ({ children }) => {
   const [branchName, setBranchName] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isDataSet, setIsDataSet] = useState(false);
-  const [options, setOptions] = useState({});
+  const [options, setOptions] = useState({
+    url_login: "",
+    url_logout: "",
+    url_branchStatus: "",
+    url_deliveronStatus: ""
+  }); // api options
   const [loginError, setLoginError] = useState([]);
   const [isVisible, setIsVisible] = useState(true);
   const [branchEnabled, setBranchEnabled] = useState(false);
   const [deliveronEnabled, setDeliveronEnabled] = useState(false);
 
   const { dictionary } = useContext(LanguageContext);
-
-  // console.log('------------------------ auth');
-  // console.log(domain);
-  // console.log(branchName);
-  // console.log(branchid);
-  // console.log('------------------------ end auth');
 
   const handleClick = () => {
     setIsVisible(true);
@@ -60,16 +59,16 @@ export const AuthProvider = ({ children }) => {
   };
 
   const deleteItem = async (key) => {
-  try {
-    const result = await SecureStore.deleteItemAsync(key);
-    if (result) {
-      console.log(key + ': Secure storage item deleted successfully.');
-    } else {
-      console.log(key + ': Secure storage item does not exist.');
+    try {
+      const result = await SecureStore.deleteItemAsync(key);
+      if (result) {
+        console.log(key + ': Secure storage item deleted successfully.');
+      } else {
+        console.log(key + ': Secure storage item does not exist.');
+      }
+    } catch (error) {
+      console.log('Error occurred while deleting secure storage:', error);
     }
-  } catch (error) {
-    console.log('Error occurred while deleting secure storage:', error);
-  }
   };
 
   useEffect(() => {
@@ -83,28 +82,30 @@ export const AuthProvider = ({ children }) => {
   }, [domain]);
 
   useEffect(() => {
-    const interval = setInterval(async () => {
+    const fetchData = async () => {
       if (domain) {
-        await axiosInstance.post(options.url_deliveronStatus).then((resp) => {
-          setDeliveronEnabled(resp.data.data.status == 0 ? true : false);
-        });
+        try {
+          const deliveronResponse = await axiosInstance.post(options.url_deliveronStatus);
+          setDeliveronEnabled(deliveronResponse.data.data.status === 0);
 
-        if (branchid) {
-          await axiosInstance
-            .post(options.url_branchStatus, { branchid: branchid })
-            .then((resp) => {
-              setBranchEnabled(resp.data.data);
-              setIsVisible(resp.data.data);
-            });
+          if (branchid) {
+            const branchResponse = await axiosInstance.post(options.url_branchStatus, { branchid });
+            setBranchEnabled(branchResponse.data.data);
+            setIsVisible(branchResponse.data.data);
+          }
+        } catch (error) {
+          console.log('Error fetching data:', error);
         }
       }
-    }, 5000);
+    };
+
+    const interval = setInterval(fetchData, 5000);
 
     return () => {
       clearInterval(interval);
     };
 
-  }, [domain, branchid]);
+  }, [domain, branchid, options]);
 
   return (
     <AuthContext.Provider
@@ -125,46 +126,47 @@ export const AuthProvider = ({ children }) => {
         setDeliveronEnabled,
         login: async (username, password) => {
           setIsLoading(true);
-          await axiosInstance
-            .post(options.url_login, {
-              password,
-              username,
-            })
-            .then((e) => {
-              if (e.data.error) {
-                setLoginError(e.data.error.message);
-                return;
-              }
-              SecureStore.setItemAsync('credentials', JSON.stringify({ username: username, password: password }));
-
-              SecureStore.setItemAsync('cookie', JSON.stringify(e.headers['set-cookie']));
-              setUser(JSON.stringify(e.headers['set-cookie']));
-              setIsLoading(false);
-            });
+          try {
+            const response = await axiosInstance.post(options.url_login, { password, username });
+            if (response.data.error) {
+              setLoginError(response.data.error.message);
+              return;
+            }
+            SecureStore.setItemAsync('credentials', JSON.stringify({ username, password }));
+            SecureStore.setItemAsync('cookie', JSON.stringify(response.headers['set-cookie']));
+            setUser(JSON.stringify(response.headers['set-cookie']));
+            setIsLoading(false);
+          } catch (error) {
+            console.log('Error logging in:', error);
+            setLoginError('An error occurred while logging in. Please try again.');
+            setIsLoading(false);
+          }
         },
         logout: async () => {
           setIsLoading(true);
-          await axiosInstance.get(options.url_logout)
-            .then((resp) => resp.data)
-            .then((data) => {
-              deleteItem("cookie");
-              deleteItem("credentials");
-              removeData("domain");
-              removeData("branch");
-              removeData("branchName");
-              setDomain(null);
-              setBranchid(null);
-              setBranchName(null);
-              setIsDataSet(false);
-              setUser(null);
-              setIsLoading(false);
-          })
+          try {
+            await axiosInstance.get(options.url_logout);
+            deleteItem("cookie");
+            deleteItem("credentials");
+            removeData("domain");
+            removeData("branch");
+            removeData("branchName");
+            setDomain(null);
+            setBranchid(null);
+            setBranchName(null);
+            setIsDataSet(false);
+            setUser(null);
+            setIsLoading(false);
+          } catch (error) {
+            console.log('Error logging out:', error);
+            setIsLoading(false);
+          }
         },
       }}
     >
       {children}
 
-      {isVisible == false && (
+      {!isVisible && (
         <TouchableOpacity onPress={handleClick}>
           <Toast
             type="failed"

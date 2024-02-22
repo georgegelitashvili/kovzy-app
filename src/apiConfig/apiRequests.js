@@ -3,16 +3,14 @@ import * as SecureStore from 'expo-secure-store';
 import * as RootNavigation from '../helpers/navigate';
 import { removeData } from "../helpers/storage";
 
-
-// Construct api config
 let cookie = null;
 
 const axiosInstance = axios.create({
   headers: {
     'Accept': "application/json",
-    'Content-Type' : 'application/json'
-    },
-    withCredentials: true,
+    'Content-Type': 'application/json'
+  },
+  withCredentials: true,
 });
 
 axiosInstance.interceptors.request.use(
@@ -30,7 +28,7 @@ axiosInstance.interceptors.request.use(
 );
 
 axiosInstance.interceptors.response.use(
-  (response) =>{
+  (response) => {
     return response;
   },
   (error) => {
@@ -41,9 +39,7 @@ axiosInstance.interceptors.response.use(
       RootNavigation.navigate('Domain', { screen: 'Domain', message: 'Not allowed' });
     }
 
-    return new Promise((resolve, reject) => {
-      reject(error.response);
-    });a
+    return Promise.reject(error);
   },
 );
 

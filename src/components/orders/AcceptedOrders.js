@@ -10,18 +10,18 @@ import {
   Alert,
   RefreshControl,
 } from "react-native";
+import * as SecureStore from "expo-secure-store";
 import { Text, Button, Divider, Card } from "react-native-paper";
 import { FlatGrid } from "react-native-super-grid";
 import {
   MaterialCommunityIcons,
-  FontAwesome,
   SimpleLineIcons,
 } from "@expo/vector-icons";
 
-import { AuthContext, AuthProvider } from "../../context/AuthProvider";
+import { AuthContext } from "../../context/AuthProvider";
 
 import Loader from "../generate/loader";
-import { String, LanguageContext } from "../Language";
+import { LanguageContext } from "../Language";
 import axiosInstance from "../../apiConfig/apiRequests";
 import OrdersDetail from "./OrdersDetail";
 import OrdersModal from "../modal/OrdersModal";
@@ -32,51 +32,51 @@ const width = Dimensions.get("window").width;
 const numColumns = printRows(width);
 const cardSize = width / numColumns;
 
-// render accepted orders function
-export const AcceptedOrdersList = (navigation) => {
-  const { domain, setDomain, branchid, setUser } = useContext(AuthContext);
+export const AcceptedOrdersList = () => {
+  const { domain, branchid, login } = useContext(AuthContext);
   const [orders, setOrders] = useState([]);
-
   const [page, setPage] = useState(0);
-
-  const [options, setOptions] = useState({}); // api options
-  const [optionsIsLoaded, setOptionsIsLoaded] = useState(false); // api options
+  const [options, setOptions] = useState({
+    url_getAcceptedOrders: "",
+    url_deliveronStatus: "",
+    url_checkOrderStatus: "",
+    url_orderPrepared: "",
+    url_rejectOrder: "",
+  }); // api options
+  const [optionsIsLoaded, setOptionsIsLoaded] = useState(false);
   const [deliveronOptions, setDeliveronOptions] = useState({});
   const [isDeliveronOptions, setIsDeliveronOptions] = useState(false);
-
   const [deliveron, setDeliveron] = useState([]);
-  const [visible, setVisible] = useState(false); // modal state
-  const [itemId, setItemId] = useState(null); //item id for modal
-  const [isOpen, setOpenState] = useState([]); // my accordion state
+  const [visible, setVisible] = useState(false);
+  const [itemId, setItemId] = useState(null);
+  const [isOpen, setOpenState] = useState([]);
   const [modalType, setModalType] = useState("");
-
   const [loading, setLoading] = useState(true);
   const [loadingOptions, setLoadingOptions] = useState(false);
   const [unauthorized, setUnauthorized] = useState(false);
+  const [credentials, setCredentials] = useState({});
+  const { dictionary } = useContext(LanguageContext);
 
-  const { dictionary, userLanguage } = useContext(LanguageContext);
-
-  const increment = () => {setPage(c => c + 1);setLoading(true)};
-  const decrement = () => {setPage(c => c - 1);setLoading(true)};
+  const increment = () => { setPage(page + 1); setLoading(true) };
+  const decrement = () => { setPage(page - 1); setLoading(true) };
 
   const onChangeModalState = useCallback((newState) => {
-    setTimeout(() => {
-      setVisible(newState);
-      setIsDeliveronOptions(newState);
-      setItemId(null);
-      setDeliveron([]);
-      setOrders([]);
-    }, 0);
-  });
+    setVisible(newState);
+    setIsDeliveronOptions(newState);
+    setItemId(null);
+    setDeliveron([]);
+    setOrders([]);
+  }, []);
 
   const toggleContent = useCallback((value) => {
-    setOpenState([...isOpen, value]);
+    if (isOpen.includes(value)) {
+      setOpenState(isOpen.filter((i) => i !== value));
+    } else {
+      setOpenState([...isOpen, value]);
+    }
+  }, [isOpen]);
 
-    let index = isOpen.indexOf(value);
-    if (index > -1) setOpenState([...isOpen.filter((i) => i !== value)]);
-  });
-
-  const apiOptions = () => {
+  const apiOptions = useCallback(() => {
     setOptions({
       url_getAcceptedOrders: `https://${domain}/api/v1/admin/getAcceptedOrders`,
       url_deliveronStatus: `https://${domain}/api/v1/admin/deliveronStatus`,
@@ -85,64 +85,63 @@ export const AcceptedOrdersList = (navigation) => {
       url_rejectOrder: `https://${domain}/api/v1/admin/rejectOrder`,
     });
     setOptionsIsLoaded(true);
-  };
+  }, [domain]);
 
-  // modal show
   const showModal = (type) => {
     setModalType(type);
     setVisible(true);
   };
 
-  const fetchAcceptedOrders = async () => {
+  const fetchAcceptedOrders = useCallback(async () => {
     setOptionsIsLoaded(true);
-    await axiosInstance
-      .post(options.url_getAcceptedOrders, JSON.stringify({
+    try {
+      const resp = await axiosInstance.post(options.url_getAcceptedOrders, JSON.stringify({
         Pagination: {
           limit: 12,
           page: page
         },
         branchid: branchid,
         type: 0
-      }))
-      .then((resp) => resp.data.data)
-      .then((data) => {
-        setOrders(data);
-        setUnauthorized(false);
-      })
-      .catch((error) => {
-        console.log('Error fetching accepted orders:', error);
-        if (error.status == 401) {
-          setOrders([]);
-          setOptionsIsLoaded(false);
-          setUnauthorized(true);
-          Alert.alert("ALERT", "somthing went wrong", [
-            { text: "OK", onPress: () => console.log('click') },
+      }));
+      const data = resp.data.data;
+      setOrders(data);
+      setUnauthorized(false);
+    } catch (error) {
+      console.log('Error fetching accepted orders:', error);
+      if (error.status == 401) {
+        setOrders([]);
+        setOptionsIsLoaded(false);
+        setUnauthorized(true);
+        if (credentials) {
+          Alert.alert("ALERT", "something went wrong", [
+            { text: "login", onPress: () => login(credentials.username, credentials.password) },
           ]);
-          setUnauthorized(true);
+          setUnauthorized(false);
         }
-        return false;
-      });
+      }
+    }
     setLoading(false);
-  }
+  }, [options, page, branchid]);
 
   useEffect(() => {
-
     if (domain && branchid) {
       apiOptions();
+      SecureStore.getItemAsync("credentials").then((obj) => {
+        if (obj) {
+          setCredentials(JSON.parse(obj));
+        }
+      });
     } else if (domain || branchid) {
       setOptionsIsLoaded(false);
       setOrders([]);
     }
-  }, [domain, branchid]);
+  }, [domain, branchid, apiOptions]);
 
   useEffect(() => {
-    if (!unauthorized) {
-      if (optionsIsLoaded || orders || page) {
-        fetchAcceptedOrders();
-      }
+    if (!unauthorized && (optionsIsLoaded || orders || page)) {
+      fetchAcceptedOrders();
     }
-  }, [optionsIsLoaded, orders, page, unauthorized]);
-
+  }, [unauthorized, optionsIsLoaded, orders, page, fetchAcceptedOrders]);
 
   useEffect(() => {
     if (itemId) {
@@ -175,13 +174,12 @@ export const AcceptedOrdersList = (navigation) => {
     }
   };
 
-
   const renderEnteredOrdersList = ({ item }) => {
     const trackLink = [JSON.parse(item.deliveron_data)]?.map(link => {
       return link.trackLink;
     });
 
-    return data = (
+    return (
       <Card key={item.id}>
         <TouchableOpacity onPress={() => toggleContent(item.id)}>
           <Card.Content style={styles.head}>
@@ -276,15 +274,6 @@ export const AcceptedOrdersList = (navigation) => {
     return <Loader />;
   }
 
-  console.log('------------ accepted orders');
-  // console.log(domain);
-  // console.log(options.url_getAcceptedOrders);
-  // console.log(orders);
-  // console.log(branchid);
-  // console.log(optionsIsLoaded);
-  console.log(unauthorized);
-  console.log('------------ end accepted orders');
-
   return (
     <View style={{ flex: 1 }}>
       {loadingOptions ? <Loader /> : null}
@@ -349,13 +338,12 @@ export const AcceptedOrdersList = (navigation) => {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 12,
+    flex: 1,
     justifyContent: "flex-start",
   },
   card: {
     backgroundColor: "#fff",
     justifyContent: "flex-start",
-
     margin: 10,
     borderRadius: 10,
     shadowColor: "#000",
@@ -365,7 +353,6 @@ const styles = StyleSheet.create({
     },
     shadowOpacity: 0.3,
     shadowRadius: 4.65,
-
     elevation: 8,
   },
   head: {

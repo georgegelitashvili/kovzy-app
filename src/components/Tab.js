@@ -1,19 +1,17 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, { useContext } from "react";
 import { createMaterialTopTabNavigator } from "@react-navigation/material-top-tabs";
-import { Text } from "react-native";
-import { String, LanguageContext } from "./Language";
+import { LanguageContext } from "./Language";
 
 const Tab = createMaterialTopTabNavigator();
 
 export default function TabContent(props) {
   const { dictionary } = useContext(LanguageContext);
 
-
   return (
     <Tab.Navigator
       initialRouteName="Orders"
       screenOptions={{
-        labelStyle: {
+        tabBarLabelStyle: {
           fontSize: 14,
         },
       }}
@@ -30,4 +28,4 @@ export default function TabContent(props) {
       />
     </Tab.Navigator>
   );
-}
+};

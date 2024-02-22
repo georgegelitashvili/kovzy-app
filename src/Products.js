@@ -26,7 +26,10 @@ export default function Products({ navigation }) {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
 
-  const [options, setOptions] = useState({}); // api options
+  const [options, setOptions] = useState({
+    url_getProducts: "",
+    url_productActivity: "",
+  }); // api options
   const [optionsIsLoaded, setOptionsIsLoaded] = useState(false); // api options
   const [activityOptions, setActivityOptions] = useState({});
   const [sendApi, setSendApi] = useState(false);
@@ -39,6 +42,7 @@ export default function Products({ navigation }) {
   const [refreshing, setRefreshing] = useState(false);
 
   const { dictionary, userLanguage } = useContext(LanguageContext);
+
 
   const apiOptions = () => {
     setOptions({

@@ -38,7 +38,12 @@ export const EnteredOrdersList = (navigation) => {
   const [appState, setAppState] = useState(AppState.currentState);
   const [intervalId, setIntervalId] = useState(null);
 
-  const [options, setOptions] = useState({}); // api options
+  const [options, setOptions] = useState({
+    url_unansweredOrders: "",
+    url_deliveronRecheck: "",
+    url_acceptOrder: "",
+    url_rejectOrder: ""
+  }); // api options
   const [optionsIsLoaded, setOptionsIsLoaded] = useState(false); // api options
   const [deliveronOptions, setDeliveronOptions] = useState({});
   const [isDeliveronOptions, setIsDeliveronOptions] = useState(false);
@@ -159,7 +164,7 @@ export const EnteredOrdersList = (navigation) => {
   };
 
   const handleAppStateChange = (nextAppState) => {
-    if (appState.match(/inactive|background/) && nextAppState === 'active') {
+    if (appState.match(/inactive|background/) && nextAppState === "active") {
       startInterval();
     } else {
       // App is in the background or inactive, clear or pause your interval
@@ -319,15 +324,6 @@ export const EnteredOrdersList = (navigation) => {
   if (loading) {
     return <Loader />;
   }
-
-  console.log('------------ entered orders');
-  // console.log(domain);
-  // console.log(orders);
-  // console.log(branchid);
-  // console.log(optionsIsLoaded);
-  console.log(unauthorized);
-  console.log(appState);
-  console.log('------------ end entered orders');
 
   return (
     <View>

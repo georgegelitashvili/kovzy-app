@@ -2,7 +2,7 @@ import React, { useContext } from "react";
 import { createStackNavigator } from "@react-navigation/stack";
 import { Appbar, useTheme } from "react-native-paper";
 
-import { String, LanguageContext } from "./Language";
+import { LanguageContext } from "./Language";
 import { DomainScreen } from "../startScreens/DomainScreen";
 import { BranchScreen } from "../startScreens/BranchScreen";
 import { LoginScreen } from "../startScreens/LoginScreen";
@@ -24,12 +24,12 @@ const Header = (props) => {
         : props.route.name;
 
   return (
-    <Appbar.Header theme={{ colors: { primary: theme.colors.surface } }} style={options.headerStyle}>
+    <Appbar.Header theme={{ colors: { primary: theme.colors.surface } }} style={{ marginTop: options.headerStyle?.marginTop }}>
       {props.back ? <Appbar.BackAction onPress={props.navigation.goBack} /> : null}
       <Appbar.Content
-        title={
-          props.back ? title : null
-        } />
+        title={title}
+        titleStyle={{ fontSize: options.headerStyle?.fontSize }}
+      />
     </Appbar.Header>
   );
 };
@@ -54,15 +54,12 @@ export const HomeNavigator = () => {
 
       <Stack.Screen name="ProductsDetail" options={{
         headerTitle: dictionary["prod.customizable"],
-        headerStyle: {
-          marginTop: -65,
-          fontSize: 10
-        }
+        headerStyle: { marginTop: -65 },
+        headerContentStyle: { fontSize: 10 }
       }}>
         {(props) => <ProductsDetail {...props} />}
       </Stack.Screen>
 
-      {/* <Stack.Screen name="Login" options={{ headerShown: false }} component={LoginScreen} /> */}
     </Stack.Navigator>
   );
 };
