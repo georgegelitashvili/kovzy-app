@@ -39,13 +39,13 @@ export default function OrdersModal({
       if (!content) return null;
       if (Array.isArray(content)) {
         return content.map((item) => ({
-          label: !item.name ? item.companyName + ' - ' + item.price : item.name + ' - ' + item.price,
+          label: !item.name ? item.companyName + ' - ' + item.price : item.name + ' - ' + item.price ?? item.price_before_accept,
           value: !item.id ? item.companyId ?? item.type : item.id,
         }));
       } else {
         return [
           {
-            label: !content.name ? content.companyName + ' - ' + content.price : content.name + ' - ' + content.price,
+            label: !content.name ? content.companyName + ' - ' + content.price : content.name + ' - ' + content.price ?? content.price_before_accept,
             value: !content.id ? content.companyId ?? content.type : content.id,
           },
         ];
