@@ -8,6 +8,7 @@ import {
   Alert,
   AppState
 } from "react-native";
+import { useFocusEffect } from '@react-navigation/native';
 import * as SecureStore from "expo-secure-store";
 import { Text, Button, Divider, Card } from "react-native-paper";
 import { FlatGrid } from "react-native-super-grid";
@@ -31,8 +32,8 @@ let ordersCount;
 let temp = 0;
 
 // render entered orders function
-export const EnteredOrdersList = (navigation) => {
-  const { domain, branchid, login } = useContext(AuthContext);
+export const EnteredOrdersList = () => {
+  const { domain, branchid, setUser, user, deleteItem, setIsDataSet } = useContext(AuthContext);
   const [orders, setOrders] = useState([]);
 
   const [appState, setAppState] = useState(AppState.currentState);
@@ -58,7 +59,6 @@ export const EnteredOrdersList = (navigation) => {
   const [loading, setLoading] = useState(true);
   const [loadingOptions, setLoadingOptions] = useState(false);
 
-  const [unauthorized, setUnauthorized] = useState(false);
   const [credentials, setCredentials] = useState({});
 
   const { dictionary, userLanguage } = useContext(LanguageContext);
@@ -108,7 +108,7 @@ export const EnteredOrdersList = (navigation) => {
     ]);
   };
 
-  const apiOptions = () => {
+  const apiOptions = useCallback(() => {
     setOptions({
       url_unansweredOrders: `https://${domain}/api/v1/admin/getUnansweredOrders`,
       url_deliveronRecheck: `https://${domain}/api/v1/admin/deliveronRecheck`,
@@ -116,7 +116,7 @@ export const EnteredOrdersList = (navigation) => {
       url_rejectOrder: `https://${domain}/api/v1/admin/rejectOrder`,
     });
     setOptionsIsLoaded(true);
-  };
+  }, [domain]);
 
   // modal show
   const showModal = (type) => {
@@ -125,35 +125,53 @@ export const EnteredOrdersList = (navigation) => {
   };
 
   const fetchEnteredOrders = async () => {
-    await axiosInstance
-      .post(options.url_unansweredOrders, {
+    try {
+      // console.log('entered orders: ', user);
+      // Check if user is authorized
+      if (!user) {
+        if (intervalId) {
+          clearInterval(intervalId);
+        }
+        throw new Error("user is not authorized"); // Exit early if user is not authorized
+      }
+      if (!options.url_unansweredOrders) {
+        throw new Error("URL is empty");
+      }
+
+      const resp = await axiosInstance.post(options.url_unansweredOrders, {
         type: 0,
         page: 1,
         branchid: branchid,
-      })
-      .then((resp) => resp.data.data)
-      .then((data) => {
-        setOrders(data);
-        setUnauthorized(false);
-      })
-      .catch((error) => {
-        console.log('Error fetching entered orders:', error);
-        if (error.status == 401) {
-          setOrders([]);
-          setOptionsIsLoaded(false);
-          setUnauthorized(true);
-          if (credentials) {
-            Alert.alert("ALERT", "something went wrong", [
-              { text: "login", onPress: () => login(credentials.username, credentials.password) },
-            ]);
-            setUnauthorized(false);
-          }
-        }
       });
-    setLoading(false);
-  }
+      const data = resp.data.data;
+      setOrders(data);
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    } catch (error) {
+      console.log('Error fetching entered orders full:', error);
+      if (error.message === 'Network Error') {
+        console.log('Network error occurred. Retrying request...');
+        // Retry request after a certain amount of time
+        setTimeout(fetchEnteredOrders, 5000); // Retry after 5 seconds
+        return;
+      }
+      const statusCode = error?.status || 'Unknown';
+      console.log('Status code entered orders:', statusCode);
+      if (statusCode === 401) {
+        console.log('Error fetching entered orders:', statusCode);
+        setOrders([]);
+        setOptions({});
+        setOptionsIsLoaded(false);
+        setIsDeliveronOptions(false);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const startInterval = () => {
+    console.log('call intervall');
     const id = setInterval(async () => {
       if (optionsIsLoaded) {
         fetchEnteredOrders();
@@ -167,8 +185,7 @@ export const EnteredOrdersList = (navigation) => {
     if (appState.match(/inactive|background/) && nextAppState === "active") {
       startInterval();
     } else {
-      // App is in the background or inactive, clear or pause your interval
-      clearInterval(intervalId)
+      clearInterval(intervalId);
     }
     setAppState(nextAppState);
   };
@@ -185,22 +202,23 @@ export const EnteredOrdersList = (navigation) => {
       setOptionsIsLoaded(false);
       setOrders([]);
     }
-  }, [domain, branchid]);
+  }, [domain, branchid, apiOptions]);
 
-  // setinterval
   useEffect(() => {
-    if (!unauthorized) {
-    // Subscribe to app state changes
+    apiOptions();
+    if (optionsIsLoaded) {
       const subscribe = AppState.addEventListener('change', handleAppStateChange);
       startInterval();
+      console.log('startinterval');
 
-    // Clear the interval and remove the event listener when component unmounts
-    return () => {
-      clearInterval(intervalId);
-      subscribe.remove();
+      return () => {
+        if (intervalId) {
+          clearInterval(intervalId);
+        }
+        subscribe.remove();
       };
     }
-  }, [optionsIsLoaded, unauthorized, appState]);
+  }, [optionsIsLoaded, appState]);
 
   // set deliveron data
   useEffect(() => {
@@ -235,7 +253,6 @@ export const EnteredOrdersList = (navigation) => {
       temp = ordersCount;
     }
   }, [orders]);
-
 
   const renderEnteredOrdersList = ({ item }) => {
     return (
@@ -322,7 +339,11 @@ export const EnteredOrdersList = (navigation) => {
   };
 
   if (loading) {
-    return <Loader />;
+    return <Loader show={loading} />;
+  }
+
+  if (!orders || orders.length === 0) {
+    return null;
   }
 
   return (
@@ -343,11 +364,11 @@ export const EnteredOrdersList = (navigation) => {
         ) : null}
         <FlatGrid
           itemDimension={cardSize}
-          data={orders || []}
+          data={orders}
           renderItem={renderEnteredOrdersList}
           adjustGridToStyles={true}
           contentContainerStyle={{ justifyContent: "flex-start" }}
-          keyExtractor={(item) => item.id.toString()}
+          keyExtractor={(item) => (item && item.id ? item.id.toString() : '')}
           onEndReachedThreshold={0.5}
         />
       </ScrollView>

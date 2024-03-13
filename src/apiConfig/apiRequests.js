@@ -32,6 +32,7 @@ axiosInstance.interceptors.response.use(
     return response;
   },
   (error) => {
+    console.log("Error axiosInstance:", error);
     if (error.response?.status === 404) {
       removeData("domain");
       removeData("branch");
@@ -39,8 +40,16 @@ axiosInstance.interceptors.response.use(
       RootNavigation.navigate('Domain', { screen: 'Domain', message: 'Not allowed' });
     }
 
-    return Promise.reject(error);
+    return Promise.reject(error.response);
   },
 );
+
+// Clear Axios cache after each request
+axios.interceptors.response.use(response => {
+  // Clear the cache
+  axios.defaults.adapter.resetCache();
+
+  return response;
+});
 
 export default axiosInstance;

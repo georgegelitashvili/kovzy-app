@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useContext } from "react";
+import React, { useState, useEffect, useCallback, createContext, useContext } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import {
   StyleSheet,
@@ -10,6 +10,7 @@ import {
   Alert,
   RefreshControl,
 } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import * as SecureStore from "expo-secure-store";
 import { Text, Button, Divider, Card } from "react-native-paper";
 import { FlatGrid } from "react-native-super-grid";
@@ -33,7 +34,7 @@ const numColumns = printRows(width);
 const cardSize = width / numColumns;
 
 export const AcceptedOrdersList = () => {
-  const { domain, branchid, login } = useContext(AuthContext);
+  const { domain, branchid, setUser, user, deleteItem, setIsDataSet } = useContext(AuthContext);
   const [orders, setOrders] = useState([]);
   const [page, setPage] = useState(0);
   const [options, setOptions] = useState({
@@ -53,20 +54,11 @@ export const AcceptedOrdersList = () => {
   const [modalType, setModalType] = useState("");
   const [loading, setLoading] = useState(true);
   const [loadingOptions, setLoadingOptions] = useState(false);
-  const [unauthorized, setUnauthorized] = useState(false);
   const [credentials, setCredentials] = useState({});
   const { dictionary } = useContext(LanguageContext);
 
   const increment = () => { setPage(page + 1); setLoading(true) };
   const decrement = () => { setPage(page - 1); setLoading(true) };
-
-  const onChangeModalState = useCallback((newState) => {
-    setVisible(newState);
-    setIsDeliveronOptions(newState);
-    setItemId(null);
-    setDeliveron([]);
-    setOrders([]);
-  }, []);
 
   const toggleContent = useCallback((value) => {
     if (isOpen.includes(value)) {
@@ -92,9 +84,18 @@ export const AcceptedOrdersList = () => {
     setVisible(true);
   };
 
-  const fetchAcceptedOrders = useCallback(async () => {
+  const fetchAcceptedOrders = async () => {
     setOptionsIsLoaded(true);
     try {
+      // console.log('accepted orders: ', user)
+      // Check if user is authorized
+      if (!user) {
+        return; // Exit early if user is not authorized
+      }
+      if (!options.url_getAcceptedOrders) {
+        throw new Error("URL is empty");
+      }
+
       const resp = await axiosInstance.post(options.url_getAcceptedOrders, JSON.stringify({
         Pagination: {
           limit: 12,
@@ -105,23 +106,37 @@ export const AcceptedOrdersList = () => {
       }));
       const data = resp.data.data;
       setOrders(data);
-      setUnauthorized(false);
     } catch (error) {
-      console.log('Error fetching accepted orders:', error);
-      if (error.status == 401) {
+      console.log('Error fetching accepted orders full:', error);
+      const statusCode = error?.status || 'Unknown';
+      console.log('Status code accepted orders:', statusCode);
+      if (statusCode === 401) {
         setOrders([]);
         setOptionsIsLoaded(false);
-        setUnauthorized(true);
-        if (credentials) {
-          Alert.alert("ALERT", "something went wrong", [
-            { text: "login", onPress: () => login(credentials.username, credentials.password) },
-          ]);
-          setUnauthorized(false);
-        }
+        setOptions({});
+        console.log(credentials);
+        Alert.alert("ALERT", "Something went wrong with acceptedOrders", [
+          {
+            text: "Retry", onPress: () => {
+              console.log('Clicked acceptedOrders retry');
+              fetchAcceptedOrders();
+            }
+          },
+        ]);
       }
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  }, [options, page, branchid]);
+  };
+
+  const onChangeModalState = useCallback((newState) => {
+    setVisible(newState);
+    setIsDeliveronOptions(newState);
+    setItemId(null);
+    setDeliveron([]);
+    setOrders([]);
+    fetchAcceptedOrders();
+  }, [orders]);
 
   useEffect(() => {
     if (domain && branchid) {
@@ -137,11 +152,13 @@ export const AcceptedOrdersList = () => {
     }
   }, [domain, branchid, apiOptions]);
 
-  useEffect(() => {
-    if (!unauthorized && (optionsIsLoaded || orders || page)) {
+  useFocusEffect(
+    React.useCallback(() => {
       fetchAcceptedOrders();
-    }
-  }, [unauthorized, optionsIsLoaded, orders, page, fetchAcceptedOrders]);
+      
+      return () => {};
+    }, [options, page, branchid])
+  );
 
   useEffect(() => {
     if (itemId) {
@@ -176,7 +193,7 @@ export const AcceptedOrdersList = () => {
 
   const renderEnteredOrdersList = ({ item }) => {
     const trackLink = [JSON.parse(item.deliveron_data)]?.map(link => {
-      return link.trackLink;
+      return link.trackLink ?? null;
     });
 
     return (
@@ -270,8 +287,10 @@ export const AcceptedOrdersList = () => {
     );
   };
 
+
+
   if (loading) {
-    return <Loader />;
+    return <Loader show={loading} />;
   }
 
   return (
@@ -292,11 +311,11 @@ export const AcceptedOrdersList = () => {
         ) : null}
         <FlatGrid
           itemDimension={cardSize}
-          data={orders || []}
+          data={orders}
           renderItem={renderEnteredOrdersList}
           adjustGridToStyles={true}
           contentContainerStyle={{ justifyContent: "flex-start" }}
-          keyExtractor={(item) => item.id.toString()}
+          keyExtractor={(item) => (item && item.id ? item.id.toString() : '')}
         />
       </ScrollView>
       <View style={styles.paginationContainer}>

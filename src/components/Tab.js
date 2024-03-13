@@ -17,7 +17,7 @@ export default function TabContent(props) {
       }}
     >
       <Tab.Screen
-        name="Orders"
+        name="EnterdOrders"
         children={() => props.tab1}
         options={{ tabBarLabel: dictionary["nav.pendingOrders"], unmountOnBlur: true }}
       />

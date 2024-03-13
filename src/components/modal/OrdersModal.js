@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useEffect, useCallback, useState, useMemo } from "react";
 import { StyleSheet, View, Dimensions, Platform } from "react-native";
 import Modal from "react-native-modal";
 import OrdersModalAccept from "./OrdersModalAccept";
@@ -18,22 +18,45 @@ export default function OrdersModal({
   type,
   options
 }) {
-  const [visible, setVisible] = useState(isVisible); // modal state
+  const [visible, setVisible] = useState(isVisible);
+
+  useEffect(() => {
+    setVisible(isVisible);
+  }, [isVisible]);
 
   const hideModal = useCallback(() => {
-    setVisible(false);
-  });
+    onChangeState(false);
+  }, [onChangeState]);
 
   const handleChangeStateClick = useCallback(() => {
-    onChangeState(visible);
+    onChangeState(false);
   });
 
-  // console.log('---------- type');
-  // console.log(deliveron);
-  // console.log('---------- end type');
+
+  const items = useMemo(() => {
+    if (deliveron.original?.status !== -2) {
+      const content = deliveron.original?.content;
+      if (!content) return null;
+      if (Array.isArray(content)) {
+        return content.map((item) => ({
+          label: !item.name ? item.companyName + ' - ' + item.price : item.name + ' - ' + item.price,
+          value: !item.id ? item.companyId ?? item.type : item.id,
+        }));
+      } else {
+        return [
+          {
+            label: !content.name ? content.companyName + ' - ' + content.price : content.name + ' - ' + content.price,
+            value: !content.id ? content.companyId ?? content.type : content.id,
+          },
+        ];
+      }
+    } else {
+      return null;
+    }
+  }, [deliveron.original?.content, deliveron.original?.status]);
 
   const loadModalComponent = () => {
-    switch(type) {
+    switch (type) {
       case 'accept':
         return (
           <OrdersModalAccept
@@ -41,12 +64,7 @@ export default function OrdersModal({
             deliveron={deliveron.original}
             deliveronOptions={deliveronOptions}
             options={options}
-            items={
-              deliveron.original?.status !== -2 ? deliveron.original?.content?.map((item) => ({
-                label: !item.name ? item.companyName + ' - ' + item.price : item.name + ' - ' + item.price,
-                value: !item.id ? item.companyId ?? item.type : item.id,
-              })) : null
-            }
+            items={items}
             hideModal={hideModal}
           />
         )
@@ -74,7 +92,7 @@ export default function OrdersModal({
     }
   }
 
-  if (deliveron.length == 0 || deliveron.original?.content.length == 0) {
+  if (deliveron.length === 0 || deliveron.original?.content.length === 0) {
     return null;
   }
 
@@ -102,6 +120,7 @@ export default function OrdersModal({
     </>
   );
 }
+
 
 const styles = StyleSheet.create({
   modal: {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext, useRef } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import { Text, Button } from "react-native-paper";
 import TextField from "../generate/TextField";
 import SelectOption from "../generate/SelectOption";
@@ -32,16 +32,19 @@ export default function OrdersModalContent(props) {
   const { dictionary } = useContext(LanguageContext);
 
   const deliveronOff = () => {
+    let shouldReturn = false;
     if (ready === false) {
-      return false;
+      shouldReturn = true;
     }
-    
+
     if (props.deliveron?.status !== -2) {
       axiosInstance.post(props.options.url_acceptOrder, acceptData.data)
         .catch((error) => {
           console.log(error);
         });
     }
+
+    return shouldReturn;
   };
 
   const acceptOrder = () => {
@@ -50,7 +53,7 @@ export default function OrdersModalContent(props) {
       return false;
     }
 
-    if(options) {
+    if (options) {
       setLoading(true);
       axiosInstance.post(options, orderData.data).then(resp => {
         if (resp.data.data?.original?.status === -2 && resp.data.data?.original?.error !== "") {
@@ -67,7 +70,7 @@ export default function OrdersModalContent(props) {
           setLoading(false);
           setReady(true);
           Alert.alert("ALERT", dictionary['dv.orderSuccess'], [
-            {text: 'OK', onPress: () => props.hideModal()},
+            { text: 'OK', onPress: () => props.hideModal() },
           ]);
         }
       }).catch((error) => {
@@ -77,7 +80,11 @@ export default function OrdersModalContent(props) {
   };
 
   useEffect(() => {
-    deliveronOff();
+    const shouldReturn = deliveronOff();
+    if (shouldReturn) {
+      return;
+    }
+
     setReady(false);
   }, [ready]);
 
@@ -87,8 +94,9 @@ export default function OrdersModalContent(props) {
   }, [props.deliveron]);
 
   useEffect(() => {
-    if (selected) {
-      props.deliveron?.content?.map((item) => {
+    if (selected && props.deliveron.content) {
+      const contentArray = Array.isArray(props.deliveron.content) ? props.deliveron.content : [props.deliveron.content];
+      contentArray.forEach((item) => {
         if (item.id == selected || item.companyId == selected || item.type == selected) {
           setOrderData({
             ...orderData,
@@ -111,7 +119,7 @@ export default function OrdersModalContent(props) {
               orderPrepTime: forDelivery.value,
               orderDelyTime: forClient.value,
             },
-          })
+          });
         }
       });
     } else {
@@ -123,7 +131,7 @@ export default function OrdersModalContent(props) {
         },
       });
     }
-  }, [selected, forClient, forDelivery]);
+  }, [selected, forClient, forDelivery, props.deliveron]);
 
   return (
     <>

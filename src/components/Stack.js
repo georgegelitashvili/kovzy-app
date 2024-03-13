@@ -12,23 +12,17 @@ import ProductsDetail from "./products/ProductsDetail";
 
 const Stack = createStackNavigator();
 
-const Header = (props) => {
+const Header = ({ options, navigation }) => {
   const theme = useTheme();
-
-  const { options } = props;
-  const title =
-    options.headerTitle !== undefined
-      ? options.headerTitle
-      : options.title !== undefined
-        ? options.title
-        : props.route.name;
+  const { headerStyle } = options;
+  const title = options.headerTitle ?? options.title ?? navigation?.route?.name;
 
   return (
-    <Appbar.Header theme={{ colors: { primary: theme.colors.surface } }} style={{ marginTop: options.headerStyle?.marginTop }}>
-      {props.back ? <Appbar.BackAction onPress={props.navigation.goBack} /> : null}
+    <Appbar.Header theme={{ colors: { primary: theme.colors.surface } }} style={{ marginTop: headerStyle?.marginTop }}>
+      {navigation?.canGoBack() ? <Appbar.BackAction onPress={navigation.goBack} /> : null}
       <Appbar.Content
         title={title}
-        titleStyle={{ fontSize: options.headerStyle?.fontSize }}
+        titleStyle={{ fontSize: headerStyle?.fontSize }}
       />
     </Appbar.Header>
   );

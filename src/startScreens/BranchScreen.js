@@ -5,43 +5,60 @@ import Logo from "../components/generate/Logo";
 import Button from "../components/generate/Button";
 import SelectOption from "../components/generate/SelectOption";
 import { storeData } from "../helpers/storage";
-import Toast from '../components/generate/Toast';
 import Loader from "../components/generate/loader";
-import { AuthContext, AuthProvider } from "../context/AuthProvider";
-
+import { AuthContext } from "../context/AuthProvider";
 import axiosInstance from "../apiConfig/apiRequests";
 
 export const BranchScreen = ({ navigation }) => {
-  const { setIsDataSet, domain, branchid } = useContext(AuthContext);
+  const { isDataSet, setIsDataSet, domain, branchid } = useContext(AuthContext);
   const [branches, setBranches] = useState([]);
-
-  const [branch, setBranch] = useState({ data: branches || null, error: "" });
   const [selected, setSelected] = useState(branchid);
   const [isLoading, setIsLoading] = useState(true);
-
-  const [options, setOptions] = useState({}); // api options
-
   const [errorText, setErrorText] = useState("");
 
   const branchApi = () => {
-    setOptions({
-      url: `https://${domain}/api/v1/admin/branches`,
-    });
+    const url = `https://${domain}/api/v1/admin/branches`;
+    console.log(url);
+    try {
+      axiosInstance.post(url)
+        .then((response) => {
+          const data = response.data.data || [];
+          setBranches(data.map((item) => ({
+            label: item.title,
+            value: item.id,
+            enabled: item.enabled
+          })));
+          setErrorText("");
+        })
+        .catch((error) => {
+          if (error.response && (error.response.status === 500 || error.response.status === 404)) {
+            setIsDataSet(false);
+            setBranches([]);
+            setErrorText("Unable to fetch branch list. Please check your internet connection and try again.");
+          }
+        })
+        .catch((error) => {
+          setIsDataSet(false);
+          setBranches([]);
+          setErrorText("An error occurred while fetching branch list. Please try again later.");
+        });
+    } finally {
+      setIsLoading(false);
+    }
   };
+
 
   const onCheckPressed = () => {
     if (selected === null) {
-      setBranch({ ...branch, error: "Branch must choose!" });
+      setErrorText("Branch must be chosen!");
       return;
     }
-
     navigation.navigate("Login");
   };
 
   useEffect(() => {
     if (domain) {
       setBranches([]);
-      setBranch({ data: null, error: "" });
       setSelected(null);
       setErrorText("");
       branchApi();
@@ -49,57 +66,22 @@ export const BranchScreen = ({ navigation }) => {
   }, [domain]);
 
   useEffect(() => {
-    if (options) {
-      axiosInstance.post(options.url)
-        .then((e) => e.data.data)
-        .then((data) => {
-          setBranch({ data: null, error: "" });
-          setBranches([]);
-          setErrorText("");
-          setIsDataSet(false);
-          data?.map((item) =>
-            setBranches((prev) => [
-              ...prev,
-              { label: item.title, value: item.id, enabled: item.enabled },
-            ])
-          );
-          setIsLoading(false);
-        })
-        .catch((error) => {
-        console.log('error branch', error.status);
-          if (error.status == 500 || error.status == 404) {
-          setIsDataSet(false);
-          setBranches([]);
-          setBranch({ data: null, error: "" });
-          setIsLoading(true);
-          setErrorText("Branch list not found or Domain is incorrect");
-        }
-      });
-    }
-  }, [options]);
+    branchApi();
+  }, []);
 
   useEffect(() => {
-    if (branches) {
-      setBranch({ data: branches, error: "" });
-    }
-  }, [branches]);
-
-  useEffect(() => {
-    if (selected) {
-      branches?.map((e) => {
-        if (e.value === selected) {
-          storeData("branchName", e.label);
-        }
-      })
+    if (selected !== null) {
+      const selectedBranch = branches.find((branch) => branch.value === selected);
+      if (selectedBranch) {
+        storeData("branchName", selectedBranch.label);
+      }
       storeData("branch", selected);
       setIsDataSet((data) => !data);
     }
   }, [selected]);
 
-  // console.log("===================  branches list");
-  // console.log(branch.data);
-  // console.log("=================== end branches list");
-
+  console.log("branch screen data set: ", isDataSet);
+  // console.log("branch screen branches: ", branches);
   if (isLoading) {
     return <Loader error={errorText} />;
   }
@@ -107,19 +89,17 @@ export const BranchScreen = ({ navigation }) => {
   return (
     <Background>
       <Logo />
-
       <SelectOption
         value={selected}
         onValueChange={(value) => {
           setSelected(value);
-          setBranch({ ...branch, error: "" });
+          setErrorText("");
         }}
-        items={branch?.data || []}
-        key={(item) => item?.id || 1}
-        error={!!branch?.error}
-        errorText={branch?.error || ""}
+        items={branches}
+        keyExtractor={(item) => (item && item.id ? item.id.toString() : '')}
+        error={!!errorText}
+        errorText={errorText}
       />
-
       <Button
         mode="contained"
         style={{ backgroundColor: "#000" }}
@@ -130,3 +110,4 @@ export const BranchScreen = ({ navigation }) => {
     </Background>
   );
 };
+

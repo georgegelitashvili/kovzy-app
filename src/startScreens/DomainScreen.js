@@ -7,31 +7,35 @@ import { AuthContext, AuthProvider } from '../context/AuthProvider';
 import { domainValidator } from '../helpers/domainValidator';
 import { storeData, getData } from '../helpers/storage';
 
-
-
 export const DomainScreen = ({ navigation }) => {
-  const { setIsDataSet } = useContext(AuthContext);
-  const [domain, setDomain] = useState({ value: "", error: "" });
+  const { setIsDataSet, domain, setDomain } = useContext(AuthContext);
+  const [inputDomain, setInputDomain] = useState({ value: domain || '', error: '' });
 
   const readData = async () => {
     try {
-      await getData("domain").then(value => {setDomain({value: value, error: ""})})
+      const value = await getData("domain");
+      setDomain(value);
     } catch (e) {
       console.log('Failed to fetch the input from storage');
     }
   };
 
-  const onCheckPressed = () => {
-    const domainError = domainValidator(domain.value)
+  const onCheckPressed = async () => {
+    const domainError = domainValidator(inputDomain.value);
     if (domainError) {
-      setDomain({ ...domain, error: domainError })
-      return
+      setInputDomain({ ...inputDomain, error: domainError });
+      return;
     }
-    storeData("domain", domain.value);
+    setDomain(inputDomain.value);
+    storeData("domain", inputDomain.value);
     setIsDataSet(true);
 
     navigation.navigate("Branch");
   };
+
+  useEffect(() => {
+    setInputDomain({ value: domain || '', error: '' });
+  }, [domain]);
 
   useEffect(() => {
     readData();
@@ -39,25 +43,24 @@ export const DomainScreen = ({ navigation }) => {
 
   return (
     <Background>
-        <Logo />
-
+      <Logo />
       <TextField
-        label="enter domain"
+        label="Enter domain"
         editable={true}
         clearButtonMode='always'
-        value={domain?.value || ''}
-        onChangeText={(text) => { setDomain({ value: text, error: '' }); }}
-        error={!!domain?.error}
-        errorText={domain?.error || ''}
+        value={inputDomain.value}
+        onChangeText={(text) => { setInputDomain({ value: text, error: '' }); }}
+        error={!!inputDomain.error}
+        errorText={inputDomain.error}
         autoCapitalize="none"
       />
       <Button
         mode="contained"
-        style={{backgroundColor: '#000'}}
+        style={{ backgroundColor: '#000' }}
         onPress={onCheckPressed}
       >
-        Check
+        Save
       </Button>
     </Background>
   )
-}
+};
