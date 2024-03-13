@@ -17,7 +17,7 @@ axiosInstance.interceptors.request.use(
   async (config) => {
     cookie = await SecureStore.getItemAsync('cookie');
     if (cookie) {
-      config.headers['set-cookie'] = JSON.stringify(cookie);
+      config.headers['Cookie'] = cookie;
     }
 
     return config;
@@ -43,13 +43,5 @@ axiosInstance.interceptors.response.use(
     return Promise.reject(error.response);
   },
 );
-
-// Clear Axios cache after each request
-axios.interceptors.response.use(response => {
-  // Clear the cache
-  axios.defaults.adapter.resetCache();
-
-  return response;
-});
 
 export default axiosInstance;
