@@ -8,7 +8,6 @@ import {
   Alert,
   AppState
 } from "react-native";
-import { useFocusEffect } from '@react-navigation/native';
 import * as SecureStore from "expo-secure-store";
 import { Text, Button, Divider, Card } from "react-native-paper";
 import { FlatGrid } from "react-native-super-grid";
@@ -33,11 +32,10 @@ let temp = 0;
 
 // render entered orders function
 export const EnteredOrdersList = () => {
-  const { domain, branchid, setUser, user, deleteItem, setIsDataSet } = useContext(AuthContext);
+  const { domain, branchid, setUser, user, deleteItem, setIsDataSet, intervalId, setIntervalId, login } = useContext(AuthContext);
   const [orders, setOrders] = useState([]);
 
   const [appState, setAppState] = useState(AppState.currentState);
-  const [intervalId, setIntervalId] = useState(null);
 
   const [options, setOptions] = useState({
     url_unansweredOrders: "",
@@ -150,12 +148,6 @@ export const EnteredOrdersList = () => {
       }
     } catch (error) {
       console.log('Error fetching entered orders full:', error);
-      if (error.message === 'Network Error') {
-        console.log('Network error occurred. Retrying request...');
-        // Retry request after a certain amount of time
-        setTimeout(fetchEnteredOrders, 5000); // Retry after 5 seconds
-        return;
-      }
       const statusCode = error?.status || 'Unknown';
       console.log('Status code entered orders:', statusCode);
       if (statusCode === 401) {
@@ -164,6 +156,9 @@ export const EnteredOrdersList = () => {
         setOptions({});
         setOptionsIsLoaded(false);
         setIsDeliveronOptions(false);
+        if (intervalId) {
+          clearInterval(intervalId);
+        }
       }
     } finally {
       setLoading(false);

@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback, createContext, useContext } from "react";
-import { useSelector, useDispatch } from "react-redux";
 import {
   StyleSheet,
   Dimensions,

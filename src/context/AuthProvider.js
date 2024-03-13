@@ -25,6 +25,7 @@ export const AuthProvider = ({ children }) => {
   const [isVisible, setIsVisible] = useState(true);
   const [branchEnabled, setBranchEnabled] = useState(false);
   const [deliveronEnabled, setDeliveronEnabled] = useState(false);
+  const [intervalId, setIntervalId] = useState(null);
 
   const { dictionary } = useContext(LanguageContext);
 
@@ -106,8 +107,6 @@ export const AuthProvider = ({ children }) => {
     return () => clearInterval(interval);
   }, [fetchData]);
 
-  if (!domain || !branchid) return;
-
   return (
     <AuthContext.Provider
       value={{
@@ -128,6 +127,8 @@ export const AuthProvider = ({ children }) => {
         deliveronEnabled,
         setDeliveronEnabled,
         deleteItem,
+        intervalId,
+        setIntervalId,
         login: async (username, password) => {
           setIsLoading(true);
           try {
@@ -168,6 +169,8 @@ export const AuthProvider = ({ children }) => {
             setBranchName(null);
             setIsDataSet(false);
             setUser(null);
+            clearInterval(intervalId);
+            setIntervalId(null);
           } catch (error) {
             console.log('Error logging out:', error);
           } finally {
