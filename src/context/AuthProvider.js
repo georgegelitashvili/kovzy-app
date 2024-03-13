@@ -176,6 +176,7 @@ export const AuthProvider = ({ children }) => {
         },
       }}
     >
+
       {children}
 
       {!isVisible && (

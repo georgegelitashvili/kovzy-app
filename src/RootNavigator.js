@@ -40,6 +40,8 @@ export default function RootNavigator() {
     }
   }, [user, setUser]);
 
+  console.log(user);
+
   if (isLoading) {
     return <Loader text={dictionary["loading"]} />;
   }
