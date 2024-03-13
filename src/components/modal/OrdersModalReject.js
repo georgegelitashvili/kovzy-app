@@ -2,18 +2,23 @@ import React, { useState, useEffect, useContext } from 'react';
 import { Text, Button } from 'react-native-paper';
 import { StyleSheet, View, Keyboard, TouchableWithoutFeedback, Alert } from 'react-native';
 import axiosInstance from "../../apiConfig/apiRequests";
+import Loader from "../generate/loader";
 import { String, LanguageContext } from '../Language';
 
 
 export default function OrdersModalContent(props) {
-    const [options, setOptions] = useState(props.options.url_rejectOrder);
-    const [orderData, setOrderData] = useState({});
+  const [options, setOptions] = useState(props.options.url_rejectOrder);
+  const [orderData, setOrderData] = useState({});
 
-    const { dictionary } = useContext(LanguageContext);
+  const [loading, setLoading] = useState(false);
 
-    const rejectOrder = () => {
-      axiosInstance.post(options, orderData.data).then(resp => {
-        if(resp.data.data.status == 0) {
+  const { dictionary } = useContext(LanguageContext);
+
+  const rejectOrder = () => {
+    setLoading(true);
+    axiosInstance.post(options, orderData.data).then(resp => {
+      if (resp.data.data?.status == 0 || resp.data.data?.status == -1) {
+        setLoading(false);
           Alert.alert("ALERT", dictionary['orders.declined'], [
             {text: 'OK', onPress: () => props.hideModal()},
           ]);
@@ -21,15 +26,32 @@ export default function OrdersModalContent(props) {
       });
     };
 
-    useEffect(() => {
-      setOrderData({...orderData, data: {
-        Orderid: props.itemId,
-    }})
-    }, [props.itemId])
+  useEffect(() => {
+    if (props.deliveron?.status !== -2 && props.deliveron?.status !== -4) {
+      props.orders?.map((item) => {
+        if (item.id == props.itemId) {
+          const deliveronId = JSON.parse(item.deliveron_data);
+          setOrderData({
+            ...orderData, data: {
+              Orderid: props.itemId,
+              deliveronOrderId: deliveronId['order_id_deliveron'] ?? null,
+            }
+          })
+        }
+      })
+    } else {
+      setOrderData({
+        ...orderData, data: {
+          Orderid: props.itemId,
+        }
+      })
+    }
+  }, [props.itemId, props.deliveron.status])
 
     return (
         <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
         <View style={styles.content}>
+          {loading ? <Loader /> : null}
           <Text textColor="black" style={styles.contentTitle}>{dictionary['orders.rejectionWarning']}</Text>
 
             <View style={styles.buttonModal}>

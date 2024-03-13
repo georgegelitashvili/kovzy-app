@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useCallback, useContext } from "react";
 import { StyleSheet, View } from "react-native";
 import { List, Text } from "react-native-paper";
 
@@ -11,40 +11,51 @@ export default function OrdersDetail({ orderId }) {
   const handlePress = () => setExpanded(!expanded);
 
   const [orderCart, setOrderCart] = useState([]);
-  const { setIsDataSet, domain } =
-    useContext(AuthContext);
+  const { domain } = useContext(AuthContext);
 
   const [options, setOptions] = useState({}); // api options
   const [optionsIsLoaded, setOptionsIsLoaded] = useState(false); // api options
 
   const { dictionary, userLanguage } = useContext(LanguageContext);
 
-  const apiOptions = () => {
+  const apiOptions = useCallback(() => {
     setOptions({
       url_orderCart: `https://${domain}/api/v1/admin/getOrderCart`,
     });
     setOptionsIsLoaded(true);
-  };
+  }, [domain]);
+
+  const fetchOrdersDetail = async () => {
+    await axiosInstance
+      .post(options.url_orderCart, { 
+        Orderid: orderId,
+        lang: userLanguage,
+      })
+      .then((resp) => resp.data.data)
+      .then((data) => {
+        if (data.message) {
+          setOrderCart([]);
+          return;
+        }
+        setOrderCart(data ?? []);
+      })
+      .catch((error) => {
+        if (error.status == 401) {
+          setOptionsIsLoaded(false);
+          setOptions({});
+          setOrderCart([]);
+        }
+      });
+  }
 
   useEffect(() => {
     apiOptions();
     if (optionsIsLoaded) {
-      axiosInstance
-        .post(options.url_orderCart, {
-          Orderid: orderId,
-          lang: userLanguage,
-        })
-        .then((resp) => setOrderCart(resp.data.data))
-        .catch((error) => {
-          if(error) {
-            setOrderCart([]);
-            setIsDataSet(false);
-          }
-        });
+      fetchOrdersDetail();
     }
   }, [optionsIsLoaded, userLanguage, orderId]);
 
-  if (orderCart?.length == 0) {
+  if (!orderCart) {
     return null;
   }
 

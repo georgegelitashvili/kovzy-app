@@ -7,19 +7,13 @@ import TextField from "../components/generate/TextField";
 import { theme } from "../core/theme";
 import { nameValidator } from "../helpers/nameValidator";
 import { passwordValidator } from "../helpers/passwordValidator";
-import { AuthContext, AuthProvider } from "../context/AuthProvider";
-
-// 'alexander.tsintsadze'
-// '700309
+import { AuthContext } from "../context/AuthProvider";
 
 export const LoginScreen = ({ navigation }) => {
   const { login, loginError } = useContext(AuthContext);
 
   const [name, setName] = useState({ value: "", error: "" });
   const [password, setPassword] = useState({ value: "", error: "" });
-
-  const [options, setOptions] = useState({});
-  const [optionsIsLoaded, setOptionsIsLoaded] = useState(false);
 
   // login function
   const onLoginPressed = () => {
@@ -32,39 +26,23 @@ export const LoginScreen = ({ navigation }) => {
       return;
     }
 
-    if (optionsIsLoaded) {
-      login(name.value, password.value);
-      setOptionsIsLoaded(false);
-    }
+    login(name.value, password.value);
   };
 
-  // if name or password changed
   useEffect(() => {
-    if (name && password) {
-      setOptions((prev) => ({
-        ...prev,
-        data: { username: name.value, password: password.value },
-      }));
-      setOptionsIsLoaded(true);
-    }
-  }, [name, password]);
+    if (loginError) {
+      let usernameError = "";
+      let passwordError = "";
 
-  useEffect(() => {
-    if (loginError?.length != 0) {
-      setName({
-        ...name,
-        error:
-          typeof loginError === "object" && loginError !== null
-            ? loginError.username[0]
-            : "",
-      });
-      setPassword({
-        ...password,
-        error:
-          typeof loginError === "object" && loginError !== null
-            ? ""
-            : loginError,
-      });
+      if (typeof loginError === "object" && loginError !== null) {
+        usernameError = loginError.username ? loginError.username[0] : "";
+        passwordError = loginError.password ? loginError.password[0] : "";
+      } else {
+        passwordError = loginError;
+      }
+
+      setName({ ...name, error: usernameError });
+      setPassword({ ...password, error: passwordError });
     }
   }, [loginError]);
 
@@ -74,7 +52,7 @@ export const LoginScreen = ({ navigation }) => {
       <TextField
         label="User name"
         returnKeyType="next"
-        value={name?.value || ""}
+        value={name.value}
         onChangeText={(text) => setName({ value: text, error: "" })}
         error={!!name.error}
         errorText={name.error}
@@ -86,7 +64,7 @@ export const LoginScreen = ({ navigation }) => {
       <TextField
         label="Password"
         returnKeyType="done"
-        value={password?.value || ""}
+        value={password.value}
         onChangeText={(text) => setPassword({ value: text, error: "" })}
         error={!!password.error}
         errorText={password.error}
@@ -96,7 +74,6 @@ export const LoginScreen = ({ navigation }) => {
         <TouchableOpacity
           onPress={() => navigation.navigate("ResetPasswordScreen")}
         >
-          {/* <Text style={styles.forgot}>Forgot your password?</Text> */}
         </TouchableOpacity>
       </View>
       <Button
@@ -106,12 +83,6 @@ export const LoginScreen = ({ navigation }) => {
       >
         Login
       </Button>
-      {/* <View style={styles.row}>
-        <Text>Don’t have an account? </Text>
-        <TouchableOpacity onPress={() => navigation.replace('RegisterScreen')}>
-          <Text style={styles.link}>Sign up</Text>
-        </TouchableOpacity>
-      </View> */}
     </Background>
   );
 };

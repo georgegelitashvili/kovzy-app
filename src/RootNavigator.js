@@ -1,43 +1,55 @@
 import React, { useContext, useState, useEffect } from "react";
 import { createDrawerNavigator } from "@react-navigation/drawer";
 import * as SecureStore from "expo-secure-store";
-import { AuthContext, AuthProvider } from "./context/AuthProvider";
+import { AuthContext } from "./context/AuthProvider";
 import { HomeNavigator, AuthNavigator } from "./components/Stack";
 import DrawerContent from "./components/DrawerContent";
-import { String, LanguageContext } from "./components/Language";
+import { LanguageContext } from "./components/Language";
 import Loader from "./components/generate/loader";
-
 
 const Drawer = createDrawerNavigator();
 
 export default function RootNavigator() {
-  const { user, setUser } = useContext(AuthContext);
+  const { user, setUser, deleteItem } = useContext(AuthContext);
   const [isLoading, setIsLoading] = useState(true);
   const { dictionary } = useContext(LanguageContext);
 
   useEffect(() => {
-    SecureStore.getItemAsync("user").then((user) => {
-      if (user) {
-        setUser(user);
+    const loadUser = async () => {
+      try {
+        const cookie = await SecureStore.getItemAsync("cookie");
+        if (cookie) {
+          setUser(cookie);
+        } else {
+          deleteItem("cookie");
+          deleteItem("credentials");
+          setUser(null);
+        }
+      } catch (error) {
+        console.error("Error loading user:", error);
+        // Handle error loading user data
+      } finally {
+        setIsLoading(false);
       }
+    };
+
+    if (!user) {
+      loadUser();
+    } else {
       setIsLoading(false);
-    });
-  }, []);
+    }
+  }, [user, setUser]);
 
   if (isLoading) {
-    return <Loader text="loading" />;
+    return <Loader text={dictionary["loading"]} />;
   }
 
-  console.log('-------------------- user');
-  console.log(user);
-  console.log('-------------------- end user');
-
   return (
-    <>
+    <Drawer.Navigator
+      drawerContent={(props) => <DrawerContent {...props} />}
+    >
       {user ? (
-        <Drawer.Navigator
-          drawerContent={(props) => <DrawerContent {...props} />}
-        >
+        <>
           <Drawer.Screen
             name="Orders"
             options={{ headerTitle: dictionary["nav.onlineOrders"] }}
@@ -48,18 +60,14 @@ export default function RootNavigator() {
             options={{ headerTitle: dictionary["nav.products"] }}
             component={HomeNavigator}
           />
-        </Drawer.Navigator>
+        </>
       ) : (
-        <Drawer.Navigator
-          drawerContent={(props) => <DrawerContent {...props} />}
-        >
           <Drawer.Screen
             name="Start"
             options={{ headerShown: false }}
             component={AuthNavigator}
           />
-        </Drawer.Navigator>
       )}
-    </>
+    </Drawer.Navigator>
   );
 }

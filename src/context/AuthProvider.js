@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { View, Text, TouchableOpacity, Alert } from 'react-native';
 import axiosInstance from "../apiConfig/apiRequests";
 import * as SecureStore from 'expo-secure-store';
@@ -15,7 +15,12 @@ export const AuthProvider = ({ children }) => {
   const [branchName, setBranchName] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isDataSet, setIsDataSet] = useState(false);
-  const [options, setOptions] = useState({});
+  const [options, setOptions] = useState({
+    url_login: "",
+    url_logout: "",
+    url_branchStatus: "",
+    url_deliveronStatus: ""
+  });
   const [loginError, setLoginError] = useState([]);
   const [isVisible, setIsVisible] = useState(true);
   const [branchEnabled, setBranchEnabled] = useState(false);
@@ -23,96 +28,91 @@ export const AuthProvider = ({ children }) => {
 
   const { dictionary } = useContext(LanguageContext);
 
-  // console.log('------------------------ aauth');
-  // console.log(domain);
-  // console.log(branchName);
-  // console.log(branchid);
-  // console.log(isDataSet);
-  // console.log('------------------------ end aauth');
+  const handleClick = () => {
+    setIsVisible(true);
+  };
+
+  const readData = async () => {
+    try {
+      const data = await getMultipleData(["domain", "branch", "branchName"]);
+      const [domain, branchid, branchName] = data;
+
+      if (domain && branchid && branchName) {
+        setDomain(domain);
+        setBranchid(branchid);
+        setBranchName(branchName);
+        setIsDataSet(true);
+      } else {
+        setIsDataSet(false);
+      }
+    } catch (e) {
+      console.log(e.message);
+      // Handle error or set appropriate state
+    }
+  };
+
+  const apiOptions = useCallback(() => {
+    if (domain) {
+      setOptions({
+        url_login: `https://${domain}/api/v1/admin/auth/login`,
+        url_logout: `https://${domain}/api/v1/admin/auth/logout`,
+        url_branchStatus: `https://${domain}/api/v1/admin/branchStatus`,
+        url_deliveronStatus: `https://${domain}/api/v1/admin/deliveronStatus`,
+      });
+    }
+  }, [domain, isDataSet]);
+
+  const deleteItem = async (key) => {
+    try {
+      const result = await SecureStore.deleteItemAsync(key);
+      if (result) {
+        console.log(key + ': Secure storage item deleted successfully.');
+      } else {
+        console.log(key + ': Secure storage item does not exist.');
+      }
+    } catch (error) {
+      console.log('Error occurred while deleting secure storage:', error);
+    }
+  };
+
+  const fetchData = useCallback(async () => {
+    if (!domain || !user) return; // Check if domain or user is null
+
+    try {
+      const deliveronResponse = await axiosInstance.post(options.url_deliveronStatus);
+      setDeliveronEnabled(deliveronResponse.data.data.status === 0);
+
+      if (branchid) {
+        const branchResponse = await axiosInstance.post(options.url_branchStatus, { branchid });
+        setBranchEnabled(branchResponse.data.data);
+        setIsVisible(branchResponse.data.data);
+      }
+    } catch (error) {
+      console.log('Error fetching data:', error);
+    }
+  }, [domain, branchid, user, options]);
+
 
   useEffect(() => {
     readData();
   }, [isDataSet]);
 
   useEffect(() => {
-    if (domain) {
-      // setBranchid(null);
-      // setBranchName(null);
-      apiOptions();
-    }
-  }, [domain]);
-
-
-  const handleClick = () => {
-    setIsVisible(true);
-  };
-
-  const readData = async () => {
-    await getMultipleData(["domain", "branch", "branchName"]).then((data) => {
-      let domain = JSON.parse(data[0][1]);
-      let branchid = JSON.parse(data[1][1]);
-      let branchName = JSON.parse(data[2][1]);
-
-      setDomain(domain);
-      setBranchid(branchid);
-      setBranchName(branchName);
-      if (domain != null && branchid != null && branchName != null) {
-        setIsDataSet(true);
-      } else {
-        setIsDataSet(false);
-      }
-    });
-  };
-
-  const apiOptions = () => {
-    setOptions({
-      url_login: `https://${domain}/api/v1/admin/auth/login`,
-      url_logout: `https://${domain}/api/v1/admin/auth/logout`,
-      url_branchStatus: `https://${domain}/api/v1/admin/branchStatus`,
-      url_deliveronStatus: `https://${domain}/api/v1/admin/deliveronStatus`,
-    });
-  };
-
-  const deleteItem = async (key) => {
-  try {
-    const result = await SecureStore.deleteItemAsync(key);
-    if (result) {
-      console.log(key + ': Secure storage item deleted successfully.');
-    } else {
-      console.log(key + ': Secure storage item does not exist.');
-    }
-  } catch (error) {
-    console.log('Error occurred while deleting secure storage:', error);
-  }
-  };
+    apiOptions();
+  }, [apiOptions]);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      if (domain) {
-        axiosInstance.post(options.url_deliveronStatus).then((resp) => {
-          setDeliveronEnabled(resp.data.data.status == 0 ? true : false);
-        });
+    const interval = setInterval(fetchData, 5000);
+    return () => clearInterval(interval);
+  }, [fetchData]);
 
-        if (branchid) {
-          axiosInstance
-            .post(options.url_branchStatus, { branchid: branchid })
-            .then((resp) => {
-              setBranchEnabled(resp.data.data);
-              setIsVisible(resp.data.data);
-            });
-        }
-      }
-    }, 5000);
-
-    return () => {
-      clearInterval(interval);
-    };
-
-  }, [domain, branchid]);
+  if (!domain || !branchid) return;
 
   return (
     <AuthContext.Provider
       value={{
+        domain,
+        setDomain,
         user,
         setUser,
         loginError,
@@ -127,45 +127,58 @@ export const AuthProvider = ({ children }) => {
         setBranchEnabled,
         deliveronEnabled,
         setDeliveronEnabled,
-        login: (username, password) => {
+        deleteItem,
+        login: async (username, password) => {
           setIsLoading(true);
-          axiosInstance
-            .post(options.url_login, {
-              password,
-              username,
-            })
-            .then((e) => {
-              if (e.data.error) {
-                setLoginError(e.data.error.message);
-                return;
-              }
-              SecureStore.setItemAsync('cookie', JSON.stringify(e.headers['set-cookie']));
-              SecureStore.setItemAsync('user', JSON.stringify(e.data.data));
-              setUser(e.data.data);
-              setIsLoading(false);
-            });
-        },
-        logout: () => {
-          axiosInstance.get(options.url_logout).then((resp) => {
-            if(resp) {
-              removeData("domain");
-              removeData("branch");
-              removeData("branchName");
-              setDomain(null);
-              setBranchid(null);
-              setBranchName(null);
-              setIsDataSet(false);
-              setUser(null);
-              deleteItem("user");
-              deleteItem("cookie");
+          try {
+            const response = await axiosInstance.post(options.url_login, { password, username });
+            const jsonObject = response.data;
+            // Accessing the value of authorized
+            const error = jsonObject.data.error;
+            // Accessing the value of authorized
+            const authorized = jsonObject.data.authorized;
+
+            if (error) {
+              setLoginError(jsonObject.data.error.message);
+              return;
             }
-          })
+
+            if (authorized === true) {
+              SecureStore.setItemAsync('credentials', JSON.stringify({ username, password }));
+              SecureStore.setItemAsync('cookie', JSON.stringify(response.headers['set-cookie']));
+              setUser(response.headers['set-cookie']);
+            }
+          } catch (error) {
+            console.log('Error logging in:', error);
+            setLoginError('An error occurred while logging in. Please try again.');
+          } finally {
+            setIsLoading(false);
+          }
+        },
+        logout: async () => {
+          setIsLoading(true);
+          try {
+            const headers = { Cookie: JSON.parse(await SecureStore.getItemAsync('cookie')) };
+            await axiosInstance.get(options.url_logout, { headers });
+            deleteItem("cookie");
+            deleteItem("credentials");
+            removeData(["domain", "branch", "branchName"]);
+            setDomain(null);
+            setBranchid(null);
+            setBranchName(null);
+            setIsDataSet(false);
+            setUser(null);
+          } catch (error) {
+            console.log('Error logging out:', error);
+          } finally {
+            setIsLoading(false);
+          }
         },
       }}
     >
       {children}
 
-      {isVisible == false && (
+      {!isVisible && (
         <TouchableOpacity onPress={handleClick}>
           <Toast
             type="failed"

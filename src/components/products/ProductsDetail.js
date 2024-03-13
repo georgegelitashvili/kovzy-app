@@ -1,12 +1,12 @@
-import React, { useState, useEffect, useContext, useCallback } from "react";
-import { StyleSheet, View, TouchableOpacity, Dimensions, RefreshControl } from "react-native";
+import React, { useState, useEffect, useContext } from "react";
+import { StyleSheet, View, TouchableOpacity, Dimensions } from "react-native";
 import NetInfo from "@react-native-community/netinfo";
 import { Text, Button, Divider, Card } from "react-native-paper";
 import { FlatGrid } from "react-native-super-grid";
 import { MaterialCommunityIcons, SimpleLineIcons } from "@expo/vector-icons";
-import { AuthContext, AuthProvider } from "../../context/AuthProvider";
+import { AuthContext } from "../../context/AuthProvider";
 import Loader from "../generate/loader";
-import { String, LanguageContext } from "../Language";
+import { LanguageContext } from "../Language";
 import axiosInstance from "../../apiConfig/apiRequests";
 
 const width = Dimensions.get("window").width;
@@ -14,11 +14,10 @@ const width = Dimensions.get("window").width;
 export default function ProductsDetail({ navigation, route }) {
   const { id } = route.params;
 
-  const { setIsDataSet, domain } = useContext(AuthContext);
+  const { setIsDataSet, domain, branchid } = useContext(AuthContext);
   const [customizable, setCustomizable] = useState([]);
   const [options, setOptions] = useState({}); // api options
   const [optionsIsLoaded, setOptionsIsLoaded] = useState(false); // api options
-  const [activityOptions, setActivityOptions] = useState({});
   const [productEnabled, setProductEnabled] = useState(false);
   const [isConnected, setIsConnected] = useState(true);
   const [sendEnabled, setSendEnabled] = useState(false);
@@ -38,7 +37,6 @@ export default function ProductsDetail({ navigation, route }) {
     });
     setOptionsIsLoaded(true);
   };
-
 
   useEffect(() => {
     const removeSubscription = NetInfo.addEventListener((state) => {
@@ -65,17 +63,13 @@ export default function ProductsDetail({ navigation, route }) {
 
   useEffect(() => {
     if (value) {
-      setActivityOptions((prev) => ({
-        ...prev,
-        data: { customizablePackid: value, enabled: enabled },
-      }));
       setSendEnabled(true);
     }
   }, [value, enabled]);
 
   useEffect(() => {
     if (sendEnabled || isConnected) {
-      axiosInstance.post(options.url_toggle, activityOptions.data);
+      axiosInstance.post(options.url_toggle, { customizablePackid: value, enabled: enabled, branchid: branchid });
       setLoading(true);
       setProductEnabled(true);
       setSendEnabled(false);
@@ -91,7 +85,7 @@ export default function ProductsDetail({ navigation, route }) {
   }, [productEnabled, isConnected]);
 
 
-  const fetchData = () => {    
+  const fetchData = () => {
     axiosInstance
       .post(options.url_customizable, {
         pid: id,
@@ -111,10 +105,15 @@ export default function ProductsDetail({ navigation, route }) {
 
 
   const toggleContent = (value) => {
-    setOpenState([...isOpen, value]);
+    setOpenState((prev) =>
+      prev.includes(value) ? prev.filter((i) => i !== value) : [...prev, value]
+    );
+  };
 
-    let index = isOpen.indexOf(value);
-    if (index > -1) setOpenState([...isOpen.filter((i) => i !== value)]);
+  const handlePackButtonPress = (packId, packEnabled) => {
+    // Update API
+    setValue(packId);
+    setEnabled(packEnabled ? 0 : 1);
   };
 
   const renderCustomizableList = ({ item }) => {
@@ -147,31 +146,14 @@ export default function ProductsDetail({ navigation, route }) {
                       {child.name}
                     </Text>
 
-                    {child.enabled == 1 ? (
-                      <Button
-                        textColor="white"
-                        buttonColor="#f14c4c"
-                        style={styles.button}
-                        onPress={() => {
-                          setValue(child.id);
-                          setEnabled(0);
-                        }}
-                      >
-                        {dictionary["prod.disableProduct"]}
-                      </Button>
-                    ) : (
-                      <Button
-                        textColor="white"
-                        buttonColor="#2fa360"
-                        style={styles.button}
-                        onPress={() => {
-                          setValue(child.id);
-                          setEnabled(1);
-                        }}
-                      >
-                        {dictionary["prod.enableProduct"]}
-                      </Button>
-                    )}
+                    <Button
+                      textColor="white"
+                      buttonColor={child.enabled ? "#f14c4c" : "#2fa360"}
+                      style={styles.button}
+                      onPress={() => handlePackButtonPress(child.id, child.enabled)}
+                    >
+                      {child.enabled ? dictionary["prod.disableProduct"] : dictionary["prod.enableProduct"]}
+                    </Button>
                   </View>
 
                   <Divider style={{ marginVertical: 9 }} />

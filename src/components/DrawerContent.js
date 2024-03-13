@@ -3,32 +3,28 @@ import { View, StyleSheet } from "react-native";
 import { DrawerItem, DrawerContentScrollView } from "@react-navigation/drawer";
 import { Drawer, Text, TouchableRipple, Switch } from "react-native-paper";
 import { MaterialCommunityIcons, Fontisto } from "@expo/vector-icons";
-import { ToggleTheme, logout } from "../redux/Actions";
-import { useDispatch, useSelector } from "react-redux";
 import { AuthContext, AuthProvider } from "../context/AuthProvider";
 import LanguageSelector from "./generate/LanguageSelector";
 import axiosInstance from "../apiConfig/apiRequests";
 import { String, LanguageContext } from "./Language";
 
 export default function DrawerContent(props) {
-  const dispatch = useDispatch();
-  const { isdarkTheme } = useSelector((state) => state.themeReducer);
-  const { domain, branchid, branchName, branchEnabled, setBranchEnabled, setDeliveronEnabled, deliveronEnabled, logout } = useContext(AuthContext);
+
+  const { domain, branchid, branchName, branchEnabled, setBranchEnabled, setDeliveronEnabled, deliveronEnabled, logout, setIsDataSet } = useContext(AuthContext);
   const { dictionary } = useContext(LanguageContext);
 
-  const [options, setOptions] = useState({}); // api options
+  const [options, setOptions] = useState({
+    url_branchActivity: "",
+    url_deliveronStatus: "",
+    url_branchStatus: "",
+    url_deliveronActivity: "",
+  }); // api options
   const [optionsIsLoaded, setOptionsIsLoaded] = useState(false); // check api options is loaded
   const [branchChangeOptions, setBranchChangeOptions] = useState({});
   const [deliveronChangeOptions, setDeliveronChangeOptions] = useState({});
 
   const [isBranchEnabled, setIsBranchEnabled] = useState(false);
   const [isDeliveronEnabled, setIsDeliveronEnabled] = useState(false);
-
-  const switchDarkTheme = () => {
-    return isdarkTheme
-      ? dispatch(ToggleTheme(false))
-      : dispatch(ToggleTheme(true));
-  };
 
   const apiOptions = () => {
     setOptions({
@@ -41,8 +37,8 @@ export default function DrawerContent(props) {
   };
 
   const onLogoutPressed = () => {
-    dispatch(ToggleTheme(false));
     props.navigation.closeDrawer();
+    setIsDataSet(false);
     logout();
   };
 
@@ -168,14 +164,6 @@ export default function DrawerContent(props) {
             </View>
           </TouchableRipple>
 
-          <TouchableRipple onPress={switchDarkTheme}>
-            <View style={styles.preference}>
-              <Text>Dark Theme</Text>
-              <View pointerEvents="none">
-                <Switch value={isdarkTheme} />
-              </View>
-            </View>
-          </TouchableRipple>
         </Drawer.Section>
       </View>
     </DrawerContentScrollView>

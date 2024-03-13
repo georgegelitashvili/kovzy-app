@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useContext } from "react";
+import React, { useState, useEffect, useCallback, createContext, useContext } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import {
   StyleSheet,
@@ -6,20 +6,23 @@ import {
   View,
   ScrollView,
   TouchableOpacity,
+  Linking,
+  Alert,
   RefreshControl,
 } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
+import * as SecureStore from "expo-secure-store";
 import { Text, Button, Divider, Card } from "react-native-paper";
 import { FlatGrid } from "react-native-super-grid";
 import {
   MaterialCommunityIcons,
-  FontAwesome,
   SimpleLineIcons,
 } from "@expo/vector-icons";
 
-import { AuthContext, AuthProvider } from "../../context/AuthProvider";
-import { storeData, getData, getMultipleData } from "../../helpers/storage";
+import { AuthContext } from "../../context/AuthProvider";
+
 import Loader from "../generate/loader";
-import { String, LanguageContext } from "../Language";
+import { LanguageContext } from "../Language";
 import axiosInstance from "../../apiConfig/apiRequests";
 import OrdersDetail from "./OrdersDetail";
 import OrdersModal from "../modal/OrdersModal";
@@ -30,49 +33,42 @@ const width = Dimensions.get("window").width;
 const numColumns = printRows(width);
 const cardSize = width / numColumns;
 
-// render accepted orders function
 export const AcceptedOrdersList = () => {
-  const { setIsDataSet, domain, setDomain, branchid, setUser } = useContext(AuthContext);
+  const { domain, branchid, setUser, user, deleteItem, setIsDataSet } = useContext(AuthContext);
   const [orders, setOrders] = useState([]);
-
   const [page, setPage] = useState(0);
-
-  const [options, setOptions] = useState({}); // api options
-  const [optionsIsLoaded, setOptionsIsLoaded] = useState(false); // api options
+  const [options, setOptions] = useState({
+    url_getAcceptedOrders: "",
+    url_deliveronStatus: "",
+    url_checkOrderStatus: "",
+    url_orderPrepared: "",
+    url_rejectOrder: "",
+  }); // api options
+  const [optionsIsLoaded, setOptionsIsLoaded] = useState(false);
   const [deliveronOptions, setDeliveronOptions] = useState({});
   const [isDeliveronOptions, setIsDeliveronOptions] = useState(false);
-
   const [deliveron, setDeliveron] = useState([]);
-  const [visible, setVisible] = useState(false); // modal state
-  const [itemId, setItemId] = useState(null); //item id for modal
-  const [isOpen, setOpenState] = useState([]); // my accordion state
+  const [visible, setVisible] = useState(false);
+  const [itemId, setItemId] = useState(null);
+  const [isOpen, setOpenState] = useState([]);
   const [modalType, setModalType] = useState("");
-
   const [loading, setLoading] = useState(true);
   const [loadingOptions, setLoadingOptions] = useState(false);
+  const [credentials, setCredentials] = useState({});
+  const { dictionary } = useContext(LanguageContext);
 
-  const { dictionary, userLanguage } = useContext(LanguageContext);
-
-  const increment = () => {setPage(c => c + 1);setLoading(true)};
-  const decrement = () => {setPage(c => c - 1);setLoading(true)};
-
-  const onChangeModalState = useCallback((newState) => {
-    setTimeout(() => {
-      setVisible(newState);
-      setIsDeliveronOptions(newState);
-      setItemId(null);
-      setDeliveron([]);
-    }, 0);
-  });
+  const increment = () => { setPage(page + 1); setLoading(true) };
+  const decrement = () => { setPage(page - 1); setLoading(true) };
 
   const toggleContent = useCallback((value) => {
-    setOpenState([...isOpen, value]);
+    if (isOpen.includes(value)) {
+      setOpenState(isOpen.filter((i) => i !== value));
+    } else {
+      setOpenState([...isOpen, value]);
+    }
+  }, [isOpen]);
 
-    let index = isOpen.indexOf(value);
-    if (index > -1) setOpenState([...isOpen.filter((i) => i !== value)]);
-  });
-
-  const apiOptions = () => {
+  const apiOptions = useCallback(() => {
     setOptions({
       url_getAcceptedOrders: `https://${domain}/api/v1/admin/getAcceptedOrders`,
       url_deliveronStatus: `https://${domain}/api/v1/admin/deliveronStatus`,
@@ -81,56 +77,88 @@ export const AcceptedOrdersList = () => {
       url_rejectOrder: `https://${domain}/api/v1/admin/rejectOrder`,
     });
     setOptionsIsLoaded(true);
-  };
+  }, [domain]);
 
-  // modal show
   const showModal = (type) => {
     setModalType(type);
     setVisible(true);
   };
 
+  const fetchAcceptedOrders = async () => {
+    setOptionsIsLoaded(true);
+    try {
+      // console.log('accepted orders: ', user)
+      // Check if user is authorized
+      if (!user) {
+        return; // Exit early if user is not authorized
+      }
+      if (!options.url_getAcceptedOrders) {
+        throw new Error("URL is empty");
+      }
+
+      const resp = await axiosInstance.post(options.url_getAcceptedOrders, JSON.stringify({
+        Pagination: {
+          limit: 12,
+          page: page
+        },
+        branchid: branchid,
+        type: 0
+      }));
+      const data = resp.data.data;
+      setOrders(data);
+    } catch (error) {
+      console.log('Error fetching accepted orders full:', error);
+      const statusCode = error?.status || 'Unknown';
+      console.log('Status code accepted orders:', statusCode);
+      if (statusCode === 401) {
+        setOrders([]);
+        setOptionsIsLoaded(false);
+        setOptions({});
+        console.log(credentials);
+        Alert.alert("ALERT", "Something went wrong with acceptedOrders", [
+          {
+            text: "Retry", onPress: () => {
+              console.log('Clicked acceptedOrders retry');
+              fetchAcceptedOrders();
+            }
+          },
+        ]);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onChangeModalState = useCallback((newState) => {
+    setVisible(newState);
+    setIsDeliveronOptions(newState);
+    setItemId(null);
+    setDeliveron([]);
+    setOrders([]);
+    fetchAcceptedOrders();
+  }, [orders]);
+
   useEffect(() => {
     if (domain && branchid) {
       apiOptions();
+      SecureStore.getItemAsync("credentials").then((obj) => {
+        if (obj) {
+          setCredentials(JSON.parse(obj));
+        }
+      });
     } else if (domain || branchid) {
       setOptionsIsLoaded(false);
       setOrders([]);
     }
-  }, [domain, branchid]);
+  }, [domain, branchid, apiOptions]);
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (optionsIsLoaded || page) {
-        axiosInstance
-          .post(options.url_getAcceptedOrders, JSON.stringify({
-            Pagination: {
-              limit: 12,
-              page: page
-            },
-            branchid: branchid,
-            type: 0
-          }))
-          .then((resp) => {
-            setOrders(resp.data.data);
-          })
-          .catch((error) => {
-            if (error) {
-              console.log("----------------- accepted orders error");
-              console.log(error);
-              console.log("----------------- end accepted orders error");
-              setOrders([]);
-              setIsDataSet(false);
-            }
-          });
-        setLoading(false);
-      }
-    }, 5000);
-
-    return () => {
-      clearInterval(interval);
-    };
-  }, [optionsIsLoaded, page]);
-
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchAcceptedOrders();
+      
+      return () => {};
+    }, [options, page, branchid])
+  );
 
   useEffect(() => {
     if (itemId) {
@@ -153,7 +181,21 @@ export const AcceptedOrdersList = () => {
     }
   }, [isDeliveronOptions]);
 
+  const openURLInBrowser = async (url) => {
+    const supported = await Linking.canOpenURL(url);
+
+    if (supported) {
+      await Linking.openURL(url);
+    } else {
+      Alert.alert(`Don't know how to open this URL: ${url}`);
+    }
+  };
+
   const renderEnteredOrdersList = ({ item }) => {
+    const trackLink = [JSON.parse(item.deliveron_data)]?.map(link => {
+      return link.trackLink ?? null;
+    });
+
     return (
       <Card key={item.id}>
         <TouchableOpacity onPress={() => toggleContent(item.id)}>
@@ -191,6 +233,26 @@ export const AcceptedOrdersList = () => {
               {dictionary["orders.address"]}: {item.address}
             </Text>
 
+            {trackLink[0] ? (
+              <TouchableOpacity onPress={() => openURLInBrowser(trackLink[0].toString())}>
+                <Text variant="titleSmall" style={styles.title}>
+                  {"Tracking link:"} <Text style={[styles.title, { color: '#3490dc' }]}>{trackLink[0]}</Text>
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+
+            {item.delivery_scheduled ? (
+              <Text variant="titleSmall" style={styles.title}>
+                {dictionary["orders.scheduledDeliveryTime"]}: {item.delivery_scheduled}
+              </Text>
+            ) : null}
+
+            {item.comment ? (
+              <Text variant="titleSmall" style={styles.title}>
+                {dictionary["orders.comment"]}: {item.comment}
+              </Text>
+            ) : null}
+
             <Divider />
             <OrdersDetail orderId={item.id} />
             <Divider />
@@ -225,8 +287,10 @@ export const AcceptedOrdersList = () => {
     );
   };
 
+
+
   if (loading) {
-    return <Loader />;
+    return <Loader show={loading} />;
   }
 
   return (
@@ -247,11 +311,11 @@ export const AcceptedOrdersList = () => {
         ) : null}
         <FlatGrid
           itemDimension={cardSize}
-          data={orders || []}
+          data={orders}
           renderItem={renderEnteredOrdersList}
           adjustGridToStyles={true}
           contentContainerStyle={{ justifyContent: "flex-start" }}
-          keyExtractor={(item) => item.id.toString()}
+          keyExtractor={(item) => (item && item.id ? item.id.toString() : '')}
         />
       </ScrollView>
       <View style={styles.paginationContainer}>
@@ -293,13 +357,12 @@ export const AcceptedOrdersList = () => {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 12,
+    flex: 1,
     justifyContent: "flex-start",
   },
   card: {
     backgroundColor: "#fff",
     justifyContent: "flex-start",
-
     margin: 10,
     borderRadius: 10,
     shadowColor: "#000",
@@ -309,7 +372,6 @@ const styles = StyleSheet.create({
     },
     shadowOpacity: 0.3,
     shadowRadius: 4.65,
-
     elevation: 8,
   },
   head: {

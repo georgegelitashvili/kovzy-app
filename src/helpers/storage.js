@@ -24,17 +24,15 @@ export const storeData = async (key, value) => {
   };
 
     // getting data from Async Storage
-    export const getMultipleData = async (key) => {
-      try {
-        const savedValue = await AsyncStorage.multiGet(key);
-        const currentUser = savedValue;
-        if (currentUser !== null) {
-          return currentUser;
-        }
-      } catch (e) {
-        console.log(e.message);
-      }
-    };
+export const getMultipleData = async (keys) => {
+  try {
+    const savedValues = await AsyncStorage.multiGet(keys);
+    return savedValues.map(([key, value]) => JSON.parse(value));
+  } catch (e) {
+    console.log(e.message);
+    throw e; // Re-throw the error to propagate it to the calling code
+  }
+};
 
   // remove all data from Async Storage
   export const removeData = async (key) => {

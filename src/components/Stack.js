@@ -2,7 +2,7 @@ import React, { useContext } from "react";
 import { createStackNavigator } from "@react-navigation/stack";
 import { Appbar, useTheme } from "react-native-paper";
 
-import { String, LanguageContext } from "./Language";
+import { LanguageContext } from "./Language";
 import { DomainScreen } from "../startScreens/DomainScreen";
 import { BranchScreen } from "../startScreens/BranchScreen";
 import { LoginScreen } from "../startScreens/LoginScreen";
@@ -12,24 +12,18 @@ import ProductsDetail from "./products/ProductsDetail";
 
 const Stack = createStackNavigator();
 
-const Header = (props) => {
+const Header = ({ options, navigation }) => {
   const theme = useTheme();
-
-  const { options } = props;
-  const title =
-    options.headerTitle !== undefined
-      ? options.headerTitle
-      : options.title !== undefined
-        ? options.title
-        : props.route.name;
+  const { headerStyle } = options;
+  const title = options.headerTitle ?? options.title ?? navigation?.route?.name;
 
   return (
-    <Appbar.Header theme={{ colors: { primary: theme.colors.surface } }} style={options.headerStyle}>
-      {props.back ? <Appbar.BackAction onPress={props.navigation.goBack} /> : null}
+    <Appbar.Header theme={{ colors: { primary: theme.colors.surface } }} style={{ marginTop: headerStyle?.marginTop }}>
+      {navigation?.canGoBack() ? <Appbar.BackAction onPress={navigation.goBack} /> : null}
       <Appbar.Content
-        title={
-          props.back ? title : null
-        } />
+        title={title}
+        titleStyle={{ fontSize: headerStyle?.fontSize }}
+      />
     </Appbar.Header>
   );
 };
@@ -54,15 +48,12 @@ export const HomeNavigator = () => {
 
       <Stack.Screen name="ProductsDetail" options={{
         headerTitle: dictionary["prod.customizable"],
-        headerStyle: {
-          marginTop: -65,
-          fontSize: 10
-        }
+        headerStyle: { marginTop: -65 },
+        headerContentStyle: { fontSize: 10 }
       }}>
         {(props) => <ProductsDetail {...props} />}
       </Stack.Screen>
 
-      {/* <Stack.Screen name="Login" options={{ headerShown: false }} component={LoginScreen} /> */}
     </Stack.Navigator>
   );
 };
@@ -77,20 +68,6 @@ export const AuthNavigator = () => {
     >
       <Stack.Screen name="Domain" options={{ headerShown: false }} component={DomainScreen} />
       <Stack.Screen name="Branch" component={BranchScreen} />
-      <Stack.Screen name="Login" component={LoginScreen} />
-    </Stack.Navigator>
-  );
-}
-
-
-export const UnauthorizedNavigator = () => {
-  return (
-    <Stack.Navigator
-      screenOptions={{
-        headerMode: "screen",
-        header: (props) => <Header {...props} />,
-      }}
-    >
       <Stack.Screen name="Login" component={LoginScreen} />
     </Stack.Navigator>
   );
