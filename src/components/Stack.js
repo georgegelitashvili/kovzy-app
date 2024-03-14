@@ -2,7 +2,7 @@ import React, { useContext } from "react";
 import { createStackNavigator } from "@react-navigation/stack";
 import { Appbar, useTheme } from "react-native-paper";
 
-import { AuthContext } from ".../../../context/AuthProvider";
+import { AuthContext } from "../context/AuthProvider";
 import { LanguageContext } from "./Language";
 import { DomainScreen } from "../startScreens/DomainScreen";
 import { BranchScreen } from "../startScreens/BranchScreen";
