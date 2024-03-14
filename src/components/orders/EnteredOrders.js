@@ -22,6 +22,8 @@ import OrdersDetail from "./OrdersDetail";
 import OrdersModal from "../modal/OrdersModal";
 import printRows from "../../PrintRows";
 
+import { navigate } from '../../helpers/navigate';
+
 const width = Dimensions.get("window").width;
 
 const numColumns = printRows(width);
@@ -32,7 +34,7 @@ let temp = 0;
 
 // render entered orders function
 export const EnteredOrdersList = () => {
-  const { domain, branchid, setUser, user, deleteItem, setIsDataSet, intervalId, setIntervalId, login } = useContext(AuthContext);
+  const { domain, branchid, setUser, user, deleteItem, setIsDataSet, intervalId, setIntervalId, login, shouldRenderAuthScreen, setShouldRenderAuthScreen } = useContext(AuthContext);
   const [orders, setOrders] = useState([]);
 
   const [appState, setAppState] = useState(AppState.currentState);
@@ -122,14 +124,16 @@ export const EnteredOrdersList = () => {
     setVisible(true);
   };
 
+  const handleNavigateToAuth = () => {
+    navigate('Auth', { screen: 'Login'});
+  };
+
   const fetchEnteredOrders = async () => {
     try {
       // console.log('entered orders: ', user);
       // Check if user is authorized
       if (!user) {
-        if (intervalId) {
-          clearInterval(intervalId);
-        }
+        clearInterval(intervalId);
         throw new Error("user is not authorized"); // Exit early if user is not authorized
       }
       if (!options.url_unansweredOrders) {
@@ -143,9 +147,7 @@ export const EnteredOrdersList = () => {
       });
       const data = resp.data.data;
       setOrders(data);
-      if (intervalId) {
-        clearInterval(intervalId);
-      }
+      clearInterval(intervalId);
     } catch (error) {
       console.log('Error fetching entered orders full:', error);
       const statusCode = error?.status || 'Unknown';
@@ -156,9 +158,16 @@ export const EnteredOrdersList = () => {
         setOptions({});
         setOptionsIsLoaded(false);
         setIsDeliveronOptions(false);
-        if (intervalId) {
-          clearInterval(intervalId);
-        }
+        Alert.alert("ALERT", "your session expired", [
+          {
+            text: "Login", onPress: () => {
+              console.log('Clicked acceptedOrders retry');
+              clearInterval(intervalId);
+              setShouldRenderAuthScreen(true);
+            }
+          },
+        ]);
+        clearInterval(intervalId);
       }
     } finally {
       setLoading(false);
@@ -169,6 +178,7 @@ export const EnteredOrdersList = () => {
     console.log('call intervall');
     const id = setInterval(async () => {
       if (optionsIsLoaded) {
+        console.log("inside set interval function: ", optionsIsLoaded);
         fetchEnteredOrders();
       }
     }, 5000);
@@ -186,13 +196,15 @@ export const EnteredOrdersList = () => {
   };
 
   useEffect(() => {
+    if (shouldRenderAuthScreen) {
+      handleNavigateToAuth();
+    }
+
+  }, [shouldRenderAuthScreen])
+
+  useEffect(() => {
     if (domain && branchid) {
       apiOptions();
-      SecureStore.getItemAsync("credentials").then((obj) => {
-        if (obj) {
-          setCredentials(JSON.parse(obj));
-        }
-      });
     } else if (domain || branchid) {
       setOptionsIsLoaded(false);
       setOrders([]);
@@ -201,15 +213,14 @@ export const EnteredOrdersList = () => {
 
   useEffect(() => {
     apiOptions();
+
     if (optionsIsLoaded) {
       const subscribe = AppState.addEventListener('change', handleAppStateChange);
       startInterval();
       console.log('startinterval');
 
       return () => {
-        if (intervalId) {
-          clearInterval(intervalId);
-        }
+        clearInterval(intervalId);
         subscribe.remove();
       };
     }

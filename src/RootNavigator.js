@@ -57,13 +57,15 @@ export default function RootNavigator() {
           <Drawer.Screen
             name="Orders"
             options={{ headerTitle: dictionary["nav.onlineOrders"] }}
-            component={HomeNavigator}
-          />
+          >
+            {(props) => <HomeNavigator {...props} navigation={props.navigation} />}
+          </Drawer.Screen>
           <Drawer.Screen
             name="Products"
             options={{ headerTitle: dictionary["nav.products"] }}
-            component={HomeNavigator}
-          />
+          >
+            {(props) => <HomeNavigator {...props} navigation={props.navigation} />}
+          </Drawer.Screen>
         </>
       ) : (
           <Drawer.Screen

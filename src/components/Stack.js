@@ -2,6 +2,7 @@ import React, { useContext } from "react";
 import { createStackNavigator } from "@react-navigation/stack";
 import { Appbar, useTheme } from "react-native-paper";
 
+import { AuthContext } from ".../../../context/AuthProvider";
 import { LanguageContext } from "./Language";
 import { DomainScreen } from "../startScreens/DomainScreen";
 import { BranchScreen } from "../startScreens/BranchScreen";
@@ -28,36 +29,6 @@ const Header = ({ options, navigation }) => {
   );
 };
 
-export const HomeNavigator = () => {
-  const { dictionary } = useContext(LanguageContext);
-  return (
-    <Stack.Navigator
-      screenOptions={{
-        headerMode: "screen",
-        headerBackTitleVisible: false,
-        header: (props) => <Header {...props} />,
-      }}
-    >
-      <Stack.Screen name="Order" options={{ headerShown: false }}>
-        {(props) => <Orders {...props} />}
-      </Stack.Screen>
-
-      <Stack.Screen name="Product" options={{ headerShown: false }}>
-        {(props) => <Products {...props} />}
-      </Stack.Screen>
-
-      <Stack.Screen name="ProductsDetail" options={{
-        headerTitle: dictionary["prod.customizable"],
-        headerStyle: { marginTop: -65 },
-        headerContentStyle: { fontSize: 10 }
-      }}>
-        {(props) => <ProductsDetail {...props} />}
-      </Stack.Screen>
-
-    </Stack.Navigator>
-  );
-};
-
 export const AuthNavigator = () => {
   return (
     <Stack.Navigator
@@ -72,3 +43,59 @@ export const AuthNavigator = () => {
     </Stack.Navigator>
   );
 }
+
+
+export const HomeNavigator = ({ navigation }) => {
+  const { shouldRenderAuthScreen } = useContext(AuthContext);
+  const { dictionary } = useContext(LanguageContext);
+
+  if (shouldRenderAuthScreen) {
+    console.log("stack navigator: ", shouldRenderAuthScreen);
+    return (
+      <Stack.Navigator
+        screenOptions={{
+          headerMode: "screen",
+          header: (props) => <Header {...props} />,
+        }}>
+        <Stack.Screen
+          name="Auth"
+          component={LoginScreen}
+          listeners={({ navigation }) => ({
+            beforeRemove: (e) => {
+              e.preventDefault();
+              navigation.navigate("Login");
+            },
+          })}
+          options={{ headerShown: false }}
+        />
+      </Stack.Navigator>
+    );
+  }
+
+  return (
+    <Stack.Navigator
+      screenOptions={{
+        headerMode: "screen",
+        headerBackTitleVisible: false,
+        header: (props) => <Header {...props} />,
+      }}
+    >
+      <Stack.Screen name="Order" options={{ headerShown: false }}>
+        {(props) => <Orders {...props} />}
+      </Stack.Screen>
+      <Stack.Screen name="Product" options={{ headerShown: false }}>
+        {(props) => <Products {...props} />}
+      </Stack.Screen>
+      <Stack.Screen
+        name="ProductsDetail"
+        options={{
+          headerTitle: dictionary["prod.customizable"],
+          headerStyle: { marginTop: -65 },
+          headerContentStyle: { fontSize: 10 },
+        }}
+      >
+        {(props) => <ProductsDetail {...props} />}
+      </Stack.Screen>
+    </Stack.Navigator>
+  );
+};

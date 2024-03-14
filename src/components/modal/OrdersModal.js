@@ -32,7 +32,6 @@ export default function OrdersModal({
     onChangeState(false);
   });
 
-
   const items = useMemo(() => {
     if (deliveron.original?.status !== -2) {
       const content = deliveron.original?.content;
@@ -45,7 +44,7 @@ export default function OrdersModal({
       } else {
         return [
           {
-            label: !content.name ? content.companyName + ' - ' + content.price : content.name + ' - ' + content.price ?? content.price_before_accept,
+            label: !content.name ? content.companyName + ' - ' + content.price : content.name + ' - ' + content.price_before_accept,
             value: !content.id ? content.companyId ?? content.type : content.id,
           },
         ];
