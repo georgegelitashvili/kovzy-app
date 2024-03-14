@@ -8,7 +8,7 @@ import { domainValidator } from '../helpers/domainValidator';
 import { storeData, getData } from '../helpers/storage';
 
 export const DomainScreen = ({ navigation }) => {
-  const { setIsDataSet, domain, setDomain } = useContext(AuthContext);
+  const { setIsDataSet, domain, setDomain, intervalId } = useContext(AuthContext);
   const [inputDomain, setInputDomain] = useState({ value: domain || '', error: '' });
 
   const readData = async () => {
@@ -39,6 +39,7 @@ export const DomainScreen = ({ navigation }) => {
 
   useEffect(() => {
     readData();
+    clearInterval(intervalId);
   }, []);
 
   return (

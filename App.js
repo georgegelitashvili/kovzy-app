@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import { StyleSheet, Alert, Linking } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { useNetInfo } from "@react-native-community/netinfo";
-import * as Updates from "expo-updates";
 import * as Sentry from "@sentry/react-native";
 import "react-native-gesture-handler";
 
@@ -21,35 +20,6 @@ function App() {
   useEffect(() => {
     setIsConnected(netInfo.isConnected);
   }, [netInfo.isConnected]);
-
-  // useEffect(() => {
-  //   async function checkForUpdates() {
-  //     try {
-  //       const { isAvailable } = await Updates.checkForUpdateAsync();
-  //       if (isAvailable) {
-  //         Alert.alert(
-  //           'Update Available',
-  //           'A new version of the app is available. Do you want to update?',
-  //           [
-  //             { text: 'Cancel', style: 'cancel' },
-  //             {
-  //               text: 'Update',
-  //               onPress: async () => {
-  //                 // Perform the update
-  //                 await Updates.fetchUpdateAsync();
-  //                 Updates.reloadAsync();
-  //               },
-  //             },
-  //           ]
-  //         );
-  //       }
-  //     } catch (error) {
-  //       console.error('Error checking for updates:', error);
-  //     }
-  //   }
-
-  //   checkForUpdates();
-  // }, []);
 
   return (
     <SafeAreaProvider style={styles.container}>
