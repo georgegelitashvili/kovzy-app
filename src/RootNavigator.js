@@ -10,7 +10,7 @@ import Loader from "./components/generate/loader";
 const Drawer = createDrawerNavigator();
 
 export default function RootNavigator() {
-  const { user, setUser, deleteItem } = useContext(AuthContext);
+  const { user, setUser, deleteItem, intervalId } = useContext(AuthContext);
   const [isLoading, setIsLoading] = useState(true);
   const { dictionary } = useContext(LanguageContext);
 
@@ -33,6 +33,10 @@ export default function RootNavigator() {
       }
     };
 
+    if (intervalId) {
+      clearInterval(intervalId);
+    }
+
     if (!user) {
       loadUser();
     } else {
@@ -53,13 +57,15 @@ export default function RootNavigator() {
           <Drawer.Screen
             name="Orders"
             options={{ headerTitle: dictionary["nav.onlineOrders"] }}
-            component={HomeNavigator}
-          />
+          >
+            {(props) => <HomeNavigator {...props} navigation={props.navigation} />}
+          </Drawer.Screen>
           <Drawer.Screen
             name="Products"
             options={{ headerTitle: dictionary["nav.products"] }}
-            component={HomeNavigator}
-          />
+          >
+            {(props) => <HomeNavigator {...props} navigation={props.navigation} />}
+          </Drawer.Screen>
         </>
       ) : (
           <Drawer.Screen

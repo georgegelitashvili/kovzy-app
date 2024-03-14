@@ -1,6 +1,6 @@
 import axios from "axios";
 import * as SecureStore from 'expo-secure-store';
-import * as RootNavigation from '../helpers/navigate';
+import { navigate } from '../helpers/navigate';
 import { removeData } from "../helpers/storage";
 
 let cookie = null;
@@ -37,7 +37,7 @@ axiosInstance.interceptors.response.use(
       removeData("domain");
       removeData("branch");
       removeData("branchName");
-      RootNavigation.navigate('Domain', { screen: 'Domain', message: 'Not allowed' });
+      navigate('Domain', { screen: 'Domain', message: 'Not allowed' });
     }
 
     return Promise.reject(error.response);

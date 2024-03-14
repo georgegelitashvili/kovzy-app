@@ -25,6 +25,8 @@ export const AuthProvider = ({ children }) => {
   const [isVisible, setIsVisible] = useState(true);
   const [branchEnabled, setBranchEnabled] = useState(false);
   const [deliveronEnabled, setDeliveronEnabled] = useState(false);
+  const [intervalId, setIntervalId] = useState(null);
+  const [shouldRenderAuthScreen, setShouldRenderAuthScreen] = useState(false);
 
   const { dictionary } = useContext(LanguageContext);
 
@@ -106,8 +108,6 @@ export const AuthProvider = ({ children }) => {
     return () => clearInterval(interval);
   }, [fetchData]);
 
-  if (!domain || !branchid) return;
-
   return (
     <AuthContext.Provider
       value={{
@@ -128,11 +128,16 @@ export const AuthProvider = ({ children }) => {
         deliveronEnabled,
         setDeliveronEnabled,
         deleteItem,
+        intervalId,
+        setIntervalId,
+        shouldRenderAuthScreen,
+        setShouldRenderAuthScreen,
         login: async (username, password) => {
           setIsLoading(true);
           try {
             const response = await axiosInstance.post(options.url_login, { password, username });
             const jsonObject = response.data;
+            console.log(jsonObject);
             // Accessing the value of authorized
             const error = jsonObject.data.error;
             // Accessing the value of authorized
@@ -147,6 +152,7 @@ export const AuthProvider = ({ children }) => {
               SecureStore.setItemAsync('credentials', JSON.stringify({ username, password }));
               SecureStore.setItemAsync('cookie', JSON.stringify(response.headers['set-cookie']));
               setUser(response.headers['set-cookie']);
+              setShouldRenderAuthScreen(false);
             }
           } catch (error) {
             console.log('Error logging in:', error);
@@ -168,6 +174,9 @@ export const AuthProvider = ({ children }) => {
             setBranchName(null);
             setIsDataSet(false);
             setUser(null);
+            clearInterval(intervalId);
+            setIntervalId(null);
+            setShouldRenderAuthScreen(false);
           } catch (error) {
             console.log('Error logging out:', error);
           } finally {
@@ -176,6 +185,7 @@ export const AuthProvider = ({ children }) => {
         },
       }}
     >
+
       {children}
 
       {!isVisible && (

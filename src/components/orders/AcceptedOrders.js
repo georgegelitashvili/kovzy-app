@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback, createContext, useContext } from "react";
-import { useSelector, useDispatch } from "react-redux";
 import {
   StyleSheet,
   Dimensions,
@@ -34,7 +33,7 @@ const numColumns = printRows(width);
 const cardSize = width / numColumns;
 
 export const AcceptedOrdersList = () => {
-  const { domain, branchid, setUser, user, deleteItem, setIsDataSet } = useContext(AuthContext);
+  const { domain, branchid, setUser, user, deleteItem, setIsDataSet, intervalId } = useContext(AuthContext);
   const [orders, setOrders] = useState([]);
   const [page, setPage] = useState(0);
   const [options, setOptions] = useState({
@@ -114,15 +113,7 @@ export const AcceptedOrdersList = () => {
         setOrders([]);
         setOptionsIsLoaded(false);
         setOptions({});
-        console.log(credentials);
-        Alert.alert("ALERT", "Something went wrong with acceptedOrders", [
-          {
-            text: "Retry", onPress: () => {
-              console.log('Clicked acceptedOrders retry');
-              fetchAcceptedOrders();
-            }
-          },
-        ]);
+        clearInterval(intervalId);
       }
     } finally {
       setLoading(false);

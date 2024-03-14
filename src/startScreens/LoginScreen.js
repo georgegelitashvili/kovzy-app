@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useContext } from "react";
 import { TouchableOpacity, StyleSheet, View } from "react-native";
+import * as SecureStore from 'expo-secure-store';
 import Background from "../components/generate/Background";
 import Header from "../components/generate/Header";
 import Button from "../components/generate/Button";
@@ -10,7 +11,8 @@ import { passwordValidator } from "../helpers/passwordValidator";
 import { AuthContext } from "../context/AuthProvider";
 
 export const LoginScreen = ({ navigation }) => {
-  const { login, loginError } = useContext(AuthContext);
+  const { login, loginError, intervalId } = useContext(AuthContext);
+  const [credentials, setCredentials] = useState({});
 
   const [name, setName] = useState({ value: "", error: "" });
   const [password, setPassword] = useState({ value: "", error: "" });
@@ -28,6 +30,23 @@ export const LoginScreen = ({ navigation }) => {
 
     login(name.value, password.value);
   };
+
+  useEffect(() => {
+    SecureStore.getItemAsync("credentials").then((obj) => {
+      if (obj) {
+        setCredentials(JSON.parse(obj));
+      }
+    });
+    clearInterval(intervalId);
+  }, [])
+
+  useEffect(() => {
+    if (credentials) {
+      // Set the message to the state or handle it accordingly
+      setName({ value: credentials.username, error: "" });
+      setPassword({ value: credentials.password, error: "" });
+    }
+  }, [credentials]);
 
   useEffect(() => {
     if (loginError) {
