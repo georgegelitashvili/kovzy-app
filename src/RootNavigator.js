@@ -1,5 +1,6 @@
 import React, { useContext, useState, useEffect } from "react";
 import { createDrawerNavigator } from "@react-navigation/drawer";
+import * as Updates from "expo-updates";
 import * as SecureStore from "expo-secure-store";
 import { AuthContext } from "./context/AuthProvider";
 import { HomeNavigator, AuthNavigator } from "./components/Stack";
@@ -24,18 +25,16 @@ export default function RootNavigator() {
           deleteItem("cookie");
           deleteItem("credentials");
           setUser(null);
+          clearInterval(intervalId);
         }
       } catch (error) {
         console.error("Error loading user:", error);
+        clearInterval(intervalId);
         // Handle error loading user data
       } finally {
         setIsLoading(false);
       }
     };
-
-    if (intervalId) {
-      clearInterval(intervalId);
-    }
 
     if (!user) {
       loadUser();
@@ -43,6 +42,36 @@ export default function RootNavigator() {
       setIsLoading(false);
     }
   }, [user, setUser]);
+
+
+  useEffect(() => {
+    async function checkForUpdates() {
+      try {
+        const { isAvailable } = await Updates.checkForUpdateAsync();
+        if (isAvailable) {
+          Alert.alert(
+            'Update Available',
+            'A new version of the app is available. Do you want to update?',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Update',
+                onPress: async () => {
+                  // Perform the update
+                  await Updates.fetchUpdateAsync();
+                  Updates.reloadAsync();
+                },
+              },
+            ]
+          );
+        }
+      } catch (error) {
+        console.error('Error checking for updates:', error);
+      }
+    }
+
+    checkForUpdates();
+  }, []);
 
   if (isLoading) {
     return <Loader text={dictionary["loading"]} />;
