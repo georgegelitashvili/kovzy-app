@@ -161,7 +161,6 @@ export const EnteredOrdersList = () => {
         Alert.alert("ALERT", "your session expired", [
           {
             text: "Login", onPress: () => {
-              console.log('Clicked acceptedOrders retry');
               clearInterval(intervalId);
               setShouldRenderAuthScreen(true);
             }
