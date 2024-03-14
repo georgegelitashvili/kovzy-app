@@ -137,7 +137,6 @@ export const AuthProvider = ({ children }) => {
           try {
             const response = await axiosInstance.post(options.url_login, { password, username });
             const jsonObject = response.data;
-            console.log(jsonObject);
             // Accessing the value of authorized
             const error = jsonObject.data.error;
             // Accessing the value of authorized

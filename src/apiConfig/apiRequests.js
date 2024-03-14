@@ -29,6 +29,10 @@ axiosInstance.interceptors.request.use(
 
 axiosInstance.interceptors.response.use(
   (response) => {
+    // Clear cache for this specific request
+    response.config.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
+    response.config.headers['Pragma'] = 'no-cache';
+    response.config.headers['Expires'] = 0;
     return response;
   },
   (error) => {
