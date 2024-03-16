@@ -86,13 +86,8 @@ export const AcceptedOrdersList = () => {
   const fetchAcceptedOrders = async () => {
     setOptionsIsLoaded(true);
     try {
-      // console.log('accepted orders: ', user)
-      // Check if user is authorized
-      if (!user) {
-        return; // Exit early if user is not authorized
-      }
-      if (!options.url_getAcceptedOrders) {
-        throw new Error("URL is empty");
+      if (!user || !options.url_getAcceptedOrders) {
+        return null;
       }
 
       const resp = await axiosInstance.post(options.url_getAcceptedOrders, JSON.stringify({
@@ -132,11 +127,6 @@ export const AcceptedOrdersList = () => {
   useEffect(() => {
     if (domain && branchid) {
       apiOptions();
-      SecureStore.getItemAsync("credentials").then((obj) => {
-        if (obj) {
-          setCredentials(JSON.parse(obj));
-        }
-      });
     } else if (domain || branchid) {
       setOptionsIsLoaded(false);
       setOrders([]);

@@ -34,6 +34,10 @@ export const DomainScreen = ({ navigation }) => {
   };
 
   useEffect(() => {
+    clearInterval(intervalId);
+  });
+
+  useEffect(() => {
     setInputDomain({ value: domain || '', error: '' });
   }, [domain]);
 

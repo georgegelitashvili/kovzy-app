@@ -73,6 +73,7 @@ export default function RootNavigator() {
     checkForUpdates();
   }, []);
 
+
   if (isLoading) {
     return <Loader text={dictionary["loading"]} />;
   }

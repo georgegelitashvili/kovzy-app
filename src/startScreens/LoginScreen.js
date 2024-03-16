@@ -32,6 +32,10 @@ export const LoginScreen = ({ navigation }) => {
   };
 
   useEffect(() => {
+    clearInterval(intervalId);
+  });
+
+  useEffect(() => {
     SecureStore.getItemAsync("credentials").then((obj) => {
       if (obj) {
         setCredentials(JSON.parse(obj));

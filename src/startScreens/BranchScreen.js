@@ -10,7 +10,7 @@ import { AuthContext } from "../context/AuthProvider";
 import axiosInstance from "../apiConfig/apiRequests";
 
 export const BranchScreen = ({ navigation }) => {
-  const { isDataSet, setIsDataSet, domain, branchid } = useContext(AuthContext);
+  const { isDataSet, setIsDataSet, domain, branchid, intervalId } = useContext(AuthContext);
   const [branches, setBranches] = useState([]);
   const [selected, setSelected] = useState(branchid);
   const [isLoading, setIsLoading] = useState(true);
@@ -57,6 +57,10 @@ export const BranchScreen = ({ navigation }) => {
   };
 
   useEffect(() => {
+    clearInterval(intervalId);
+  });
+
+  useEffect(() => {
     if (domain) {
       setBranches([]);
       setSelected(null);
@@ -80,7 +84,7 @@ export const BranchScreen = ({ navigation }) => {
     }
   }, [selected]);
 
-  console.log("branch screen data set: ", isDataSet);
+  // console.log("branch screen data set: ", isDataSet);
   // console.log("branch screen branches: ", branches);
   if (isLoading) {
     return <Loader error={errorText} />;

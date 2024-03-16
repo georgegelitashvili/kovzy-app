@@ -13,7 +13,7 @@ import axiosInstance from "./apiConfig/apiRequests";
 const width = Dimensions.get("window").width;
 
 export default function Products({ navigation }) {
-  const { setIsDataSet, domain, branchid } = useContext(AuthContext);
+  const { setIsDataSet, domain, branchid, user, intervalId } = useContext(AuthContext);
   const isFocused = useIsFocused();
   const { dictionary, userLanguage } = useContext(LanguageContext);
 
@@ -33,11 +33,21 @@ export default function Products({ navigation }) {
     url_productActivity: "",
   }); // api options
 
+  useEffect(() => {
+    if (domain) {
+      setOptions({
+        url_getProducts: `https://${domain}/api/v1/admin/getProducts`,
+        url_productActivity: `https://${domain}/api/v1/admin/productActivity`,
+      });
+    }
+  }, [domain]);
+
   const fetchData = async () => {
     try {
-      if (!options.url_getProducts) {
-        throw new Error("URL is empty");
+      if (!user || !options.url_getProducts) {
+        return null;
       }
+      
       const response = await axiosInstance.post(options.url_getProducts, {
         lang: userLanguage,
         page: page,
@@ -64,21 +74,13 @@ export default function Products({ navigation }) {
         setProducts([]);
         setExcluded([]);
         setIsDataSet(false);
+        clearInterval(intervalId);
       }
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
-
-  useEffect(() => {
-    if (domain) {
-      setOptions({
-        url_getProducts: `https://${domain}/api/v1/admin/getProducts`,
-        url_productActivity: `https://${domain}/api/v1/admin/productActivity`,
-      });
-    }
-  }, [domain]);
 
   useEffect(() => {
     const removeSubscription = NetInfo.addEventListener((state) => {
