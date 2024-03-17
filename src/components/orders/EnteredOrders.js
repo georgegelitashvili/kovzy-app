@@ -13,6 +13,7 @@ import { Text, Button, Divider, Card } from "react-native-paper";
 import { FlatGrid } from "react-native-super-grid";
 import { MaterialCommunityIcons, SimpleLineIcons } from "@expo/vector-icons";
 import { Audio } from "expo-av";
+import * as Updates from 'expo-updates';
 
 import { AuthContext, AuthProvider } from "../../context/AuthProvider";
 import Loader from "../generate/loader";
@@ -34,7 +35,7 @@ let temp = 0;
 
 // render entered orders function
 export const EnteredOrdersList = () => {
-  const { domain, branchid, setUser, user, deleteItem, setIsDataSet, intervalId, setIntervalId, login, shouldRenderAuthScreen, setShouldRenderAuthScreen } = useContext(AuthContext);
+  const { domain, branchid, setUser, user, intervalId, setIntervalId, shouldRenderAuthScreen, setShouldRenderAuthScreen } = useContext(AuthContext);
   const [orders, setOrders] = useState([]);
 
   const [appState, setAppState] = useState(AppState.currentState);
@@ -59,11 +60,10 @@ export const EnteredOrdersList = () => {
   const [loading, setLoading] = useState(true);
   const [loadingOptions, setLoadingOptions] = useState(false);
 
-  const [credentials, setCredentials] = useState({});
-
   const { dictionary, userLanguage } = useContext(LanguageContext);
 
   const onChangeModalState = (newState) => {
+    console.log("modal close: ", newState);
     setTimeout(() => {
       setVisible(newState);
       setIsDeliveronOptions(newState);
@@ -108,6 +108,10 @@ export const EnteredOrdersList = () => {
     ]);
   };
 
+  const handleReload = async () => {
+    await Updates.reloadAsync();
+  };
+
   const apiOptions = useCallback(() => {
     setOptions({
       url_unansweredOrders: `https://${domain}/api/v1/admin/getUnansweredOrders`,
@@ -130,14 +134,8 @@ export const EnteredOrdersList = () => {
 
   const fetchEnteredOrders = async () => {
     try {
-      // console.log('entered orders: ', user);
-      // Check if user is authorized
-      if (!user) {
-        clearInterval(intervalId);
-        throw new Error("user is not authorized"); // Exit early if user is not authorized
-      }
-      if (!options.url_unansweredOrders) {
-        throw new Error("URL is empty");
+      if (!user || !options.url_unansweredOrders) {
+        return null;
       }
 
       const resp = await axiosInstance.post(options.url_unansweredOrders, {
@@ -147,7 +145,6 @@ export const EnteredOrdersList = () => {
       });
       const data = resp.data.data;
       setOrders(data);
-      clearInterval(intervalId);
     } catch (error) {
       console.log('Error fetching entered orders full:', error);
       const statusCode = error?.status || 'Unknown';
@@ -166,7 +163,9 @@ export const EnteredOrdersList = () => {
             }
           },
         ]);
-        clearInterval(intervalId);
+        return clearInterval(intervalId); // Clear the interval here
+      } else {
+        handleReload();
       }
     } finally {
       setLoading(false);
@@ -174,15 +173,17 @@ export const EnteredOrdersList = () => {
   };
 
   const startInterval = () => {
-    console.log('call intervall');
-    const id = setInterval(async () => {
+    console.log('call interval');
+    const newIntervalId = setInterval(() => {
       if (optionsIsLoaded) {
-        console.log("inside set interval function: ", optionsIsLoaded);
+        console.log('fetchEnteredOrders called');
         fetchEnteredOrders();
+      } else {
+        console.log('Options not loaded');
       }
     }, 5000);
 
-    setIntervalId(id);
+    setIntervalId(newIntervalId); // Update the intervalId state immediately
   };
 
   const handleAppStateChange = (nextAppState) => {
@@ -195,13 +196,6 @@ export const EnteredOrdersList = () => {
   };
 
   useEffect(() => {
-    if (shouldRenderAuthScreen) {
-      handleNavigateToAuth();
-    }
-
-  }, [shouldRenderAuthScreen])
-
-  useEffect(() => {
     if (domain && branchid) {
       apiOptions();
     } else if (domain || branchid) {
@@ -211,19 +205,27 @@ export const EnteredOrdersList = () => {
   }, [domain, branchid, apiOptions]);
 
   useEffect(() => {
+    if (shouldRenderAuthScreen) {
+      handleNavigateToAuth();
+    }
+  }, [shouldRenderAuthScreen]);
+
+  useEffect(() => {
     apiOptions();
 
     if (optionsIsLoaded) {
       const subscribe = AppState.addEventListener('change', handleAppStateChange);
+      console.log('Starting interval...');
       startInterval();
-      console.log('startinterval');
+      console.log('Interval started.');
 
       return () => {
-        clearInterval(intervalId);
+        clearInterval(intervalId); // Clear the interval in the cleanup function
         subscribe.remove();
       };
     }
   }, [optionsIsLoaded, appState]);
+
 
   // set deliveron data
   useEffect(() => {
@@ -238,7 +240,24 @@ export const EnteredOrdersList = () => {
     if (isDeliveronOptions) {
       axiosInstance
         .post(options.url_deliveronRecheck, deliveronOptions.data)
-        .then((resp) => {setDeliveron(resp.data.data)});
+        .then((resp) => {
+          return resp.data.data
+        })
+        .then((data) => {
+          if (data.original?.content.length === 0) {
+            Alert.alert("ALERT", dictionary["dv.empty"] , [
+              {
+                text: "okay", onPress: () => {
+                  setIsDeliveronOptions(false);
+                  setItemId(null);
+                  setDeliveron([]);
+                  console.log('deliveron null modal');
+                }
+              },
+            ])
+          }
+          setDeliveron(data)
+        });
     }
   }, [isDeliveronOptions]);
 

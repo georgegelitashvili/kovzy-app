@@ -77,36 +77,36 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const fetchData = useCallback(async () => {
-    if (!domain || !user) return; // Check if domain or user is null
-
-    try {
-      const deliveronResponse = await axiosInstance.post(options.url_deliveronStatus);
-      setDeliveronEnabled(deliveronResponse.data.data.status === 0);
-
-      if (branchid) {
-        const branchResponse = await axiosInstance.post(options.url_branchStatus, { branchid });
-        setBranchEnabled(branchResponse.data.data);
-        setIsVisible(branchResponse.data.data);
-      }
-    } catch (error) {
-      console.log('Error fetching data:', error);
-    }
-  }, [domain, branchid, user, options]);
-
-
   useEffect(() => {
     readData();
   }, [isDataSet]);
 
   useEffect(() => {
     apiOptions();
-  }, [apiOptions]);
+  }, [domain, isDataSet]);
 
   useEffect(() => {
+    const fetchData = async () => {
+      if (!domain || !user) return;
+
+      try {
+        const [deliveronResponse, branchResponse] = await Promise.all([
+          axiosInstance.post(options.url_deliveronStatus),
+          axiosInstance.post(options.url_branchStatus, { branchid }),
+        ]);
+
+        setDeliveronEnabled(deliveronResponse.data.data.status === 0);
+        setBranchEnabled(branchResponse.data.data);
+        setIsVisible(branchResponse.data.data);
+      } catch (error) {
+        console.log('Error fetching data:', error);
+        clearInterval(intervalId);
+      }
+    };
+
     const interval = setInterval(fetchData, 5000);
     return () => clearInterval(interval);
-  }, [fetchData]);
+  }, [domain, branchid, user, options]);
 
   return (
     <AuthContext.Provider
@@ -156,6 +156,7 @@ export const AuthProvider = ({ children }) => {
           } catch (error) {
             console.log('Error logging in:', error);
             setLoginError('An error occurred while logging in. Please try again.');
+            clearInterval(intervalId);
           } finally {
             setIsLoading(false);
           }
@@ -178,6 +179,7 @@ export const AuthProvider = ({ children }) => {
             setShouldRenderAuthScreen(false);
           } catch (error) {
             console.log('Error logging out:', error);
+            clearInterval(intervalId);
           } finally {
             setIsLoading(false);
           }

@@ -11,7 +11,7 @@ import { passwordValidator } from "../helpers/passwordValidator";
 import { AuthContext } from "../context/AuthProvider";
 
 export const LoginScreen = ({ navigation }) => {
-  const { login, loginError, intervalId } = useContext(AuthContext);
+  const { login, loginError, intervalId, shouldRenderAuthScreen } = useContext(AuthContext);
   const [credentials, setCredentials] = useState({});
 
   const [name, setName] = useState({ value: "", error: "" });
@@ -38,7 +38,7 @@ export const LoginScreen = ({ navigation }) => {
       }
     });
     clearInterval(intervalId);
-  }, [])
+  }, [shouldRenderAuthScreen])
 
   useEffect(() => {
     if (credentials) {

@@ -1,6 +1,7 @@
-import React, { useEffect, useCallback, useState, useMemo } from "react";
-import { StyleSheet, View, Dimensions, Platform } from "react-native";
+import React, { useEffect, useCallback, useState, useMemo, useContext } from "react";
+import { StyleSheet, View, Dimensions, Platform, Alert, } from "react-native";
 import Modal from "react-native-modal";
+import { AuthContext, AuthProvider } from "../../context/AuthProvider";
 import OrdersModalAccept from "./OrdersModalAccept";
 import OrdersModalReject from "./OrdersModalReject";
 import OrdersModalStatus from "./OrdersModalStatus";
@@ -19,6 +20,7 @@ export default function OrdersModal({
   options
 }) {
   const [visible, setVisible] = useState(isVisible);
+  const { intervalId, setIntervalId } = useContext(AuthContext);
 
   useEffect(() => {
     setVisible(isVisible);

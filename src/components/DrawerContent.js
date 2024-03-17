@@ -10,7 +10,7 @@ import { String, LanguageContext } from "./Language";
 
 export default function DrawerContent(props) {
 
-  const { domain, branchid, branchName, branchEnabled, setBranchEnabled, setDeliveronEnabled, deliveronEnabled, logout, setIsDataSet } = useContext(AuthContext);
+  const { domain, branchid, branchName, branchEnabled, setBranchEnabled, setDeliveronEnabled, deliveronEnabled, logout, setIsDataSet, intervalId } = useContext(AuthContext);
   const { dictionary } = useContext(LanguageContext);
 
   const [options, setOptions] = useState({
@@ -39,6 +39,7 @@ export default function DrawerContent(props) {
   const onLogoutPressed = () => {
     props.navigation.closeDrawer();
     setIsDataSet(false);
+    clearInterval(intervalId);
     logout();
   };
 
