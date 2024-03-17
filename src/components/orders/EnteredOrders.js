@@ -122,15 +122,6 @@ export const EnteredOrdersList = () => {
     setOptionsIsLoaded(true);
   }, [domain]);
 
-  useEffect(() => {
-    if (domain && branchid) {
-      apiOptions();
-    } else if (domain || branchid) {
-      setOptionsIsLoaded(false);
-      setOrders([]);
-    }
-  }, [domain, branchid, apiOptions]);
-
   // modal show
   const showModal = (type) => {
     setModalType(type);
@@ -155,37 +146,34 @@ export const EnteredOrdersList = () => {
       const data = resp.data.data;
       setOrders(data);
     } catch (error) {
-      handleFetchError(error);
+      console.log('Error fetching entered orders full:', error);
+      const statusCode = error?.status || 'Unknown';
+      console.log('Status code entered orders:', statusCode);
+      if (statusCode === 401) {
+        console.log('Error fetching entered orders:', statusCode);
+        clearInterval(intervalId); // Clear the interval here
+        setOrders([]);
+        setOptions({});
+        setOptionsIsLoaded(false);
+        setIsDeliveronOptions(false);
+        Alert.alert("ALERT", "your session expired", [
+          {
+            text: "Login", onPress: () => {
+              clearInterval(intervalId);
+              setShouldRenderAuthScreen(true);
+            }
+          },
+        ]);
+      } else {
+        handleReload();
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  const handleFetchError = (error) => {
-    console.log('Error fetching entered orders full:', error);
-    const statusCode = error?.status || 'Unknown';
-    console.log('Status code entered orders:', statusCode);
-    if (statusCode === 401) {
-      console.log('Error fetching entered orders:', statusCode);
-      clearInterval(intervalId); // Clear the interval here
-      setOrders([]);
-      setOptions({});
-      setOptionsIsLoaded(false);
-      setIsDeliveronOptions(false);
-      Alert.alert("ALERT", "your session expired", [
-        {
-          text: "Login", onPress: () => {
-            clearInterval(intervalId);
-            setShouldRenderAuthScreen(true);
-          }
-        },
-      ]);
-    }
-  };
-
   const startInterval = () => {
     console.log('call interval');
-    clearInterval(intervalId);
     const newIntervalId = setInterval(() => {
       if (optionsIsLoaded) {
         console.log('fetchEnteredOrders called');
@@ -193,7 +181,7 @@ export const EnteredOrdersList = () => {
       } else {
         console.log('Options not loaded');
       }
-    }, 5000); // Increased interval to 15 seconds
+    }, 5000);
 
     setIntervalId(newIntervalId); // Update the intervalId state immediately
   };
@@ -206,6 +194,15 @@ export const EnteredOrdersList = () => {
     }
     setAppState(nextAppState);
   };
+
+  useEffect(() => {
+    if (domain && branchid) {
+      apiOptions();
+    } else if (domain || branchid) {
+      setOptionsIsLoaded(false);
+      setOrders([]);
+    }
+  }, [domain, branchid, apiOptions]);
 
   useEffect(() => {
     if (shouldRenderAuthScreen) {
