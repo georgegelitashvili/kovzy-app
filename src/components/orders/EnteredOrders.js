@@ -151,7 +151,6 @@ export const EnteredOrdersList = () => {
       console.log('Status code entered orders:', statusCode);
       if (statusCode === 401) {
         console.log('Error fetching entered orders:', statusCode);
-        clearInterval(intervalId); // Clear the interval here
         setOrders([]);
         setOptions({});
         setOptionsIsLoaded(false);
@@ -164,6 +163,7 @@ export const EnteredOrdersList = () => {
             }
           },
         ]);
+        return clearInterval(intervalId); // Clear the interval here
       } else {
         handleReload();
       }
@@ -214,7 +214,6 @@ export const EnteredOrdersList = () => {
     apiOptions();
 
     if (optionsIsLoaded) {
-      console.log('entered orders: ', intervalId);
       const subscribe = AppState.addEventListener('change', handleAppStateChange);
       console.log('Starting interval...');
       startInterval();
