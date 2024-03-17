@@ -27,14 +27,20 @@ function App() {
   useEffect(() => {
     const handleAppCrash = () => {
       setShowReloadButton(true);
+      handleReload();
     };
 
     // Capture unhandled exceptions
     const previousHandler = ErrorUtils.getGlobalHandler();
     ErrorUtils.setGlobalHandler((error, isFatal) => {
-      handleAppCrash();
-      if (previousHandler) {
-        previousHandler(error, isFatal);
+      // Check for specific error conditions and handle them
+      if (isMemoryLeak(error) || isUnhandledException(error) || isIncorrectNativeModuleUsage(error)) {
+        handleAppCrash();
+      } else {
+        // Call the previous error handler if it exists
+        if (previousHandler) {
+          previousHandler(error, isFatal);
+        }
       }
     });
 
