@@ -3,23 +3,21 @@ import * as SecureStore from 'expo-secure-store';
 import { navigate } from '../helpers/navigate';
 import { removeData } from "../helpers/storage";
 
-let cookie = null;
-
 const axiosInstance = axios.create({
   headers: {
     'Accept': "application/json",
-    'Content-Type': 'application/json'
+    'Content-Type': 'application/json',
   },
   withCredentials: true,
 });
 
 axiosInstance.interceptors.request.use(
   async (config) => {
-    cookie = await SecureStore.getItemAsync('cookie');
-    if (cookie) {
-      config.headers['Cookie'] = cookie;
+    console.log("Request URL:", config.url);
+    const token = await SecureStore.getItemAsync('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
     }
-
     return config;
   },
   (error) => {
@@ -36,15 +34,18 @@ axiosInstance.interceptors.response.use(
     return response;
   },
   (error) => {
-    console.log("Error axiosInstance:", error);
-    if (error.response?.status === 404) {
+    console.error("Error axiosInstance:", error);
+    if (error?.response && error?.response.status === 404) {
+      // Handle not found error
       removeData("domain");
       removeData("branch");
       removeData("branchName");
       navigate('Domain', { screen: 'Domain', message: 'Not allowed' });
+    } else {
+      // Handle other types of errors (e.g., network errors)
+      console.error("An error occurred (axios):", error.message);
     }
-
-    return Promise.reject(error.response);
+    return Promise.reject(error);
   },
 );
 

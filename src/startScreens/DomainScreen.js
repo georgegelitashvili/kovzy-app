@@ -6,10 +6,12 @@ import TextField from '../components/generate/TextField';
 import { AuthContext, AuthProvider } from '../context/AuthProvider';
 import { domainValidator } from '../helpers/domainValidator';
 import { storeData, getData } from '../helpers/storage';
+import { LanguageContext } from "../components/Language";
 
 export const DomainScreen = ({ navigation }) => {
-  const { setIsDataSet, domain, setDomain, intervalId } = useContext(AuthContext);
+  const { domain, setDomain, intervalId } = useContext(AuthContext);
   const [inputDomain, setInputDomain] = useState({ value: domain || '', error: '' });
+  const { dictionary } = useContext(LanguageContext);
 
   const readData = async () => {
     try {
@@ -28,14 +30,9 @@ export const DomainScreen = ({ navigation }) => {
     }
     setDomain(inputDomain.value);
     storeData("domain", inputDomain.value);
-    setIsDataSet(true);
 
     navigation.navigate("Branch");
   };
-
-  useEffect(() => {
-    clearInterval(intervalId);
-  });
 
   useEffect(() => {
     setInputDomain({ value: domain || '', error: '' });
@@ -43,7 +40,6 @@ export const DomainScreen = ({ navigation }) => {
 
   useEffect(() => {
     readData();
-    clearInterval(intervalId);
   }, []);
 
   return (
@@ -64,7 +60,7 @@ export const DomainScreen = ({ navigation }) => {
         style={{ backgroundColor: '#000' }}
         onPress={onCheckPressed}
       >
-        Save
+        {dictionary['save']}
       </Button>
     </Background>
   )

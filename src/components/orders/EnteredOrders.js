@@ -12,7 +12,7 @@ import { Text, Button, Divider, Card } from "react-native-paper";
 import { FlatGrid } from "react-native-super-grid";
 import { MaterialCommunityIcons, SimpleLineIcons } from "@expo/vector-icons";
 import { Audio } from "expo-av";
-import * as Updates from 'expo-updates';
+import io from 'socket.io-client';
 
 import { AuthContext, AuthProvider } from "../../context/AuthProvider";
 import Loader from "../generate/loader";
@@ -34,13 +34,13 @@ let temp = 0;
 
 // render entered orders function
 export const EnteredOrdersList = () => {
-  const { domain, branchid, setUser, user, intervalId, setIntervalId, shouldRenderAuthScreen, setShouldRenderAuthScreen } = useContext(AuthContext);
+  const { domain, branchid, user } = useContext(AuthContext);
   const [orders, setOrders] = useState([]);
 
   const [appState, setAppState] = useState(AppState.currentState);
 
   const [options, setOptions] = useState({
-    url_unansweredOrders: "",
+    url_orders: "",
     url_deliveronRecheck: "",
     url_acceptOrder: "",
     url_rejectOrder: ""
@@ -58,6 +58,7 @@ export const EnteredOrdersList = () => {
 
   const [loading, setLoading] = useState(true);
   const [loadingOptions, setLoadingOptions] = useState(false);
+  const [socket, setSocket] = useState(null);
 
   const { dictionary, userLanguage } = useContext(LanguageContext);
 
@@ -107,13 +108,9 @@ export const EnteredOrdersList = () => {
     ]);
   };
 
-  const handleReload = async () => {
-    await Updates.reloadAsync();
-  };
-
   const apiOptions = useCallback(() => {
     setOptions({
-      url_unansweredOrders: `https://${domain}/api/v1/admin/getUnansweredOrders`,
+      url_orders: `https://${domain}/api/v1/admin/`,
       url_deliveronRecheck: `https://${domain}/api/v1/admin/deliveronRecheck`,
       url_acceptOrder: `https://${domain}/api/v1/admin/acceptOrder`,
       url_rejectOrder: `https://${domain}/api/v1/admin/rejectOrder`,
@@ -127,73 +124,6 @@ export const EnteredOrdersList = () => {
     setVisible(true);
   };
 
-  const handleNavigateToAuth = () => {
-    navigate('Auth', { screen: 'Login'});
-  };
-
-  const fetchEnteredOrders = async () => {
-    try {
-      if (!user || !options.url_unansweredOrders) {
-        return null;
-      }
-
-      const resp = await axiosInstance.post(options.url_unansweredOrders, {
-        type: 0,
-        page: 1,
-        branchid: branchid,
-      });
-      const data = resp.data.data;
-      setOrders(data);
-    } catch (error) {
-      console.log('Error fetching entered orders full:', error);
-      const statusCode = error?.status || 'Unknown';
-      console.log('Status code entered orders:', statusCode);
-      if (statusCode === 401) {
-        console.log('Error fetching entered orders:', statusCode);
-        setOrders([]);
-        setOptions({});
-        setOptionsIsLoaded(false);
-        setIsDeliveronOptions(false);
-        Alert.alert("ALERT", "your session expired", [
-          {
-            text: "Login", onPress: () => {
-              clearInterval(intervalId);
-              setShouldRenderAuthScreen(true);
-            }
-          },
-        ]);
-        return clearInterval(intervalId); // Clear the interval here
-      } else {
-        handleReload();
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const startInterval = () => {
-    console.log('call interval');
-    const newIntervalId = setInterval(() => {
-      if (optionsIsLoaded) {
-        console.log('fetchEnteredOrders called');
-        fetchEnteredOrders();
-      } else {
-        console.log('Options not loaded');
-      }
-    }, 5000);
-
-    setIntervalId(newIntervalId); // Update the intervalId state immediately
-  };
-
-  const handleAppStateChange = (nextAppState) => {
-    if (appState.match(/inactive|background/) && nextAppState === "active") {
-      startInterval();
-    } else {
-      clearInterval(intervalId);
-    }
-    setAppState(nextAppState);
-  };
-
   useEffect(() => {
     if (domain && branchid) {
       apiOptions();
@@ -203,27 +133,59 @@ export const EnteredOrdersList = () => {
     }
   }, [domain, branchid, apiOptions]);
 
-  useEffect(() => {
-    if (shouldRenderAuthScreen) {
-      handleNavigateToAuth();
-    }
-  }, [shouldRenderAuthScreen]);
 
   useEffect(() => {
-    apiOptions();
+    if (user?.token && !socket && branchid) {
+      const newSocket = io('https://your-laravel-websocket-server-url', {
+        auth: {
+          token: user?.token,
+        },
+        query: {
+          type: 0,
+          page: 1,
+          branchid: branchid,
+        },
+        extraHeaders: {
+          Authorization: `Bearer ${user.token}`,
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+      });
 
-    if (optionsIsLoaded) {
-      const subscribe = AppState.addEventListener('change', handleAppStateChange);
-      console.log('Starting interval...');
-      startInterval();
-      console.log('Interval started.');
+      newSocket.on('connect', () => {
+        console.log('socket connected');
+      });
 
-      return () => {
-        clearInterval(intervalId); // Clear the interval in the cleanup function
-        subscribe.remove();
-      };
+      newSocket.on('connect_error', error => {
+        console.error('Socket connection error:', error);
+        // Attempt to reconnect the socket
+        newSocket.disconnect();
+        newSocket.connect();
+      });
+
+      newSocket.on('order-received', data => {
+        console.log('New order received:', data);
+        setOrders(prevOrders => [data, ...prevOrders]);
+      });
+
+      newSocket.on('order-update', data => {
+        console.log('Order update received:', data);
+        setOrders(prevOrders => prevOrders.map(order => order.id === data.id ? { ...order, ...data } : order));
+      });
+
+      setSocket(newSocket);
     }
-  }, [optionsIsLoaded, appState]);
+
+    if (!branchid && socket) {
+      socket.disconnect();
+    }
+
+    return () => {
+      if (socket) {
+        socket.disconnect();
+      }
+    };
+  }, [user, socket, branchid]);
 
 
   // set deliveron data
