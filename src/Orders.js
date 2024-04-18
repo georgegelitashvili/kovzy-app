@@ -4,7 +4,7 @@ import { AuthContext } from "./context/AuthProvider";
 import { EnteredOrdersList } from "./components/orders/EnteredOrders";
 import { AcceptedOrdersList } from "./components/orders/AcceptedOrders";
 
-export default function Orders({ navigation }) {
+export default function Orders() {
   const { isDataSet } = useContext(AuthContext);
   const [dataReady, setDataReady] = useState(false);
 

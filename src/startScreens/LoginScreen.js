@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext } from "react";
 import { TouchableOpacity, StyleSheet, View } from "react-native";
-import * as SecureStore from 'expo-secure-store';
 import Background from "../components/generate/Background";
+import Logo from "../components/generate/Logo";
 import Header from "../components/generate/Header";
 import Button from "../components/generate/Button";
 import TextField from "../components/generate/TextField";
@@ -9,13 +9,15 @@ import { theme } from "../core/theme";
 import { nameValidator } from "../helpers/nameValidator";
 import { passwordValidator } from "../helpers/passwordValidator";
 import { AuthContext } from "../context/AuthProvider";
+import { LanguageContext } from "../components/Language";
 
 export const LoginScreen = ({ navigation }) => {
-  const { login, loginError, intervalId, shouldRenderAuthScreen } = useContext(AuthContext);
+  const { login, loginError } = useContext(AuthContext);
   const [credentials, setCredentials] = useState({});
 
   const [name, setName] = useState({ value: "", error: "" });
   const [password, setPassword] = useState({ value: "", error: "" });
+  const { dictionary } = useContext(LanguageContext);
 
   // login function
   const onLoginPressed = () => {
@@ -30,15 +32,6 @@ export const LoginScreen = ({ navigation }) => {
 
     login(name.value, password.value);
   };
-
-  useEffect(() => {
-    SecureStore.getItemAsync("credentials").then((obj) => {
-      if (obj) {
-        setCredentials(JSON.parse(obj));
-      }
-    });
-    clearInterval(intervalId);
-  }, [shouldRenderAuthScreen])
 
   useEffect(() => {
     if (credentials) {
@@ -67,40 +60,33 @@ export const LoginScreen = ({ navigation }) => {
 
   return (
     <Background>
-      <Header style={{ color: "#000" }}>Welcome to the kovzy app</Header>
+      <Logo />
       <TextField
         label="User name"
-        returnKeyType="next"
+        returnKeyType="done"
+        clearButtonMode='always'
         value={name.value}
         onChangeText={(text) => setName({ value: text, error: "" })}
         error={!!name.error}
         errorText={name.error}
         autoCapitalize="none"
-        autoCompleteType="name"
-        textContentType="username"
-        typeOfKeyboard="text"
       />
       <TextField
         label="Password"
         returnKeyType="done"
+        clearButtonMode='always'
         value={password.value}
         onChangeText={(text) => setPassword({ value: text, error: "" })}
         error={!!password.error}
         errorText={password.error}
         secureTextEntry={true}
       />
-      <View style={styles.forgotPassword}>
-        <TouchableOpacity
-          onPress={() => navigation.navigate("ResetPasswordScreen")}
-        >
-        </TouchableOpacity>
-      </View>
       <Button
         mode="contained"
         style={{ backgroundColor: "#000" }}
         onPress={onLoginPressed}
       >
-        Login
+        {dictionary['login']}
       </Button>
     </Background>
   );

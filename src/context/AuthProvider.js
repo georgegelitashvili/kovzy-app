@@ -19,7 +19,7 @@ export const AuthProvider = ({ children }) => {
     url_login: "",
     url_logout: "",
     url_branchStatus: "",
-    url_deliveronStatus: ""
+    url_deliveronStatus: "",
   });
   const [loginError, setLoginError] = useState([]);
   const [isVisible, setIsVisible] = useState(true);
@@ -77,11 +77,12 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  useEffect(() => {
-    readData();
-  }, [isDataSet]);
+  // useEffect(() => {
+  //   readData();
+  // }, [isDataSet]);
 
   useEffect(() => {
+    readData();
     apiOptions();
   }, [domain, isDataSet]);
 
@@ -100,13 +101,11 @@ export const AuthProvider = ({ children }) => {
         setIsVisible(branchResponse.data.data);
       } catch (error) {
         console.log('Error fetching data:', error);
-        clearInterval(intervalId);
       }
     };
 
-    const interval = setInterval(fetchData, 5000);
-    return () => clearInterval(interval);
-  }, [domain, branchid, user, options]);
+    fetchData();
+  }, [domain, branchid, options]);
 
   return (
     <AuthContext.Provider
@@ -117,11 +116,9 @@ export const AuthProvider = ({ children }) => {
         setUser,
         loginError,
         isLoading,
-        domain,
-        setDomain,
-        branchid,
         setIsDataSet,
-        isDataSet,
+        branchid,
+        setBranchid,
         branchName,
         branchEnabled,
         setBranchEnabled,
@@ -136,27 +133,34 @@ export const AuthProvider = ({ children }) => {
           setIsLoading(true);
           try {
             const response = await axiosInstance.post(options.url_login, { password, username });
-            const jsonObject = response.data;
+            console.log(response);
+            return false;
             // Accessing the value of authorized
-            const error = jsonObject.data.error;
+            const error = response.error;
             // Accessing the value of authorized
-            const authorized = jsonObject.data.authorized;
+            const authorized = response.Authorized;
+            const user = response.user;
 
             if (error) {
-              setLoginError(jsonObject.data.error.message);
+              setLoginError(response.error.message);
               return;
             }
+            
+            const userResponse = {
+              token: authorized,
+              id: user.id,
+              username: user.username,
+            };
 
-            if (authorized === true) {
-              SecureStore.setItemAsync('credentials', JSON.stringify({ username, password }));
-              SecureStore.setItemAsync('cookie', JSON.stringify(response.headers['set-cookie']));
-              setUser(response.headers['set-cookie']);
-              setShouldRenderAuthScreen(false);
-            }
+            setUser(userResponse);
+            setLoginError([]);
+            SecureStore.setItemAsync('credentials', JSON.stringify({ username, password }));
+            SecureStore.setItemAsync('token', JSON.stringify(authorized));
+            SecureStore.setItemAsync('user', JSON.stringify(userResponse));
           } catch (error) {
             console.log('Error logging in:', error);
             setLoginError('An error occurred while logging in. Please try again.');
-            clearInterval(intervalId);
+            setIsLoading(false);
           } finally {
             setIsLoading(false);
           }
@@ -164,22 +168,30 @@ export const AuthProvider = ({ children }) => {
         logout: async () => {
           setIsLoading(true);
           try {
-            const headers = { Cookie: JSON.parse(await SecureStore.getItemAsync('cookie')) };
-            await axiosInstance.get(options.url_logout, { headers });
-            deleteItem("cookie");
+            const token = JSON.parse(await SecureStore.getItemAsync('token'));
+            axiosInstance.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+            await axiosInstance.post(options.url_logout);
+            deleteItem("token");
             deleteItem("credentials");
+            deleteItem("user");
             removeData(["domain", "branch", "branchName"]);
             setDomain(null);
             setBranchid(null);
             setBranchName(null);
             setIsDataSet(false);
             setUser(null);
-            clearInterval(intervalId);
-            setIntervalId(null);
-            setShouldRenderAuthScreen(false);
           } catch (error) {
             console.log('Error logging out:', error);
-            clearInterval(intervalId);
+            deleteItem("token");
+            deleteItem("credentials");
+            deleteItem("user");
+            removeData(["domain", "branch", "branchName"]);
+            setDomain(null);
+            setBranchid(null);
+            setBranchName(null);
+            setIsDataSet(false);
+            setUser(null);
+            setIsLoading(false);
           } finally {
             setIsLoading(false);
           }
