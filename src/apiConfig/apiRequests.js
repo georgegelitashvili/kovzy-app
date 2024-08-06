@@ -5,7 +5,7 @@ import { removeData } from "../helpers/storage";
 
 const axiosInstance = axios.create({
   headers: {
-    'Accept': "application/json",
+    'Accept': 'application/json',
     'Content-Type': 'application/json',
   },
   withCredentials: true,
@@ -13,17 +13,21 @@ const axiosInstance = axios.create({
 
 axiosInstance.interceptors.request.use(
   async (config) => {
-    console.log("Request URL:", config.url);
+    // console.log("Request URL:", config.url);
     const token = await SecureStore.getItemAsync('token');
     if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+      config.headers.Authorization = `Bearer ${JSON.parse(token)}`;
     }
+    console.log("Token:", token);
+    console.log("Config:", config.headers);
     return config;
   },
   (error) => {
+    console.error("Interceptor error:", error);
     return Promise.reject(error);
   },
 );
+
 
 axiosInstance.interceptors.response.use(
   (response) => {

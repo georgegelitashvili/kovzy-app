@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useContext } from "react";
-import { TouchableOpacity, StyleSheet, View } from "react-native";
+import { StyleSheet } from "react-native";
 import Background from "../components/generate/Background";
 import Logo from "../components/generate/Logo";
-import Header from "../components/generate/Header";
 import Button from "../components/generate/Button";
 import TextField from "../components/generate/TextField";
 import { theme } from "../core/theme";
