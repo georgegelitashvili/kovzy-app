@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import React, { createContext, useContext, useState, useRef, useEffect, useCallback } from "react";
+import { AppState } from 'react-native';
 import { View, Text, TouchableOpacity, Alert } from 'react-native';
 import axiosInstance from "../apiConfig/apiRequests";
 import * as SecureStore from 'expo-secure-store';
@@ -26,6 +27,7 @@ export const AuthProvider = ({ children }) => {
   const [branchEnabled, setBranchEnabled] = useState(false);
   const [deliveronEnabled, setDeliveronEnabled] = useState(false);
   const [intervalId, setIntervalId] = useState(null);
+  const [appState, setAppState] = useState(AppState.currentState);
   const [shouldRenderAuthScreen, setShouldRenderAuthScreen] = useState(false);
 
   const { dictionary } = useContext(LanguageContext);
@@ -77,6 +79,36 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const fetchData = async () => {
+    if (!domain || !branchid || !options) return;
+
+    try {
+      const [deliveronResponse, branchResponse] = await Promise.all([
+        axiosInstance.post(options.url_deliveronStatus),
+        axiosInstance.post(options.url_branchStatus, { branchid }),
+      ]);
+
+      setDeliveronEnabled(deliveronResponse.data.data.status === 0);
+      setBranchEnabled(branchResponse.data.data);
+      setIsVisible(branchResponse.data.data);
+    } catch (error) {
+      console.log('Error fetching data:', error);
+      clearInterval(intervalId);
+    }
+  };
+
+  const startInterval = () => {
+    const newIntervalId = setInterval(fetchData, 5000);
+    setIntervalId(newIntervalId);
+  };
+
+  const stopInterval = () => {
+    if (intervalId) {
+      clearInterval(intervalId);
+      setIntervalId(null);
+    }
+  };
+
   // useEffect(() => {
   //   readData();
   // }, [isDataSet]);
@@ -87,24 +119,28 @@ export const AuthProvider = ({ children }) => {
   }, [domain, isDataSet]);
 
   useEffect(() => {
-    const fetchData = async () => {
-      if (!domain || !user) return;
+      fetchData();
+      startInterval();
 
-      try {
-        const [deliveronResponse, branchResponse] = await Promise.all([
-          axiosInstance.post(options.url_deliveronStatus),
-          axiosInstance.post(options.url_branchStatus, { branchid }),
-        ]);
+      const handleAppStateChange = (nextAppState) => {
+        if (appState.match(/inactive|background/) && nextAppState === 'active') {
+          // App has come to the foreground
+          fetchData();
+          startInterval();
+        } else {
+          // App has gone to the background
+          stopInterval();
+        }
 
-        setDeliveronEnabled(deliveronResponse.data.data.status === 0);
-        setBranchEnabled(branchResponse.data.data);
-        setIsVisible(branchResponse.data.data);
-      } catch (error) {
-        console.log('Error fetching data:', error);
-      }
-    };
+        setAppState(nextAppState);
+      };
 
-    fetchData();
+      const subscribe = AppState.addEventListener('change', handleAppStateChange);
+
+      return () => {
+        stopInterval();
+        subscribe.remove();
+      };
   }, [domain, branchid, options]);
 
   return (
@@ -133,13 +169,13 @@ export const AuthProvider = ({ children }) => {
           setIsLoading(true);
           try {
             const response = await axiosInstance.post(options.url_login, { password, username });
-            console.log(response);
-            return false;
-            // Accessing the value of authorized
+            console.log(response.data.token);
+            console.log(response.data.user);
+            // return false;
             const error = response.error;
             // Accessing the value of authorized
-            const authorized = response.Authorized;
-            const user = response.user;
+            const authorized = response.data.token;
+            const user = response.data.user;
 
             if (error) {
               setLoginError(response.error.message);

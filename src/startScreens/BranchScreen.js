@@ -16,7 +16,7 @@ export const BranchScreen = ({ navigation }) => {
   const [selected, setSelected] = useState(branchid);
   const [isLoading, setIsLoading] = useState(true);
   const [errorText, setErrorText] = useState("");
-  const { dictionary } = useContext(LanguageContext);
+  const { dictionary, userLanguage } = useContext(LanguageContext);
 
   const branchApi = async () => {
     const url = `https://${domain}/api/v1/admin/branches`;

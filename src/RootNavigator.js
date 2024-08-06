@@ -1,6 +1,5 @@
 import React, { useContext, useState, useEffect, useCallback } from "react";
 import { createDrawerNavigator } from "@react-navigation/drawer";
-import * as SecureStore from "expo-secure-store";
 import { AuthContext } from "./context/AuthProvider";
 import { OrdersNavigator, ProductsNavigator, AuthNavigator } from "./components/Stack";
 import DrawerContent from "./components/DrawerContent";
@@ -12,7 +11,7 @@ import { getData } from "./helpers/storage";
 const Drawer = createDrawerNavigator();
 
 const RootNavigator = () => {
-  const { user, setUser, domain } = useContext(AuthContext);
+  const { user, setUser, domain, intervalId, setIntervalId } = useContext(AuthContext);
   const [isLoading, setIsLoading] = useState(true);
   const [options, setOptions] = useState({
     url_authUser: "",
@@ -29,31 +28,39 @@ const RootNavigator = () => {
 
   useEffect(() => {
     apiOptions();
-  }, []);
+  }, [apiOptions]);
 
   useEffect(() => {
     const loadUser = async () => {
       try {
-        if (options.url_authUser) {
-          const response = await axiosInstance.post(options.url_authUser);
-          if (response.data.user) {
-            const userObj = getData('user');
-            setUser(userObj);
-          } else {
-            setUser(null);
-          }
+        const response = await axiosInstance.get(options.url_authUser);
+        if (response.data.user) {
+          const userObj = getData('user'); // Ensure getData is async if necessary
+          setUser(userObj);
+        } else {
+          setUser(null);
+          clearInterval(intervalId);
+          setIntervalId(null);
+          setIsLoading(false);
         }
       } catch (error) {
         console.error("Error loading user:", error);
         setUser(null);
+        clearInterval(intervalId);
+        setIntervalId(null);
       } finally {
         setIsLoading(false);
       }
     };
 
-    loadUser();
-  }, [user, options.url_authUser]);
+    if (options.url_authUser) {
+      loadUser();
+    } else {
+      setIsLoading(false);
+    }
+  }, [options.url_authUser]);
 
+  console.log("user:", user);
 
   if (isLoading) {
     return <Loader text={dictionary["loading"]} />;
