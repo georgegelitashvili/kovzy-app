@@ -29,7 +29,8 @@ const Header = ({ options, navigation }) => {
 };
 
 export const AuthNavigator = () => {
-  const { dictionary } = useContext(LanguageContext);
+  const { dictionary, userLanguage } = useContext(LanguageContext);
+
   return (
     <Stack.Navigator
       screenOptions={({ navigation, route }) => ({
@@ -46,14 +47,12 @@ export const AuthNavigator = () => {
 }
 
 export const OrdersNavigator = () => {
-  const { dictionary } = useContext(LanguageContext);
-
   return (
     <Stack.Navigator
       screenOptions={({ navigation, route }) => ({
         headerMode: "screen",
         headerBackTitleVisible: false,
-        header: (props) => <Header {...props}/>,
+        header: (props) => <Header {...props} />,
         ...route.params?.options, // Pass route params as options
       })}
     >
@@ -70,7 +69,7 @@ export const ProductsNavigator = () => {
       screenOptions={({ navigation, route }) => ({
         headerMode: "screen",
         headerBackTitleVisible: false,
-        header: (props) => <Header {...props}/>,
+        header: (props) => <Header {...props} />,
         ...route.params?.options, // Pass route params as options
       })}
     >

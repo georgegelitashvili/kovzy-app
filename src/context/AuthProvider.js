@@ -1,10 +1,12 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import React, { createContext, useContext, useState, useRef, useEffect, useCallback } from "react";
+import { AppState } from 'react-native';
 import { View, Text, TouchableOpacity, Alert } from 'react-native';
 import axiosInstance from "../apiConfig/apiRequests";
 import * as SecureStore from 'expo-secure-store';
-import { removeData, getMultipleData } from "../helpers/storage";
+import { storeData, getData, removeData, getMultipleData } from "../helpers/storage";
 import Toast from '../components/generate/Toast';
-import { String, LanguageContext } from "../components/Language";
+import { useFetchLanguages } from "../components/UseFetchLanguages";
+import { LanguageContext } from "../components/Language";
 
 export const AuthContext = createContext();
 
@@ -26,9 +28,17 @@ export const AuthProvider = ({ children }) => {
   const [branchEnabled, setBranchEnabled] = useState(false);
   const [deliveronEnabled, setDeliveronEnabled] = useState(false);
   const [intervalId, setIntervalId] = useState(null);
+  const [appState, setAppState] = useState(AppState.currentState);
   const [shouldRenderAuthScreen, setShouldRenderAuthScreen] = useState(false);
+  const [defaultLang, setDefaultLang] = useState(null);
+  const [language, setLanguage] = useState([]);
+  const [languageId, setLanguageId] = useState(2);
 
-  const { dictionary } = useContext(LanguageContext);
+  const { userLanguage, userLanguageChange, dictionary } = useContext(LanguageContext);
+
+  const { languages } = useFetchLanguages(domain);
+
+  const handleLanguageChange = e => userLanguageChange(e);
 
   const handleClick = () => {
     setIsVisible(true);
@@ -44,6 +54,7 @@ export const AuthProvider = ({ children }) => {
         setBranchid(branchid);
         setBranchName(branchName);
         setIsDataSet(true);
+
       } else {
         setIsDataSet(false);
       }
@@ -77,9 +88,36 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // useEffect(() => {
-  //   readData();
-  // }, [isDataSet]);
+  const fetchData = async () => {
+    if (!domain || !branchid || !options) return;
+
+    try {
+      const [deliveronResponse, branchResponse] = await Promise.all([
+        axiosInstance.post(options.url_deliveronStatus),
+        axiosInstance.post(options.url_branchStatus, { branchid }),
+      ]);
+
+      setDeliveronEnabled(deliveronResponse.data.data.status === 0);
+      setBranchEnabled(branchResponse.data.data);
+      setIsVisible(branchResponse.data.data);
+    } catch (error) {
+      console.log('Error fetching data:', error);
+      clearInterval(intervalId);
+    }
+  };
+
+  const startInterval = () => {
+    const newIntervalId = setInterval(fetchData, 5000);
+    setIntervalId(newIntervalId);
+  };
+
+  const stopInterval = () => {
+    if (intervalId) {
+      clearInterval(intervalId);
+      setIntervalId(null);
+    }
+  };
+
 
   useEffect(() => {
     readData();
@@ -87,25 +125,52 @@ export const AuthProvider = ({ children }) => {
   }, [domain, isDataSet]);
 
   useEffect(() => {
-    const fetchData = async () => {
-      if (!domain || !user) return;
+    if (languages.length > 0) {
+      const defaultLanguage = languages.find(language => language.default === 1);
+      setDefaultLang(defaultLanguage ? defaultLanguage.lang : null);
+      handleLanguageChange(defaultLanguage.lang);
+      setLanguage(languages);
+      storeData('rcml-lang', defaultLanguage.lang);
+      console.log('save languages: ', languages);
+      storeData('languages', languages);
+    }
+  }, [languages]);
 
-      try {
-        const [deliveronResponse, branchResponse] = await Promise.all([
-          axiosInstance.post(options.url_deliveronStatus),
-          axiosInstance.post(options.url_branchStatus, { branchid }),
-        ]);
+  useEffect(() => {
+    const languageid = language.find(language => language.lang === userLanguage);
+    console.log(languageid);
+    setLanguageId(2);
+  }, [userLanguage, language]);
 
-        setDeliveronEnabled(deliveronResponse.data.data.status === 0);
-        setBranchEnabled(branchResponse.data.data);
-        setIsVisible(branchResponse.data.data);
-      } catch (error) {
-        console.log('Error fetching data:', error);
+  useEffect(() => {
+    fetchData();
+    startInterval();
+
+    const handleAppStateChange = (nextAppState) => {
+      if (appState.match(/inactive|background/) && nextAppState === 'active') {
+        // App has come to the foreground
+        fetchData();
+        startInterval();
+      } else {
+        // App has gone to the background
+        stopInterval();
       }
+
+      setAppState(nextAppState);
     };
 
-    fetchData();
+    const subscribe = AppState.addEventListener('change', handleAppStateChange);
+
+    return () => {
+      stopInterval();
+      subscribe.remove();
+    };
   }, [domain, branchid, options]);
+
+  console.log('userLanguage: ', userLanguage);
+
+  console.log('app should open with language: ', defaultLang);
+
 
   return (
     <AuthContext.Provider
@@ -129,23 +194,23 @@ export const AuthProvider = ({ children }) => {
         setIntervalId,
         shouldRenderAuthScreen,
         setShouldRenderAuthScreen,
+        languages,
+        languageId,
         login: async (username, password) => {
           setIsLoading(true);
           try {
             const response = await axiosInstance.post(options.url_login, { password, username });
-            console.log(response);
-            return false;
-            // Accessing the value of authorized
+            // return false;
             const error = response.error;
             // Accessing the value of authorized
-            const authorized = response.Authorized;
-            const user = response.user;
+            const authorized = response.data.token;
+            const user = response.data.user;
 
             if (error) {
               setLoginError(response.error.message);
               return;
             }
-            
+
             const userResponse = {
               token: authorized,
               id: user.id,
@@ -185,6 +250,8 @@ export const AuthProvider = ({ children }) => {
             deleteItem("token");
             deleteItem("credentials");
             deleteItem("user");
+            deleteItem("rcml-lang");
+            deleteItem("languages");
             removeData(["domain", "branch", "branchName"]);
             setDomain(null);
             setBranchid(null);

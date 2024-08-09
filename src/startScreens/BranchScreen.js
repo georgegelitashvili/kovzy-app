@@ -16,7 +16,7 @@ export const BranchScreen = ({ navigation }) => {
   const [selected, setSelected] = useState(branchid);
   const [isLoading, setIsLoading] = useState(true);
   const [errorText, setErrorText] = useState("");
-  const { dictionary } = useContext(LanguageContext);
+  const { dictionary, userLanguage } = useContext(LanguageContext);
 
   const branchApi = async () => {
     const url = `https://${domain}/api/v1/admin/branches`;
@@ -25,8 +25,10 @@ export const BranchScreen = ({ navigation }) => {
       return;
     }
     try {
-      const response = await axiosInstance.post(url);
-      const data = response.data.data || [];
+      const response = await axiosInstance.post(url, {
+        lang: userLanguage,
+      });
+      const data = response.data.branches || [];
       setBranches(data.map((item) => ({
         label: item.title,
         value: item.id,

@@ -1,35 +1,36 @@
-import React, { useState, createContext, useContext, useEffect } from 'react';
+import React, { useState, createContext, useEffect } from 'react';
 import { storeData, getData } from '../helpers/storage';
 import { languageList, dictionaryList } from './languages';
 
-// create the language context with default selected language
 export const LanguageContext = createContext({
-  userLanguage: 'ka',
-  dictionary: dictionaryList.ka
+  userLanguage: 'en',
+  dictionary: dictionaryList.en,
+  userLanguageChange: () => { }  // Add default function to prevent errors
 });
 
-// it provides the language context to app
 export function LanguageProvider({ children }) {
-  const [defaultLang, setDefaultLang] = useState('');
-  const [userLanguage, setUserLanguage] = useState('ka');
-
-  // console.log('-------------- user Language');
-  // console.log(userLanguage);
-  // console.log('-------------- end user Language');
-
+  const [userLanguage, setUserLanguage] = useState('en');
+  const [languageId, setLanguageId] = useState(2);
 
   useEffect(() => {
-    getData('rcml-lang').then(lang => setUserLanguage(lang || 'ka'));
-  }, [userLanguage])
+    const fetchLanguage = async () => {
+      const lang = await getData('rcml-lang');
+      setUserLanguage(lang ?? 'en');
+      const languages = await getData('languages');
+    };
+    fetchLanguage();
+  }, []);
+
+  const userLanguageChange = (selected) => {
+    const newLanguage = languageList[selected] ? selected : 'en';
+    setUserLanguage(newLanguage);
+    storeData('rcml-lang', newLanguage);
+  };
 
   const provider = {
     userLanguage,
     dictionary: dictionaryList[userLanguage],
-    userLanguageChange: selected => {
-      const newLanguage = languageList[selected] ? selected : 'ka'
-      setUserLanguage(newLanguage);
-      storeData('rcml-lang', newLanguage);
-    }
+    userLanguageChange
   };
 
   return (
@@ -37,11 +38,4 @@ export function LanguageProvider({ children }) {
       {children}
     </LanguageContext.Provider>
   );
-};
-
-// get text according to id & current language
-export function String({ tid }) {
-  const languageContext = useContext(LanguageContext);
-
-  return languageContext.dictionary[tid] || tid;
-};
+}

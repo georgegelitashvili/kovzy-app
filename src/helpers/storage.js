@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as SecureStore from 'expo-secure-store';
 
 // storing data into Async Storage
 export const storeData = async (key, value) => {
@@ -21,7 +22,21 @@ export const storeData = async (key, value) => {
     } catch (e) {
       console.log(e.message);
     }
-  };
+};
+  
+// getting data from secure Storage
+export const getSecureData = async (key) => {
+  try {
+    const savedValue = await SecureStore.getItemAsync(key);
+    const currentUser = JSON.parse(savedValue);
+
+    if (currentUser !== null) {
+      return currentUser;
+    }
+  } catch (e) {
+    console.log(e.message);
+  }
+};
 
     // getting data from Async Storage
 export const getMultipleData = async (keys) => {
@@ -43,4 +58,5 @@ export const getMultipleData = async (keys) => {
       console.log(e.message);
       return false;
     }
-  };
+};
+  

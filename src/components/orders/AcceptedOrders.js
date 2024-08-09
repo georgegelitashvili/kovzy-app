@@ -32,7 +32,7 @@ const numColumns = printRows(width);
 const cardSize = width / numColumns;
 
 export const AcceptedOrdersList = () => {
-  const { domain, branchid, setUser, user, deleteItem, setIsDataSet, intervalId } = useContext(AuthContext);
+  const { domain, branchid, setUser, user, deleteItem, setIsDataSet, intervalId, languageId } = useContext(AuthContext);
   const [orders, setOrders] = useState([]);
   const [page, setPage] = useState(0);
   const [options, setOptions] = useState({
@@ -94,6 +94,7 @@ export const AcceptedOrdersList = () => {
           limit: 12,
           page: page
         },
+        Languageid: languageId,
         branchid: branchid,
         type: 0
       }));
@@ -135,8 +136,8 @@ export const AcceptedOrdersList = () => {
   useFocusEffect(
     React.useCallback(() => {
       fetchAcceptedOrders();
-      
-      return () => {};
+
+      return () => { };
     }, [options, page, branchid])
   );
 
@@ -170,6 +171,8 @@ export const AcceptedOrdersList = () => {
       Alert.alert(`Don't know how to open this URL: ${url}`);
     }
   };
+
+  console.log('lang id order: ', languageId);
 
   const renderEnteredOrdersList = ({ item }) => {
     const trackLink = [JSON.parse(item.deliveron_data)]?.map(link => {
@@ -232,6 +235,10 @@ export const AcceptedOrdersList = () => {
                 {dictionary["orders.comment"]}: {item.comment}
               </Text>
             ) : null}
+
+            <Text variant="titleSmall" style={styles.title}>
+              {dictionary["orders.paymentMethod"]}: {item.payment_type}
+            </Text>
 
             <Divider />
             <OrdersDetail orderId={item.id} />

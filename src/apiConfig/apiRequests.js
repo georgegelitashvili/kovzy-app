@@ -13,11 +13,11 @@ const axiosInstance = axios.create({
 
 axiosInstance.interceptors.request.use(
   async (config) => {
-    console.log("Request URL:", config.url);
     const token = await SecureStore.getItemAsync('token');
     if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+      config.headers.Authorization = `Bearer ${JSON.parse(token)}`;
     }
+
     return config;
   },
   (error) => {
@@ -31,6 +31,7 @@ axiosInstance.interceptors.response.use(
     response.config.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
     response.config.headers['Pragma'] = 'no-cache';
     response.config.headers['Expires'] = 0;
+
     return response;
   },
   (error) => {

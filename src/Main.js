@@ -14,14 +14,20 @@ import RootNavigator from "./RootNavigator";
 
 export default function Main() {
   return (
-    <AuthProvider>
-      <LanguageProvider>
-        <PaperProvider>
+    <LanguageProvider>
+      
+      <PaperProvider>
+
+        <AuthProvider>
+
           <NavigationContainer ref={navigationRef}>
             <RootNavigator />
           </NavigationContainer>
-        </PaperProvider>
-      </LanguageProvider>
-    </AuthProvider>
+          
+        </AuthProvider>
+
+      </PaperProvider>
+      
+    </LanguageProvider>
   );
 };

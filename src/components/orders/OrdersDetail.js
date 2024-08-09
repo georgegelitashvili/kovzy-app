@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useContext } from "react";
 import { StyleSheet, View } from "react-native";
 import { List, Text } from "react-native-paper";
+import { Entypo } from "@expo/vector-icons";
 
 import { AuthContext, AuthProvider } from "../../context/AuthProvider";
 import { String, LanguageContext } from "../Language";
@@ -93,7 +94,10 @@ export default function OrdersDetail({ orderId }) {
             return (
               <View style={styles.body} key={item.cart_id + "." + index}>
                 <Text style={styles.header}>
-                  {index + 1 + "."} {item.name}
+                  <Entypo
+                    name="dot-single"
+                    style={styles.productIcon}
+                  /> {item.name}
                 </Text>
                 <Text style={styles.option}>
                   {dictionary["amount"]}: {item.amount}
@@ -126,5 +130,8 @@ const styles = StyleSheet.create({
     opacity: 0.6,
     paddingHorizontal: 15,
     fontWeight: "500",
+  },
+  productIcon: {
+    fontSize: 25,
   },
 });
