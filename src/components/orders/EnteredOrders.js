@@ -61,8 +61,6 @@ export const EnteredOrdersList = () => {
 
   const { dictionary, languageId } = useContext(LanguageContext);
 
-  console.log('lang id order otside: ', languageId);
-
   const onChangeModalState = (newState) => {
     console.log("modal close: ", newState);
     setTimeout(() => {
@@ -138,7 +136,7 @@ export const EnteredOrdersList = () => {
       if (!user || !options.url_unansweredOrders) {
         return null;
       }
-      console.log('lang id order inside: ', languageId);
+
       const resp = await axiosInstance.post(options.url_unansweredOrders, {
         type: 0,
         page: 1,
