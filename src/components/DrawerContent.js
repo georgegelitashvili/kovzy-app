@@ -11,7 +11,7 @@ import { String, LanguageContext } from "./Language";
 export default function DrawerContent(props) {
 
   const { domain, branchid, branchName, branchEnabled, setBranchEnabled, setDeliveronEnabled, deliveronEnabled, logout, setIsDataSet, intervalId } = useContext(AuthContext);
-  const { dictionary } = useContext(LanguageContext);
+  const { dictionary, userLanguageChange } = useContext(LanguageContext);
 
   const [options, setOptions] = useState({
     url_branchActivity: "",
@@ -49,18 +49,15 @@ export default function DrawerContent(props) {
       axiosInstance
         .post(options.url_branchActivity, branchChangeOptions.data)
         .then((resp) => setBranchEnabled(resp.data.data));
-      setIsBranchEnabled(false);
     }
   };
 
   const toggleDeliveron = () => {
     setDeliveronEnabled((data) => !data);
-
     if (isDeliveronEnabled) {
       axiosInstance
         .post(options.url_deliveronActivity, deliveronChangeOptions.data)
         .then((resp) => setDeliveronEnabled(resp.data.data));
-      setIsDeliveronEnabled(false);
     }
   };
 
@@ -122,7 +119,7 @@ export default function DrawerContent(props) {
             )}
             label={dictionary["nav.products"]}
             onPress={() => {
-              props.navigation.navigate("Products", { screen: "Product" });
+              props.navigation.navigate("Products");
             }}
           />
           <DrawerItem
@@ -135,7 +132,7 @@ export default function DrawerContent(props) {
             )}
             label={dictionary["nav.onlineOrders"]}
             onPress={() => {
-              props.navigation.navigate("Orders", { screen: "Order" });
+              props.navigation.navigate("Orders");
             }}
           />
           <DrawerItem
@@ -146,7 +143,8 @@ export default function DrawerContent(props) {
             onPress={onLogoutPressed}
           />
         </Drawer.Section>
-        <Drawer.Section theme="dark">
+
+        <Drawer.Section>
           <TouchableRipple onPress={toggleDeliveron}>
             <View style={styles.preference}>
               <Text>{dictionary["dv.deliveron"]}</Text>
@@ -164,8 +162,8 @@ export default function DrawerContent(props) {
               </View>
             </View>
           </TouchableRipple>
-
         </Drawer.Section>
+
       </View>
     </DrawerContentScrollView>
   );

@@ -1,10 +1,12 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import React, { createContext, useContext, useState, useRef, useEffect, useCallback } from "react";
+import { AppState } from 'react-native';
 import { View, Text, TouchableOpacity, Alert } from 'react-native';
 import axiosInstance from "../apiConfig/apiRequests";
 import * as SecureStore from 'expo-secure-store';
-import { removeData, getMultipleData } from "../helpers/storage";
+import { storeData, getData, removeData, getMultipleData } from "../helpers/storage";
 import Toast from '../components/generate/Toast';
-import { String, LanguageContext } from "../components/Language";
+import { useFetchLanguages } from "../components/UseFetchLanguages";
+import { LanguageContext } from "../components/Language";
 
 export const AuthContext = createContext();
 
@@ -19,16 +21,22 @@ export const AuthProvider = ({ children }) => {
     url_login: "",
     url_logout: "",
     url_branchStatus: "",
-    url_deliveronStatus: ""
+    url_deliveronStatus: "",
   });
   const [loginError, setLoginError] = useState([]);
   const [isVisible, setIsVisible] = useState(true);
   const [branchEnabled, setBranchEnabled] = useState(false);
   const [deliveronEnabled, setDeliveronEnabled] = useState(false);
   const [intervalId, setIntervalId] = useState(null);
+  const [appState, setAppState] = useState(AppState.currentState);
   const [shouldRenderAuthScreen, setShouldRenderAuthScreen] = useState(false);
+  const [defaultLang, setDefaultLang] = useState(null);
 
-  const { dictionary } = useContext(LanguageContext);
+  const { userLanguage, userLanguageChange, dictionary } = useContext(LanguageContext);
+
+  const { languages } = useFetchLanguages(domain);
+
+  const handleLanguageChange = e => userLanguageChange(e);
 
   const handleClick = () => {
     setIsVisible(true);
@@ -44,6 +52,7 @@ export const AuthProvider = ({ children }) => {
         setBranchid(branchid);
         setBranchName(branchName);
         setIsDataSet(true);
+
       } else {
         setIsDataSet(false);
       }
@@ -77,36 +86,78 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  useEffect(() => {
-    readData();
-  }, [isDataSet]);
+  const fetchData = async () => {
+    if (!domain || !branchid || !options) return;
+
+    try {
+      const [deliveronResponse, branchResponse] = await Promise.all([
+        axiosInstance.post(options.url_deliveronStatus),
+        axiosInstance.post(options.url_branchStatus, { branchid }),
+      ]);
+
+      setDeliveronEnabled(deliveronResponse.data.data.status === 0);
+      setBranchEnabled(branchResponse.data.data);
+      setIsVisible(branchResponse.data.data);
+    } catch (error) {
+      console.log('Error fetching data:', error);
+      clearInterval(intervalId);
+    }
+  };
+
+  const startInterval = () => {
+    const newIntervalId = setInterval(fetchData, 5000);
+    setIntervalId(newIntervalId);
+  };
+
+  const stopInterval = () => {
+    if (intervalId) {
+      clearInterval(intervalId);
+      setIntervalId(null);
+    }
+  };
+
 
   useEffect(() => {
+    readData();
     apiOptions();
   }, [domain, isDataSet]);
 
   useEffect(() => {
-    const fetchData = async () => {
-      if (!domain || !user) return;
+    if (languages.length > 0) {
+      const defaultLanguage = languages.find(language => language.default === 1);
+      setDefaultLang(defaultLanguage ? defaultLanguage.lang : null);
+      handleLanguageChange(defaultLanguage.lang);
+      storeData('rcml-lang', defaultLanguage.lang);
+      storeData('languages', languages);
+    }
+  }, [languages]);
 
-      try {
-        const [deliveronResponse, branchResponse] = await Promise.all([
-          axiosInstance.post(options.url_deliveronStatus),
-          axiosInstance.post(options.url_branchStatus, { branchid }),
-        ]);
 
-        setDeliveronEnabled(deliveronResponse.data.data.status === 0);
-        setBranchEnabled(branchResponse.data.data);
-        setIsVisible(branchResponse.data.data);
-      } catch (error) {
-        console.log('Error fetching data:', error);
-        clearInterval(intervalId);
+  useEffect(() => {
+    fetchData();
+    startInterval();
+
+    const handleAppStateChange = (nextAppState) => {
+      if (appState.match(/inactive|background/) && nextAppState === 'active') {
+        // App has come to the foreground
+        fetchData();
+        startInterval();
+      } else {
+        // App has gone to the background
+        stopInterval();
       }
+
+      setAppState(nextAppState);
     };
 
-    const interval = setInterval(fetchData, 5000);
-    return () => clearInterval(interval);
-  }, [domain, branchid, user, options]);
+    const subscribe = AppState.addEventListener('change', handleAppStateChange);
+
+    return () => {
+      stopInterval();
+      subscribe.remove();
+    };
+  }, [domain, branchid, options]);
+
 
   return (
     <AuthContext.Provider
@@ -117,11 +168,9 @@ export const AuthProvider = ({ children }) => {
         setUser,
         loginError,
         isLoading,
-        domain,
-        setDomain,
-        branchid,
         setIsDataSet,
-        isDataSet,
+        branchid,
+        setBranchid,
         branchName,
         branchEnabled,
         setBranchEnabled,
@@ -132,31 +181,37 @@ export const AuthProvider = ({ children }) => {
         setIntervalId,
         shouldRenderAuthScreen,
         setShouldRenderAuthScreen,
+        languages,
         login: async (username, password) => {
           setIsLoading(true);
           try {
             const response = await axiosInstance.post(options.url_login, { password, username });
-            const jsonObject = response.data;
+            // return false;
+            const error = response.error;
             // Accessing the value of authorized
-            const error = jsonObject.data.error;
-            // Accessing the value of authorized
-            const authorized = jsonObject.data.authorized;
+            const authorized = response.data.token;
+            const user = response.data.user;
 
             if (error) {
-              setLoginError(jsonObject.data.error.message);
+              setLoginError(response.error.message);
               return;
             }
 
-            if (authorized === true) {
-              SecureStore.setItemAsync('credentials', JSON.stringify({ username, password }));
-              SecureStore.setItemAsync('cookie', JSON.stringify(response.headers['set-cookie']));
-              setUser(response.headers['set-cookie']);
-              setShouldRenderAuthScreen(false);
-            }
+            const userResponse = {
+              token: authorized,
+              id: user.id,
+              username: user.username,
+            };
+
+            setUser(userResponse);
+            setLoginError([]);
+            SecureStore.setItemAsync('credentials', JSON.stringify({ username, password }));
+            SecureStore.setItemAsync('token', JSON.stringify(authorized));
+            SecureStore.setItemAsync('user', JSON.stringify(userResponse));
           } catch (error) {
             console.log('Error logging in:', error);
             setLoginError('An error occurred while logging in. Please try again.');
-            clearInterval(intervalId);
+            setIsLoading(false);
           } finally {
             setIsLoading(false);
           }
@@ -164,22 +219,32 @@ export const AuthProvider = ({ children }) => {
         logout: async () => {
           setIsLoading(true);
           try {
-            const headers = { Cookie: JSON.parse(await SecureStore.getItemAsync('cookie')) };
-            await axiosInstance.get(options.url_logout, { headers });
-            deleteItem("cookie");
+            const token = JSON.parse(await SecureStore.getItemAsync('token'));
+            axiosInstance.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+            await axiosInstance.post(options.url_logout);
+            deleteItem("token");
             deleteItem("credentials");
+            deleteItem("user");
             removeData(["domain", "branch", "branchName"]);
             setDomain(null);
             setBranchid(null);
             setBranchName(null);
             setIsDataSet(false);
             setUser(null);
-            clearInterval(intervalId);
-            setIntervalId(null);
-            setShouldRenderAuthScreen(false);
           } catch (error) {
             console.log('Error logging out:', error);
-            clearInterval(intervalId);
+            deleteItem("token");
+            deleteItem("credentials");
+            deleteItem("user");
+            deleteItem("rcml-lang");
+            deleteItem("languages");
+            removeData(["domain", "branch", "branchName"]);
+            setDomain(null);
+            setBranchid(null);
+            setBranchName(null);
+            setIsDataSet(false);
+            setUser(null);
+            setIsLoading(false);
           } finally {
             setIsLoading(false);
           }

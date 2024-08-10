@@ -8,45 +8,47 @@ import { storeData } from "../helpers/storage";
 import Loader from "../components/generate/loader";
 import { AuthContext } from "../context/AuthProvider";
 import axiosInstance from "../apiConfig/apiRequests";
+import { LanguageContext } from "../components/Language";
 
 export const BranchScreen = ({ navigation }) => {
-  const { isDataSet, setIsDataSet, domain, branchid, intervalId } = useContext(AuthContext);
+  const { setIsDataSet, domain, branchid, setBranchid } = useContext(AuthContext);
   const [branches, setBranches] = useState([]);
   const [selected, setSelected] = useState(branchid);
   const [isLoading, setIsLoading] = useState(true);
   const [errorText, setErrorText] = useState("");
+  const { dictionary, userLanguage } = useContext(LanguageContext);
 
-  const branchApi = () => {
+  const branchApi = async () => {
     const url = `https://${domain}/api/v1/admin/branches`;
-    console.log(url);
+    if (!url) {
+      console.error("URL is empty");
+      return;
+    }
     try {
-      axiosInstance.post(url)
-        .then((response) => {
-          const data = response.data.data || [];
-          setBranches(data.map((item) => ({
-            label: item.title,
-            value: item.id,
-            enabled: item.enabled
-          })));
-          setErrorText("");
-        })
-        .catch((error) => {
-          if (error.response && (error.response.status === 500 || error.response.status === 404)) {
-            setIsDataSet(false);
-            setBranches([]);
-            setErrorText("Unable to fetch branch list. Please check your internet connection and try again.");
-          }
-        })
-        .catch((error) => {
-          setIsDataSet(false);
-          setBranches([]);
-          setErrorText("An error occurred while fetching branch list. Please try again later.");
-        });
+      const response = await axiosInstance.post(url, {
+        lang: userLanguage,
+      });
+      const data = response.data.branches || [];
+      setBranches(data.map((item) => ({
+        label: item.title,
+        value: item.id,
+        enabled: item.enabled
+      })));
+      setErrorText("");
+    } catch (error) {
+      if (error.response && (error.response.status === 500 || error.response.status === 404)) {
+        setIsDataSet(false);
+        setBranches([]);
+        setErrorText("Unable to fetch branch list.");
+      } else {
+        setIsDataSet(false);
+        setBranches([]);
+        setErrorText("An error occurred while fetching branch list. Please try again.");
+      }
     } finally {
       setIsLoading(false);
     }
   };
-
 
   const onCheckPressed = () => {
     if (selected === null) {
@@ -55,10 +57,6 @@ export const BranchScreen = ({ navigation }) => {
     }
     navigation.navigate("Login");
   };
-
-  useEffect(() => {
-    clearInterval(intervalId);
-  });
 
   useEffect(() => {
     if (domain) {
@@ -70,10 +68,6 @@ export const BranchScreen = ({ navigation }) => {
   }, [domain]);
 
   useEffect(() => {
-    branchApi();
-  }, []);
-
-  useEffect(() => {
     if (selected !== null) {
       const selectedBranch = branches.find((branch) => branch.value === selected);
       if (selectedBranch) {
@@ -81,11 +75,10 @@ export const BranchScreen = ({ navigation }) => {
       }
       storeData("branch", selected);
       setIsDataSet((data) => !data);
+      setBranchid(selected);
     }
   }, [selected]);
 
-  // console.log("branch screen data set: ", isDataSet);
-  // console.log("branch screen branches: ", branches);
   if (isLoading) {
     return <Loader error={errorText} />;
   }
@@ -109,7 +102,7 @@ export const BranchScreen = ({ navigation }) => {
         style={{ backgroundColor: "#000" }}
         onPress={onCheckPressed}
       >
-        accept
+        {dictionary['save']}
       </Button>
     </Background>
   );

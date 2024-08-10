@@ -1,109 +1,97 @@
-import React, { useContext, useState, useEffect } from "react";
+import React, { useContext, useState, useEffect, useCallback } from "react";
 import { createDrawerNavigator } from "@react-navigation/drawer";
-import * as Updates from "expo-updates";
-import * as SecureStore from "expo-secure-store";
 import { AuthContext } from "./context/AuthProvider";
-import { HomeNavigator, AuthNavigator } from "./components/Stack";
+import { OrdersNavigator, ProductsNavigator, AuthNavigator } from "./components/Stack";
 import DrawerContent from "./components/DrawerContent";
 import { LanguageContext } from "./components/Language";
 import Loader from "./components/generate/loader";
+import axiosInstance from "./apiConfig/apiRequests";
+import { getSecureData } from "./helpers/storage";
 
 const Drawer = createDrawerNavigator();
 
-export default function RootNavigator() {
-  const { user, setUser, deleteItem, intervalId } = useContext(AuthContext);
+const RootNavigator = () => {
+  const { user, setUser, domain, intervalId, setIntervalId } = useContext(AuthContext);
   const [isLoading, setIsLoading] = useState(true);
+  const [options, setOptions] = useState({
+    url_authUser: "",
+  });
   const { dictionary } = useContext(LanguageContext);
+
+  const apiOptions = useCallback(() => {
+    if (domain) {
+      setOptions({
+        url_authUser: `https://${domain}/api/v1/admin/auth/authorized`,
+      });
+    }
+  }, [domain]);
+
+  useEffect(() => {
+    apiOptions();
+  }, [apiOptions]);
 
   useEffect(() => {
     const loadUser = async () => {
       try {
-        const cookie = await SecureStore.getItemAsync("cookie");
-        if (cookie) {
-          setUser(cookie);
+        const response = await axiosInstance.get(options.url_authUser);
+        console.log('check auth resposne: ', response.data);
+        if (response.data.user) {
+          setIsLoading(true);
+          const userObj = await getSecureData('user'); // Await the async function
+          setUser(userObj);
         } else {
-          deleteItem("cookie");
-          deleteItem("credentials");
           setUser(null);
           clearInterval(intervalId);
+          setIntervalId(null);
+          setIsLoading(false);
         }
       } catch (error) {
         console.error("Error loading user:", error);
+        setUser(null);
         clearInterval(intervalId);
-        // Handle error loading user data
+        setIntervalId(null);
       } finally {
         setIsLoading(false);
       }
     };
 
-    if (!user) {
+    if (options.url_authUser) {
+      setIsLoading(true);
       loadUser();
     } else {
       setIsLoading(false);
     }
-  }, [user, setUser]);
+  }, [domain, options.url_authUser]);
 
-
-  useEffect(() => {
-    async function checkForUpdates() {
-      try {
-        const { isAvailable } = await Updates.checkForUpdateAsync();
-        if (isAvailable) {
-          Alert.alert(
-            'Update Available',
-            'A new version of the app is available. Do you want to update?',
-            [
-              { text: 'Cancel', style: 'cancel' },
-              {
-                text: 'Update',
-                onPress: async () => {
-                  // Perform the update
-                  await Updates.fetchUpdateAsync();
-                  Updates.reloadAsync();
-                },
-              },
-            ]
-          );
-        }
-      } catch (error) {
-        console.error('Error checking for updates:', error);
-      }
-    }
-
-    checkForUpdates();
-  }, []);
-
+  console.log("user:", user);
 
   if (isLoading) {
     return <Loader text={dictionary["loading"]} />;
   }
 
   return (
-    <Drawer.Navigator
-      drawerContent={(props) => <DrawerContent {...props} />}
-    >
+    <>
       {user ? (
-        <>
+        <Drawer.Navigator
+          drawerContent={(props) => <DrawerContent {...props} />}
+          initialRouteName="Order"
+        >
           <Drawer.Screen
             name="Orders"
-            options={{ headerTitle: dictionary["nav.onlineOrders"] }}
-          >
-            {(props) => <HomeNavigator {...props} navigation={props.navigation} />}
-          </Drawer.Screen>
+            component={OrdersNavigator}
+            options={{ title: dictionary["nav.onlineOrders"], unmountOnBlur: true }}
+          />
           <Drawer.Screen
             name="Products"
-            options={{ headerTitle: dictionary["nav.products"] }}
-          >
-            {(props) => <HomeNavigator {...props} navigation={props.navigation} />}
-          </Drawer.Screen>
-        </>
-      ) : (
-          <Drawer.Screen
-            name="Start"
-            options={{ headerShown: false }}
-            component={AuthNavigator}
+            component={ProductsNavigator}
+            options={{ title: dictionary["nav.products"], unmountOnBlur: true }}
           />
+        </Drawer.Navigator>
+      ) : (
+        <AuthNavigator />
       )}
-    </Drawer.Navigator>
+    </>
   );
-}
+};
+
+export default RootNavigator;
