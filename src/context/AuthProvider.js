@@ -31,8 +31,6 @@ export const AuthProvider = ({ children }) => {
   const [appState, setAppState] = useState(AppState.currentState);
   const [shouldRenderAuthScreen, setShouldRenderAuthScreen] = useState(false);
   const [defaultLang, setDefaultLang] = useState(null);
-  const [language, setLanguage] = useState([]);
-  const [languageId, setLanguageId] = useState(2);
 
   const { userLanguage, userLanguageChange, dictionary } = useContext(LanguageContext);
 
@@ -129,18 +127,11 @@ export const AuthProvider = ({ children }) => {
       const defaultLanguage = languages.find(language => language.default === 1);
       setDefaultLang(defaultLanguage ? defaultLanguage.lang : null);
       handleLanguageChange(defaultLanguage.lang);
-      setLanguage(languages);
       storeData('rcml-lang', defaultLanguage.lang);
-      console.log('save languages: ', languages);
       storeData('languages', languages);
     }
   }, [languages]);
 
-  useEffect(() => {
-    const languageid = language.find(language => language.lang === userLanguage);
-    console.log(languageid);
-    setLanguageId(2);
-  }, [userLanguage, language]);
 
   useEffect(() => {
     fetchData();
@@ -167,10 +158,6 @@ export const AuthProvider = ({ children }) => {
     };
   }, [domain, branchid, options]);
 
-  console.log('userLanguage: ', userLanguage);
-
-  console.log('app should open with language: ', defaultLang);
-
 
   return (
     <AuthContext.Provider
@@ -195,7 +182,6 @@ export const AuthProvider = ({ children }) => {
         shouldRenderAuthScreen,
         setShouldRenderAuthScreen,
         languages,
-        languageId,
         login: async (username, password) => {
           setIsLoading(true);
           try {

@@ -34,7 +34,7 @@ let temp = 0;
 
 // render entered orders function
 export const EnteredOrdersList = () => {
-  const { domain, branchid, setUser, user, intervalId, setIntervalId, shouldRenderAuthScreen, setShouldRenderAuthScreen, languageId } = useContext(AuthContext);
+  const { domain, branchid, setUser, user, intervalId, setIntervalId, shouldRenderAuthScreen, setShouldRenderAuthScreen } = useContext(AuthContext);
   const [orders, setOrders] = useState([]);
 
   const [appState, setAppState] = useState(AppState.currentState);
@@ -59,7 +59,9 @@ export const EnteredOrdersList = () => {
   const [loading, setLoading] = useState(true);
   const [loadingOptions, setLoadingOptions] = useState(false);
 
-  const { dictionary, userLanguage } = useContext(LanguageContext);
+  const { dictionary, languageId } = useContext(LanguageContext);
+
+  console.log('lang id order otside: ', languageId);
 
   const onChangeModalState = (newState) => {
     console.log("modal close: ", newState);
@@ -136,7 +138,7 @@ export const EnteredOrdersList = () => {
       if (!user || !options.url_unansweredOrders) {
         return null;
       }
-
+      console.log('lang id order inside: ', languageId);
       const resp = await axiosInstance.post(options.url_unansweredOrders, {
         type: 0,
         page: 1,
@@ -185,7 +187,6 @@ export const EnteredOrdersList = () => {
 
     setIntervalId(newIntervalId); // Update the intervalId state immediately
   };
-
   const handleAppStateChange = (nextAppState) => {
     if (appState.match(/inactive|background/) && nextAppState === "active") {
       startInterval();
@@ -213,10 +214,16 @@ export const EnteredOrdersList = () => {
   useEffect(() => {
     apiOptions();
 
-    if (optionsIsLoaded) {
+    if (optionsIsLoaded && languageId) {
       const subscribe = AppState.addEventListener('change', handleAppStateChange);
       console.log('Starting interval...');
+
+      // Clear any existing interval
+      clearInterval(intervalId);
+
+      // Start the interval with the correct languageId
       startInterval();
+
       console.log('Interval started.');
 
       return () => {

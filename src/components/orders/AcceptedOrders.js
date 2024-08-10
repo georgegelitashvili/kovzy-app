@@ -32,7 +32,7 @@ const numColumns = printRows(width);
 const cardSize = width / numColumns;
 
 export const AcceptedOrdersList = () => {
-  const { domain, branchid, setUser, user, deleteItem, setIsDataSet, intervalId, languageId } = useContext(AuthContext);
+  const { domain, branchid, setUser, user, deleteItem, setIsDataSet, intervalId } = useContext(AuthContext);
   const [orders, setOrders] = useState([]);
   const [page, setPage] = useState(0);
   const [options, setOptions] = useState({
@@ -53,7 +53,7 @@ export const AcceptedOrdersList = () => {
   const [loading, setLoading] = useState(true);
   const [loadingOptions, setLoadingOptions] = useState(false);
   const [credentials, setCredentials] = useState({});
-  const { dictionary } = useContext(LanguageContext);
+  const { dictionary, languageId } = useContext(LanguageContext);
 
   const increment = () => { setPage(page + 1); setLoading(true) };
   const decrement = () => { setPage(page - 1); setLoading(true) };
@@ -138,7 +138,7 @@ export const AcceptedOrdersList = () => {
       fetchAcceptedOrders();
 
       return () => { };
-    }, [options, page, branchid])
+    }, [options, page, branchid, languageId])
   );
 
   useEffect(() => {
@@ -171,8 +171,6 @@ export const AcceptedOrdersList = () => {
       Alert.alert(`Don't know how to open this URL: ${url}`);
     }
   };
-
-  console.log('lang id order: ', languageId);
 
   const renderEnteredOrdersList = ({ item }) => {
     const trackLink = [JSON.parse(item.deliveron_data)]?.map(link => {

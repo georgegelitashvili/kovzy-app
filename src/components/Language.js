@@ -5,21 +5,42 @@ import { languageList, dictionaryList } from './languages';
 export const LanguageContext = createContext({
   userLanguage: 'en',
   dictionary: dictionaryList.en,
-  userLanguageChange: () => { }  // Add default function to prevent errors
+  userLanguageChange: () => { }
 });
 
 export function LanguageProvider({ children }) {
   const [userLanguage, setUserLanguage] = useState('en');
-  const [languageId, setLanguageId] = useState(2);
+  const [languageId, setLanguageId] = useState();
 
   useEffect(() => {
-    const fetchLanguage = async () => {
-      const lang = await getData('rcml-lang');
-      setUserLanguage(lang ?? 'en');
+    const fetchLanguageAndId = async () => {
+      const storedLang = await getData('rcml-lang');
+      const finalLang = storedLang ?? 'en';
+
       const languages = await getData('languages');
+      const language = languages.find(lang => lang.lang === finalLang);
+
+      if (language) {
+        setUserLanguage(finalLang);
+        setLanguageId(language.id);
+      }
     };
-    fetchLanguage();
+
+    fetchLanguageAndId();
   }, []);
+
+  useEffect(() => {
+    const updateLanguageId = async () => {
+      const languages = await getData('languages');
+      const language = languages.find(lang => lang.lang === userLanguage);
+
+      if (language) {
+        setLanguageId(language.id);
+      }
+    };
+
+    updateLanguageId();
+  }, [userLanguage]);
 
   const userLanguageChange = (selected) => {
     const newLanguage = languageList[selected] ? selected : 'en';
@@ -30,7 +51,8 @@ export function LanguageProvider({ children }) {
   const provider = {
     userLanguage,
     dictionary: dictionaryList[userLanguage],
-    userLanguageChange
+    userLanguageChange,
+    languageId // Include languageId in the provider
   };
 
   return (
