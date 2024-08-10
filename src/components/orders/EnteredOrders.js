@@ -59,7 +59,7 @@ export const EnteredOrdersList = () => {
   const [loading, setLoading] = useState(true);
   const [loadingOptions, setLoadingOptions] = useState(false);
 
-  const { dictionary, userLanguage } = useContext(LanguageContext);
+  const { dictionary, languageId } = useContext(LanguageContext);
 
   const onChangeModalState = (newState) => {
     console.log("modal close: ", newState);
@@ -141,6 +141,7 @@ export const EnteredOrdersList = () => {
         type: 0,
         page: 1,
         branchid: branchid,
+        Languageid: languageId
       });
       const data = resp.data.data;
       setOrders(data);
@@ -184,7 +185,6 @@ export const EnteredOrdersList = () => {
 
     setIntervalId(newIntervalId); // Update the intervalId state immediately
   };
-
   const handleAppStateChange = (nextAppState) => {
     if (appState.match(/inactive|background/) && nextAppState === "active") {
       startInterval();
@@ -212,10 +212,16 @@ export const EnteredOrdersList = () => {
   useEffect(() => {
     apiOptions();
 
-    if (optionsIsLoaded) {
+    if (optionsIsLoaded && languageId) {
       const subscribe = AppState.addEventListener('change', handleAppStateChange);
       console.log('Starting interval...');
+
+      // Clear any existing interval
+      clearInterval(intervalId);
+
+      // Start the interval with the correct languageId
       startInterval();
+
       console.log('Interval started.');
 
       return () => {
@@ -223,7 +229,7 @@ export const EnteredOrdersList = () => {
         subscribe.remove();
       };
     }
-  }, [optionsIsLoaded, appState]);
+  }, [optionsIsLoaded, languageId, appState]);
 
 
   // set deliveron data
@@ -326,6 +332,10 @@ export const EnteredOrdersList = () => {
                 {dictionary["orders.comment"]}: {item.comment}
               </Text>
             ) : null}
+
+            <Text variant="titleSmall" style={styles.title}>
+              {dictionary["orders.paymentMethod"]}: {item.payment_type}
+            </Text>
 
             <Divider />
             <OrdersDetail orderId={item.id} />

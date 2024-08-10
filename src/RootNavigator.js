@@ -6,7 +6,7 @@ import DrawerContent from "./components/DrawerContent";
 import { LanguageContext } from "./components/Language";
 import Loader from "./components/generate/loader";
 import axiosInstance from "./apiConfig/apiRequests";
-import { getData } from "./helpers/storage";
+import { getSecureData } from "./helpers/storage";
 
 const Drawer = createDrawerNavigator();
 
@@ -34,8 +34,10 @@ const RootNavigator = () => {
     const loadUser = async () => {
       try {
         const response = await axiosInstance.get(options.url_authUser);
+        console.log('check auth resposne: ', response.data);
         if (response.data.user) {
-          const userObj = getData('user'); // Ensure getData is async if necessary
+          setIsLoading(true);
+          const userObj = await getSecureData('user'); // Await the async function
           setUser(userObj);
         } else {
           setUser(null);
@@ -54,11 +56,12 @@ const RootNavigator = () => {
     };
 
     if (options.url_authUser) {
+      setIsLoading(true);
       loadUser();
     } else {
       setIsLoading(false);
     }
-  }, [options.url_authUser]);
+  }, [domain, options.url_authUser]);
 
   console.log("user:", user);
 

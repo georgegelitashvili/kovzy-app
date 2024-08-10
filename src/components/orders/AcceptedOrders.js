@@ -53,7 +53,7 @@ export const AcceptedOrdersList = () => {
   const [loading, setLoading] = useState(true);
   const [loadingOptions, setLoadingOptions] = useState(false);
   const [credentials, setCredentials] = useState({});
-  const { dictionary } = useContext(LanguageContext);
+  const { dictionary, languageId } = useContext(LanguageContext);
 
   const increment = () => { setPage(page + 1); setLoading(true) };
   const decrement = () => { setPage(page - 1); setLoading(true) };
@@ -94,6 +94,7 @@ export const AcceptedOrdersList = () => {
           limit: 12,
           page: page
         },
+        Languageid: languageId,
         branchid: branchid,
         type: 0
       }));
@@ -135,9 +136,9 @@ export const AcceptedOrdersList = () => {
   useFocusEffect(
     React.useCallback(() => {
       fetchAcceptedOrders();
-      
-      return () => {};
-    }, [options, page, branchid])
+
+      return () => { };
+    }, [options, page, branchid, languageId])
   );
 
   useEffect(() => {
@@ -232,6 +233,10 @@ export const AcceptedOrdersList = () => {
                 {dictionary["orders.comment"]}: {item.comment}
               </Text>
             ) : null}
+
+            <Text variant="titleSmall" style={styles.title}>
+              {dictionary["orders.paymentMethod"]}: {item.payment_type}
+            </Text>
 
             <Divider />
             <OrdersDetail orderId={item.id} />

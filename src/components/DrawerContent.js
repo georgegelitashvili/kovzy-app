@@ -11,7 +11,7 @@ import { String, LanguageContext } from "./Language";
 export default function DrawerContent(props) {
 
   const { domain, branchid, branchName, branchEnabled, setBranchEnabled, setDeliveronEnabled, deliveronEnabled, logout, setIsDataSet, intervalId } = useContext(AuthContext);
-  const { dictionary } = useContext(LanguageContext);
+  const { dictionary, userLanguageChange } = useContext(LanguageContext);
 
   const [options, setOptions] = useState({
     url_branchActivity: "",

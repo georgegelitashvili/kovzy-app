@@ -57,6 +57,8 @@ export const LoginScreen = ({ navigation }) => {
     }
   }, [loginError]);
 
+  console.log('login error: ', loginError);
+
   return (
     <Background>
       <Logo />

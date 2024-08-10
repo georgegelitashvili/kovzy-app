@@ -25,8 +25,10 @@ export const BranchScreen = ({ navigation }) => {
       return;
     }
     try {
-      const response = await axiosInstance.post(url);
-      const data = response.data.data || [];
+      const response = await axiosInstance.post(url, {
+        lang: userLanguage,
+      });
+      const data = response.data.branches || [];
       setBranches(data.map((item) => ({
         label: item.title,
         value: item.id,
