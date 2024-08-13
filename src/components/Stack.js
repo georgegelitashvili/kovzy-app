@@ -34,14 +34,36 @@ export const AuthNavigator = () => {
   return (
     <Stack.Navigator
       screenOptions={({ navigation, route }) => ({
-        headerMode: "screen",
+        headerMode: 'screen',
         header: (props) => <Header {...props} />,
         ...route.params?.options, // Pass route params as options
       })}
     >
-      <Stack.Screen name="Domain" options={{ headerShown: true, headerTitle: dictionary["domains.addDomain"] }} component={DomainScreen} />
-      <Stack.Screen name="Branch" options={{ headerTitle: dictionary["branches.branches"] }} component={BranchScreen} />
-      <Stack.Screen name="Login" options={{ headerTitle: dictionary["nav.auth"] }} component={LoginScreen} />
+      <Stack.Screen
+        name="Domain"
+        options={{
+          headerShown: false,
+          headerTitle: dictionary["domains.addDomain"],
+          unmountOnBlur: true
+        }}
+        component={DomainScreen}
+      />
+      <Stack.Screen
+        name="Branch"
+        options={{
+          headerTitle: dictionary["branches.branches"],
+          unmountOnBlur: true
+        }}
+        component={BranchScreen}
+      />
+      <Stack.Screen
+        name="Login"
+        options={{
+          headerTitle: dictionary["nav.auth"],
+          unmountOnBlur: true
+        }}
+        component={LoginScreen}
+      />
     </Stack.Navigator>
   );
 }

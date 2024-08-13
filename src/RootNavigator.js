@@ -6,7 +6,7 @@ import DrawerContent from "./components/DrawerContent";
 import { LanguageContext } from "./components/Language";
 import Loader from "./components/generate/loader";
 import axiosInstance from "./apiConfig/apiRequests";
-import { getSecureData } from "./helpers/storage";
+import { removeData, getSecureData } from "./helpers/storage";
 
 const Drawer = createDrawerNavigator();
 
@@ -32,18 +32,21 @@ const RootNavigator = () => {
 
   useEffect(() => {
     const loadUser = async () => {
+      const userObj = await getSecureData('user');
+      console.log('object of user', userObj);
+
       try {
-        const response = await axiosInstance.get(options.url_authUser);
-        console.log('check auth resposne: ', response.data);
-        if (response.data.user) {
-          setIsLoading(true);
-          const userObj = await getSecureData('user'); // Await the async function
-          setUser(userObj);
-        } else {
-          setUser(null);
-          clearInterval(intervalId);
-          setIntervalId(null);
-          setIsLoading(false);
+        if (userObj) {
+          const response = await axiosInstance.get(options.url_authUser);
+          console.log('check auth response data:', response.data);
+
+          if (response.data.user) {
+            setUser(userObj);
+          } else {
+            setUser(null);
+            clearInterval(intervalId);
+            setIntervalId(null);
+          }
         }
       } catch (error) {
         console.error("Error loading user:", error);
@@ -51,7 +54,10 @@ const RootNavigator = () => {
         clearInterval(intervalId);
         setIntervalId(null);
       } finally {
-        setIsLoading(false);
+        // Add a slight delay before hiding the loader
+        setTimeout(() => {
+          setIsLoading(false);
+        }, 1500); // Adjust the delay time (in milliseconds) as needed
       }
     };
 
@@ -64,14 +70,15 @@ const RootNavigator = () => {
   }, [domain, options.url_authUser]);
 
   console.log("user:", user);
+  console.log("loader:", isLoading);
 
-  if (isLoading) {
+  if (!user && isLoading) {
     return <Loader text={dictionary["loading"]} />;
   }
 
   return (
     <>
-      {user ? (
+      {user !== null ? (
         <Drawer.Navigator
           drawerContent={(props) => <DrawerContent {...props} />}
           initialRouteName="Order"

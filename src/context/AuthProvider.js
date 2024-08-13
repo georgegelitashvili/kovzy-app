@@ -64,12 +64,13 @@ export const AuthProvider = ({ children }) => {
 
   const apiOptions = useCallback(() => {
     if (domain) {
-      setOptions({
+      setOptions(prevOptions => ({
+        ...prevOptions,
         url_login: `https://${domain}/api/v1/admin/auth/login`,
         url_logout: `https://${domain}/api/v1/admin/auth/logout`,
         url_branchStatus: `https://${domain}/api/v1/admin/branchStatus`,
         url_deliveronStatus: `https://${domain}/api/v1/admin/deliveronStatus`,
-      });
+      }));
     }
   }, [domain, isDataSet]);
 
@@ -115,7 +116,6 @@ export const AuthProvider = ({ children }) => {
       setIntervalId(null);
     }
   };
-
 
   useEffect(() => {
     readData();
@@ -231,6 +231,7 @@ export const AuthProvider = ({ children }) => {
             setBranchName(null);
             setIsDataSet(false);
             setUser(null);
+            setIsLoading(false);
           } catch (error) {
             console.log('Error logging out:', error);
             deleteItem("token");

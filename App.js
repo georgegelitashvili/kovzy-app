@@ -30,17 +30,12 @@ function App() {
       handleReload();
     };
 
-    // Capture unhandled exceptions
     const previousHandler = ErrorUtils.getGlobalHandler();
     ErrorUtils.setGlobalHandler((error, isFatal) => {
-      // Check for specific error conditions and handle them
-      if (isMemoryLeak(error) || isUnhandledException(error) || isIncorrectNativeModuleUsage(error)) {
-        handleAppCrash();
-      } else {
-        // Call the previous error handler if it exists
-        if (previousHandler) {
-          previousHandler(error, isFatal);
-        }
+      handleAppCrash(); // Simplified error handling logic
+
+      if (previousHandler) {
+        previousHandler(error, isFatal);
       }
     });
 
@@ -50,7 +45,7 @@ function App() {
   }, []);
 
   const handleReload = async () => {
-    Sentry.captureEvent('Reloaded the app');
+    Sentry.captureMessage('App Reload Triggered');
     await Updates.reloadAsync();
   };
 
@@ -72,7 +67,7 @@ function App() {
           <Text style={styles.reloadText}>
             {!isConnected ? 'Connection Error' : 'App has crashed'}
           </Text>
-          <Button style={styles.reloadButton} title="Reload App" onPress={handleReload} />
+          <Button title="Reload App" onPress={handleReload} />
         </View>
       )}
     </SafeAreaProvider>
@@ -86,10 +81,9 @@ const styles = StyleSheet.create({
   },
   reloadText: {
     marginBottom: 10,
+    fontSize: 16,
+    fontWeight: 'bold',
   },
-  reloadButton: {
-    marginBottom: 10,
-  }
 });
 
 export default Sentry.wrap(App);
