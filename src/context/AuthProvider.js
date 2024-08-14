@@ -192,12 +192,14 @@ export const AuthProvider = ({ isConnected, children }) => {
       }
     };
 
-    if (options) {
+    if (options || isConnected) {
       loadUser();
     } else {
       setIsLoading(false);
     }
-  }, [domain, options]);
+  }, [domain, options, isConnected]);
+
+  console.log('connection: ', isConnected);
 
 
   return (
