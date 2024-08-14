@@ -3,7 +3,7 @@ import { AppState } from 'react-native';
 import { View, Text, TouchableOpacity, Alert } from 'react-native';
 import axiosInstance from "../apiConfig/apiRequests";
 import * as SecureStore from 'expo-secure-store';
-import { storeData, getData, removeData, getMultipleData } from "../helpers/storage";
+import { storeData, getSecureData, removeData, getMultipleData } from "../helpers/storage";
 import Toast from '../components/generate/Toast';
 import { useFetchLanguages } from "../components/UseFetchLanguages";
 import { LanguageContext } from "../components/Language";
@@ -22,6 +22,7 @@ export const AuthProvider = ({ children }) => {
     url_logout: "",
     url_branchStatus: "",
     url_deliveronStatus: "",
+    url_authUser: ""
   });
   const [loginError, setLoginError] = useState([]);
   const [isVisible, setIsVisible] = useState(true);
@@ -32,7 +33,7 @@ export const AuthProvider = ({ children }) => {
   const [shouldRenderAuthScreen, setShouldRenderAuthScreen] = useState(false);
   const [defaultLang, setDefaultLang] = useState(null);
 
-  const { userLanguage, userLanguageChange, dictionary } = useContext(LanguageContext);
+  const { userLanguageChange, dictionary } = useContext(LanguageContext);
 
   const { languages } = useFetchLanguages(domain);
 
@@ -64,12 +65,14 @@ export const AuthProvider = ({ children }) => {
 
   const apiOptions = useCallback(() => {
     if (domain) {
-      setOptions({
+      setOptions(prevOptions => ({
+        ...prevOptions,
         url_login: `https://${domain}/api/v1/admin/auth/login`,
         url_logout: `https://${domain}/api/v1/admin/auth/logout`,
         url_branchStatus: `https://${domain}/api/v1/admin/branchStatus`,
         url_deliveronStatus: `https://${domain}/api/v1/admin/deliveronStatus`,
-      });
+        url_authUser: `https://${domain}/api/v1/admin/auth/authorized`,
+      }));
     }
   }, [domain, isDataSet]);
 
@@ -116,7 +119,6 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-
   useEffect(() => {
     readData();
     apiOptions();
@@ -157,6 +159,45 @@ export const AuthProvider = ({ children }) => {
       subscribe.remove();
     };
   }, [domain, branchid, options]);
+
+
+  useEffect(() => {
+    const loadUser = async () => {
+      const userObj = await getSecureData('user');
+      console.log('object of user', userObj);
+
+      try {
+        if (userObj) {
+          const response = await axiosInstance.get(options.url_authUser);
+          console.log('check auth response data:', response.data);
+
+          if (response.data.user) {
+            setUser(userObj);
+          } else {
+            setUser(null);
+            clearInterval(intervalId);
+            setIntervalId(null);
+          }
+        }
+      } catch (error) {
+        console.error("Error loading user:", error);
+        setUser(null);
+        clearInterval(intervalId);
+        setIntervalId(null);
+      } finally {
+        // Add a slight delay before hiding the loader
+        setTimeout(() => {
+          setIsLoading(false);
+        }, 1500); // Adjust the delay time (in milliseconds) as needed
+      }
+    };
+
+    if (options) {
+      loadUser();
+    } else {
+      setIsLoading(false);
+    }
+  }, [domain, options]);
 
 
   return (
@@ -231,6 +272,7 @@ export const AuthProvider = ({ children }) => {
             setBranchName(null);
             setIsDataSet(false);
             setUser(null);
+            setIsLoading(false);
           } catch (error) {
             console.log('Error logging out:', error);
             deleteItem("token");

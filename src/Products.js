@@ -186,9 +186,6 @@ export default function Products({ navigation }) {
     });
   };
 
-
-  console.log(checkedItems);
-
   const renderProductList = ({ item }) => {
     const isExcluded = excluded.some((excludedItem) => excludedItem.productid === item.id);
     const isDisabled = isExcluded; // Assuming exclusion implies disabled status
@@ -279,7 +276,6 @@ export default function Products({ navigation }) {
       <View style={{ paddingLeft: 10, paddingRight: 10 }}>
         {showSearch && (
           <TextField
-            style={styles.input}
             placeholder="Search..."
             editable={true}
             clearButtonMode='always'

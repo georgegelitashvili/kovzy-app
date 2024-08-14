@@ -41,7 +41,7 @@ axiosInstance.interceptors.response.use(
       removeData("domain");
       removeData("branch");
       removeData("branchName");
-      navigate('Domain', { screen: 'Domain', message: 'Not allowed' });
+      removeData("user");
     } else {
       // Handle other types of errors (e.g., network errors)
       console.error("An error occurred (axios):", error.message);
