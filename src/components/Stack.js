@@ -101,8 +101,9 @@ export const ProductsNavigator = () => {
         component={ProductsDetail}
         options={({ route }) => ({
           headerTitle: dictionary["prod.customizable"],
-          headerStyle: { marginTop: -65 },
+          headerStyle: { marginTop: 0 },
           headerContentStyle: { fontSize: 10 },
+          unmountOnBlur: true,
           ...route.params?.options, // Pass route params as options
         })}
       />
