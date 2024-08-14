@@ -10,7 +10,7 @@ import { LanguageContext } from "../components/Language";
 
 export const AuthContext = createContext();
 
-export const AuthProvider = ({ children }) => {
+export const AuthProvider = ({ isConnected, children }) => {
   const [user, setUser] = useState(null);
   const [domain, setDomain] = useState(null);
   const [branchid, setBranchid] = useState(null);

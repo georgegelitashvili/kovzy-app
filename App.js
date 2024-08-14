@@ -57,7 +57,7 @@ function App() {
   return (
     <SafeAreaProvider>
       <ErrorBoundary>
-        <Main />
+        <Main isConnected={isConnected} />
       </ErrorBoundary>
       {!isConnected && (
         <Toast
