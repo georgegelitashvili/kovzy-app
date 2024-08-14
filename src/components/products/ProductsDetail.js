@@ -56,10 +56,12 @@ export default function ProductsDetail({ navigation, route }) {
 
   useEffect(() => {
     if (sendApi || isConnected) {
-      fetchData();
+      if (options.url_customizable) {
+        fetchData();
+      }
       setSendApi(false);
     }
-  }, [sendApi, isConnected]);
+  }, [sendApi, isConnected, options.url_customizable]);
 
   useEffect(() => {
     if (value) {
@@ -78,14 +80,21 @@ export default function ProductsDetail({ navigation, route }) {
 
   useEffect(() => {
     if (productEnabled || isConnected) {
-      fetchData();
+      if (options.url_customizable) {
+        fetchData();
+      }
       setProductEnabled(false);
       setSendApi(false);
     }
-  }, [productEnabled, isConnected]);
+  }, [productEnabled, isConnected, options.url_customizable]);
 
 
   const fetchData = () => {
+    if (!options.url_customizable) {
+      console.error("URL for customizable is not set.");
+      return;
+    }
+    
     axiosInstance
       .post(options.url_customizable, {
         pid: id,
