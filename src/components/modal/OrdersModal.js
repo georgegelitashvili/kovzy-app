@@ -17,7 +17,8 @@ export default function OrdersModal({
   deliveron,
   deliveronOptions,
   type,
-  options
+  options,
+  takeAway
 }) {
   const [visible, setVisible] = useState(isVisible);
   const { intervalId, setIntervalId } = useContext(AuthContext);
@@ -66,6 +67,7 @@ export default function OrdersModal({
             deliveronOptions={deliveronOptions}
             options={options}
             items={items}
+            takeAway={takeAway}
             hideModal={hideModal}
           />
         )
@@ -76,6 +78,7 @@ export default function OrdersModal({
             deliveron={deliveron.original ?? deliveron}
             orders={orders}
             options={options}
+            takeAway={takeAway}
             hideModal={hideModal}
           />
         )
@@ -87,11 +90,14 @@ export default function OrdersModal({
             deliveron={deliveron.original ?? deliveron}
             options={options}
             deliveronOptions={deliveronOptions}
+            takeAway={takeAway}
             hideModal={hideModal}
           />
         )
     }
   }
+
+  console.log(takeAway);
 
   if (deliveron.length === 0 || deliveron.original?.content.length === 0) {
     return null;

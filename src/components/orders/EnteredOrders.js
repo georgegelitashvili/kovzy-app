@@ -52,6 +52,7 @@ export const EnteredOrdersList = () => {
   const [deliveron, setDeliveron] = useState([]);
   const [visible, setVisible] = useState(false); // modal state
   const [itemId, setItemId] = useState(null); //item id for modal
+  const [itemTakeAway, setItemTakeAway] = useState(0);
   const [isOpen, setOpenState] = useState([]); // my accordion state
   const [modalType, setModalType] = useState("");
   const [sound, setSound] = useState(new Audio.Sound());
@@ -234,12 +235,12 @@ export const EnteredOrdersList = () => {
 
   // set deliveron data
   useEffect(() => {
-    if (itemId) {
+    if (itemId && itemTakeAway !== 1) {
       setDeliveronOptions((prev) => ({ ...prev, data: { orderId: itemId } }));
       setIsDeliveronOptions(true);
       setLoadingOptions(true);
     }
-  }, [itemId]);
+  }, [itemId, itemTakeAway]);
 
   useEffect(() => {
     if (isDeliveronOptions) {
@@ -295,6 +296,7 @@ export const EnteredOrdersList = () => {
               />
               {item.id}
             </Text>
+            <Text style={styles.takeAway}>{item.take_away === 1 ? "("+dictionary["orders.takeAway"] + ")" : ""}</Text>
             <Text variant="headlineMedium" style={styles.header}>
               <SimpleLineIcons
                 name={!isOpen.includes(item.id) ? "arrow-up" : "arrow-down"}
@@ -349,6 +351,7 @@ export const EnteredOrdersList = () => {
                 buttonColor="#2fa360"
                 onPress={() => {
                   setItemId(item.id);
+                  setItemTakeAway(item.take_away);
                   showModal("accept");
                 }}
               >
@@ -393,6 +396,7 @@ export const EnteredOrdersList = () => {
             deliveronOptions={deliveronOptions}
             type={modalType}
             options={options}
+            takeAway={itemTakeAway}
           />
         ) : null}
         <FlatGrid
@@ -436,6 +440,10 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingVertical: 10,
+  },
+  takeAway: {
+    paddingVertical: 20,
+    fontSize: 15,
   },
   leftIcon: {
     marginRight: 3,

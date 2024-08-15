@@ -4,7 +4,7 @@ import { AuthContext } from "./context/AuthProvider";
 import { OrdersNavigator, ProductsNavigator, AuthNavigator } from "./components/Stack";
 import DrawerContent from "./components/DrawerContent";
 import { LanguageContext } from "./components/Language";
-import Loader from "./components/generate/loader";
+
 
 const Drawer = createDrawerNavigator();
 
@@ -14,10 +14,6 @@ const RootNavigator = () => {
   const { dictionary } = useContext(LanguageContext);
 
   console.log("user:", user);
-
-  if (!user && isLoading) {
-    return <Loader text={dictionary["loading"]} />;
-  }
 
   return (
     <>

@@ -133,6 +133,7 @@ export default function OrdersModalContent(props) {
     }
   }, [selected, forClient, forDelivery, props.deliveron]);
 
+  console.log(props.takeAway);
 
   return (
     <>
@@ -154,7 +155,7 @@ export default function OrdersModalContent(props) {
             typeOfKeyboard="number"
           />
 
-          {props.deliveron?.status !== -2 ? (
+          {props.deliveron?.status !== -2 && props.takeAway !== 1 ? (
             <>
               <TextField
                 label={dictionary["general.AOPTD"]}

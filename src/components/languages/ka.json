@@ -219,6 +219,7 @@
     "orders.additionalFees" : "დამატებითი გადასახადები (ჯამი)",
     "orders.details" : "დამატებითი გადასახადების დეტალები",
     "orders.warning" : "შეგახსენებთ, შემოვიდა შეკვეთა",
+    "orders.takeAway": "ადგილიდან გატანა",
     "slider.sliderPages": "სლაიდერის გვერდები",
     "slider.editingSliderPage": "სლაიდერის გვერდების შესწორება",
     "slider.product": "პროდუქტი",

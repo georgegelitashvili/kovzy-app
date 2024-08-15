@@ -7,11 +7,13 @@ import { storeData, getSecureData, removeData, getMultipleData } from "../helper
 import Toast from '../components/generate/Toast';
 import { useFetchLanguages } from "../components/UseFetchLanguages";
 import { LanguageContext } from "../components/Language";
+import Loader from "../components/generate/loader";
 
 export const AuthContext = createContext();
 
 export const AuthProvider = ({ isConnected, children }) => {
   const [user, setUser] = useState(null);
+  const [userObject, setUserObject] = useState(null);
   const [domain, setDomain] = useState(null);
   const [branchid, setBranchid] = useState(null);
   const [branchName, setBranchName] = useState(null);
@@ -32,6 +34,7 @@ export const AuthProvider = ({ isConnected, children }) => {
   const [appState, setAppState] = useState(AppState.currentState);
   const [shouldRenderAuthScreen, setShouldRenderAuthScreen] = useState(false);
   const [defaultLang, setDefaultLang] = useState(null);
+  const [showReload, setShowReload] = useState(false);
 
   const { userLanguageChange, dictionary } = useContext(LanguageContext);
 
@@ -102,8 +105,36 @@ export const AuthProvider = ({ isConnected, children }) => {
       setBranchEnabled(branchResponse.data.data);
       setIsVisible(branchResponse.data.data);
     } catch (error) {
-      console.log('Error fetching data:', error);
+      console.error('Error fetching data:', error.message || error);
       clearInterval(intervalId);
+    }
+  };
+
+  const loadUser = async () => {
+    setIsLoading(true);
+    const userObj = await getSecureData('user');
+    if (userObj) {
+      console.log('object of user', userObj);
+      setUserObject(userObj);
+      await axiosInstance.get(options.url_authUser)
+        .then(response => {
+          if (response.data.user) {
+            setUser(userObj);
+          } else {
+            setUser(null);
+            clearInterval(intervalId);
+            setIntervalId(null);
+            setIsLoading(false);
+          }
+        })
+        .catch(error => {
+          console.error('Error loading user:', error.message || error);
+          setUser(null);
+          clearInterval(intervalId);
+          setIntervalId(null);
+          setShowReload(true);
+          setIsLoading(true);
+        });
     }
   };
 
@@ -160,47 +191,20 @@ export const AuthProvider = ({ isConnected, children }) => {
     };
   }, [domain, branchid, options]);
 
-
   useEffect(() => {
-    const loadUser = async () => {
-      const userObj = await getSecureData('user');
-      console.log('object of user', userObj);
-
-      try {
-        if (userObj) {
-          const response = await axiosInstance.get(options.url_authUser);
-          console.log('check auth response data:', response.data);
-
-          if (response.data.user) {
-            setUser(userObj);
-          } else {
-            setUser(null);
-            clearInterval(intervalId);
-            setIntervalId(null);
-          }
-        }
-      } catch (error) {
-        console.error("Error loading user:", error);
-        setUser(null);
-        clearInterval(intervalId);
-        setIntervalId(null);
-      } finally {
-        // Add a slight delay before hiding the loader
-        setTimeout(() => {
-          setIsLoading(false);
-        }, 1500); // Adjust the delay time (in milliseconds) as needed
-      }
-    };
-
-    if (options || isConnected) {
+    if (options.url_authUser && isConnected) {
       loadUser();
     } else {
       setIsLoading(false);
     }
   }, [domain, options, isConnected]);
 
-  console.log('connection: ', isConnected);
 
+  const handleReload = () => {
+    setShowReload(false);  // Hide reload button on click
+    fetchData();           // Reattempt data fetch
+    loadUser();            // Reattempt to load user
+  };
 
   return (
     <AuthContext.Provider
@@ -264,17 +268,22 @@ export const AuthProvider = ({ isConnected, children }) => {
           try {
             const token = JSON.parse(await SecureStore.getItemAsync('token'));
             axiosInstance.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-            await axiosInstance.post(options.url_logout);
-            deleteItem("token");
-            deleteItem("credentials");
-            deleteItem("user");
-            removeData(["domain", "branch", "branchName"]);
-            setDomain(null);
-            setBranchid(null);
-            setBranchName(null);
-            setIsDataSet(false);
-            setUser(null);
-            setIsLoading(false);
+            const response = await axiosInstance.post(options.url_logout);
+            if (response.data.message) {
+              deleteItem("token");
+              deleteItem("credentials");
+              deleteItem("user");
+              removeData(["domain", "branch", "branchName"]);
+              setDomain(null);
+              setBranchid(null);
+              setBranchName(null);
+              setIsDataSet(false);
+              setUser(null);
+              setIsLoading(false);
+              setUserObject(null);
+            } else {
+              logout();
+            }
           } catch (error) {
             console.log('Error logging out:', error);
             deleteItem("token");
@@ -296,7 +305,23 @@ export const AuthProvider = ({ isConnected, children }) => {
       }}
     >
 
-      {children}
+      {userObject && showReload && (
+        Alert.alert("ALERT", "connection lost", [
+          {
+            text: "retry", onPress: () => {
+              handleReload();
+              console.log('deliveron null modal');
+            }
+          },
+        ])
+      )}
+
+      {userObject && !user && isLoading && (
+          <Loader text={dictionary["loading"]} />
+        )
+      }
+
+      { children }
 
       {!isVisible && (
         <TouchableOpacity onPress={handleClick}>
