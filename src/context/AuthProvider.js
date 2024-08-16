@@ -115,11 +115,11 @@ export const AuthProvider = ({ isConnected, children }) => {
     setIsLoading(true);
     const userObj = await getSecureData('user');
     if (userObj) {
-      console.log('object of user', userObj);
+      console.log('object of user', userObj.id);
       setUserObject(userObj);
       await axiosInstance.get(options.url_authUser)
         .then(response => {
-          if (response.data.user) {
+          if (response.data.user.id === userObj.id) {
             setUser(userObj);
           } else {
             setUser(null);
@@ -134,7 +134,7 @@ export const AuthProvider = ({ isConnected, children }) => {
           clearInterval(intervalId);
           setIntervalId(null);
           setShowReload(true);
-          setIsLoading(true);
+          setIsLoading(false);
         });
     }
   };

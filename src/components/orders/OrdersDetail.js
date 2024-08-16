@@ -3,22 +3,19 @@ import { StyleSheet, View } from "react-native";
 import { List, Text } from "react-native-paper";
 import { Entypo } from "@expo/vector-icons";
 
-import { AuthContext, AuthProvider } from "../../context/AuthProvider";
-import { String, LanguageContext } from "../Language";
+import { AuthContext } from "../../context/AuthProvider";
+import { LanguageContext } from "../Language";
 import axiosInstance from "../../apiConfig/apiRequests";
 
 export default function OrdersDetail({ orderId }) {
   const [expanded, setExpanded] = useState(true);
-  const handlePress = () => setExpanded(!expanded);
-
   const [orderCart, setOrderCart] = useState([]);
   const { domain } = useContext(AuthContext);
-
-  const [options, setOptions] = useState({}); // api options
-  const [optionsIsLoaded, setOptionsIsLoaded] = useState(false); // api options
-
+  const [options, setOptions] = useState({});
+  const [optionsIsLoaded, setOptionsIsLoaded] = useState(false);
   const { dictionary, userLanguage } = useContext(LanguageContext);
 
+  // Set API options based on domain
   const apiOptions = useCallback(() => {
     setOptions({
       url_orderCart: `https://${domain}/api/v1/admin/getOrderCart`,
@@ -26,38 +23,49 @@ export default function OrdersDetail({ orderId }) {
     setOptionsIsLoaded(true);
   }, [domain]);
 
-  const fetchOrdersDetail = async () => {
-    await axiosInstance
-      .post(options.url_orderCart, {
-        Orderid: orderId,
-        lang: userLanguage,
-      })
-      .then((resp) => resp.data.data)
-      .then((data) => {
+  // Fetch order details
+  const fetchOrdersDetail = useCallback(async () => {
+    if (optionsIsLoaded) {
+      try {
+        const response = await axiosInstance.post(options.url_orderCart, {
+          Orderid: orderId,
+          lang: userLanguage,
+        });
+        const data = response.data.data;
+
         if (data.message) {
           setOrderCart([]);
-          return;
+        } else {
+          setOrderCart(data ?? []);
         }
-        setOrderCart(data ?? []);
-      })
-      .catch((error) => {
-        if (error.status == 401) {
+      } catch (error) {
+        if (error.status === 401) {
           setOptionsIsLoaded(false);
           setOptions({});
           setOrderCart([]);
         }
-      });
-  }
+      }
+    }
+  }, [options, orderId, userLanguage, optionsIsLoaded]);
 
+  // Load API options and fetch order details
   useEffect(() => {
     apiOptions();
-    if (optionsIsLoaded) {
-      fetchOrdersDetail();
-    }
-  }, [optionsIsLoaded, userLanguage, orderId]);
+  }, [apiOptions]);
 
-  if (!orderCart) {
-    return null;
+  useEffect(() => {
+    fetchOrdersDetail();
+  }, [fetchOrdersDetail]);
+
+  // Handle the accordion expand/collapse
+  const handlePress = () => setExpanded(!expanded);
+
+  if (!orderCart.length) {
+    return (
+      <View style={styles.emptyContainer}>
+        <Text>{dictionary["orders.noDetails"]}</Text>
+      </View>
+    );
   }
 
   return (
@@ -67,74 +75,60 @@ export default function OrdersDetail({ orderId }) {
         expanded={expanded}
         onPress={handlePress}
       >
-        {orderCart?.map((item, index) => {
-          if (item.cart_id == orderId) {
-            let optionsMarkup = null;
+        {orderCart.map((item, index) => (
+          <View style={styles.body} key={`${item.cart_id}.${index}`}>
+            <Text style={styles.header}>
+              <Entypo name="dot-single" style={styles.productIcon} />
+              {item.name} X{item.amount}
+            </Text>
+            {item.type === 1 ? (
+              item.children?.map((child) => (
+                <View key={child.id}>
+                  <Text style={styles.option}>{child.name}:</Text>
+                  {child.customizables.map((cust, idx) => (
+                    <View key={idx}>
+                      <Text style={styles.bulletItem}>
+                        <Text style={styles.bullet}>•</Text>
+                        {cust.name}:
+                      </Text>
+                      {cust.packs.map((pack, pidx) => (
+                        <View key={pidx} style={styles.nestedBulletItem}>
+                          <Text style={styles.bullet}>◦</Text>
+                          <Text style={styles.option}>{pack.name}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  ))}
+                </View>
+              ))
+            ) : (
+              item.customizables?.map((cust, idx) => (
+                <View key={idx}>
+                  <Text style={styles.bulletItem}>
+                    <Text style={styles.bullet}>•</Text>
+                    {cust.name}:
+                  </Text>
+                  {cust.packs.map((pack, pidx) => (
+                    <View key={pidx} style={styles.nestedBulletItem}>
+                      <Text style={styles.bullet}>◦</Text>
+                      <Text style={styles.option}>{pack.name}</Text>
+                    </View>
+                  ))}
+                </View>
+              ))
+            )}
+          </View>
+        ))}
 
-            if (item.type == 1) {
-              optionsMarkup = item.children
-                ?.map((child) => (
-                  <View key={child.id}>
-                    <Text style={styles.option}>{child.name}:</Text>
-                    {child.customizables.map((cust, idx) => (
-                      <View key={idx}>
-                        <Text style={styles.bulletItem}>
-                          <Text style={styles.bullet}>•</Text>
-                          {cust.name}:
-                        </Text>
-                        {cust.packs.map((pack, pidx) => (
-                          <View key={pidx} style={styles.nestedBulletItem}>
-                            <Text style={styles.bullet}>◦</Text>
-                            <Text style={styles.option}>{pack.name}</Text>
-                          </View>
-                        ))}
-                      </View>
-                    ))}
-                  </View>
-                ));
-            } else if (item.type == 0) {
-              optionsMarkup = item.customizables
-                ?.map((cust, idx) => (
-                  <View key={idx}>
-                    <Text style={styles.bulletItem}>
-                      <Text style={styles.bullet}>•</Text>
-                      {cust.name}:
-                    </Text>
-                    {cust.packs.map((pack, pidx) => (
-                      <View key={pidx} style={styles.nestedBulletItem}>
-                        <Text style={styles.bullet}>◦</Text>
-                        <Text style={styles.option}>{pack.name}</Text>
-                      </View>
-                    ))}
-                  </View>
-                ));
-            }
-
-            return (
-              <View style={styles.body} key={item.cart_id + "." + index}>
-                <Text style={styles.header}>
-                  <Entypo
-                    name="dot-single"
-                    style={styles.productIcon}
-                  /> {item.name} X{item.amount}
-                </Text>
-                {optionsMarkup ? (
-                  <View>{optionsMarkup}</View>
-                ) : (
-                  <Text style={styles.option}>Options:()</Text>
-                )}
-              </View>
-            );
-          }
-        })}
       </List.Accordion>
     </List.Section>
   );
 }
 
 const styles = StyleSheet.create({
-  accordion: {
-    background: "#fff",
+  emptyContainer: {
+    padding: 20,
+    alignItems: "center",
   },
   body: {
     padding: 5,
