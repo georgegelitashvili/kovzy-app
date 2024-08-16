@@ -189,7 +189,7 @@ export const AuthProvider = ({ isConnected, children }) => {
       stopInterval();
       subscribe.remove();
     };
-  }, [domain, branchid, options]);
+  }, [domain, branchid, options, isConnected]);
 
   useEffect(() => {
     if (options.url_authUser && isConnected) {

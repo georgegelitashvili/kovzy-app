@@ -188,6 +188,7 @@ export const AcceptedOrdersList = () => {
               />
               {item.id}
             </Text>
+            <Text style={styles.takeAway}>{item.take_away === 1 ? "(" + dictionary["orders.takeAway"] + ")" : ""}</Text>
             <Text variant="headlineMedium" style={styles.header}>
               <SimpleLineIcons
                 name={!isOpen.includes(item.id) ? "arrow-up" : "arrow-down"}
@@ -365,6 +366,10 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingVertical: 10,
+  },
+  takeAway: {
+    paddingVertical: 20,
+    fontSize: 15,
   },
   leftIcon: {
     marginRight: 3,
