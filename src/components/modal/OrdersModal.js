@@ -97,9 +97,7 @@ export default function OrdersModal({
     }
   }
 
-  console.log(takeAway);
-
-  if (deliveron.length === 0 || deliveron.original?.content.length === 0) {
+  if (takeAway !== 1 && (deliveron.length === 0 || deliveron.original?.content.length === 0)) {
     return null;
   }
 

@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useContext } from "react";
-import { Text } from "react-native-paper";
+import { Text, Button } from "react-native-paper";
 import Background from "../components/generate/Background";
 import Logo from "../components/generate/Logo";
-import Button from "../components/generate/Button";
 import SelectOption from "../components/generate/SelectOption";
 import { storeData } from "../helpers/storage";
 import Loader from "../components/generate/loader";

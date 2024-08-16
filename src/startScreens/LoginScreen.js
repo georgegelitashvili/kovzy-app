@@ -3,7 +3,7 @@ import { TouchableOpacity, StyleSheet, View } from "react-native";
 import Background from "../components/generate/Background";
 import Logo from "../components/generate/Logo";
 import Header from "../components/generate/Header";
-import Button from "../components/generate/Button";
+import { Text, Button } from "react-native-paper";
 import TextField from "../components/generate/TextField";
 import { theme } from "../core/theme";
 import { nameValidator } from "../helpers/nameValidator";

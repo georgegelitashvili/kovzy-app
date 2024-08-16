@@ -18,7 +18,7 @@ export default function OrdersModalContent(props) {
   const [forDelivery, setForDelivery] = useState({ value: "", error: "" });
 
   const [options, setOptions] = useState(
-    props.deliveron?.status !== -2
+    props.deliveron?.status !== -2 && props.takeAway !== 1
       ? props.options.url_deliveronRecheck
       : props.options.url_acceptOrder
   );
@@ -94,7 +94,7 @@ export default function OrdersModalContent(props) {
   }, [props.deliveron]);
 
   useEffect(() => {
-    if (selected && props.deliveron.content) {
+    if (props.takeAway !== 1 && selected && props.deliveron.content) {
       const contentArray = Array.isArray(props.deliveron.content) ? props.deliveron.content : [props.deliveron.content];
       contentArray.forEach((item) => {
         if (item.id == selected || item.companyId == selected || item.type == selected) {
@@ -131,9 +131,7 @@ export default function OrdersModalContent(props) {
         },
       });
     }
-  }, [selected, forClient, forDelivery, props.deliveron]);
-
-  console.log(props.takeAway);
+  }, [selected, forClient, forDelivery, props.deliveron, props.takeAway]);
 
   return (
     <>
