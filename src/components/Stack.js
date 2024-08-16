@@ -21,10 +21,15 @@ const Header = ({ options, navigation }) => {
     <Appbar.Header
       theme={{ colors: { primary: theme.colors.surface } }}
       style={{ marginTop: headerStyle?.marginTop, backgroundColor: 'white', }}>
-      {navigation?.canGoBack() ? <Appbar.BackAction onPress={navigation.goBack} /> : null}
+      {navigation?.canGoBack() ?
+        <Appbar.BackAction
+          style={{ color: '#000', fontWeight: 'bold' }}
+          onPress={navigation.goBack}
+        />
+        : null}
       <Appbar.Content
         title={title}
-        titleStyle={{ fontSize: headerStyle?.fontSize }}
+        titleStyle={{ fontSize: headerStyle?.fontSize, color: '#000', fontWeight: 'bold' }}
       />
     </Appbar.Header>
   );
