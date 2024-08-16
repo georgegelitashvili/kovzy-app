@@ -116,10 +116,7 @@ export default function OrdersDetail({ orderId }) {
                   <Entypo
                     name="dot-single"
                     style={styles.productIcon}
-                  /> {item.name}
-                </Text>
-                <Text style={styles.option}>
-                  {dictionary["amount"]}: {item.amount}
+                  /> {item.name} X{item.amount}
                 </Text>
                 {optionsMarkup ? (
                   <View>{optionsMarkup}</View>
