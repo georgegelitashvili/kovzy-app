@@ -28,7 +28,7 @@ export default function OrdersDetail({ orderId }) {
 
   const fetchOrdersDetail = async () => {
     await axiosInstance
-      .post(options.url_orderCart, { 
+      .post(options.url_orderCart, {
         Orderid: orderId,
         lang: userLanguage,
       })
@@ -73,22 +73,41 @@ export default function OrdersDetail({ orderId }) {
 
             if (item.type == 1) {
               optionsMarkup = item.children
-                ?.map((child) => {
-                  return `${child.name}: ${child.customizables.map((cust) => {
-                    return `${cust.name}: ${cust.packs
-                      ?.map((e) => e.name)
-                      .join(", ")}`;
-                  })}; `;
-                })
-                .join("");
+                ?.map((child) => (
+                  <View key={child.id}>
+                    <Text style={styles.option}>{child.name}:</Text>
+                    {child.customizables.map((cust, idx) => (
+                      <View key={idx}>
+                        <Text style={styles.bulletItem}>
+                          <Text style={styles.bullet}>•</Text>
+                          {cust.name}:
+                        </Text>
+                        {cust.packs.map((pack, pidx) => (
+                          <View key={pidx} style={styles.nestedBulletItem}>
+                            <Text style={styles.bullet}>◦</Text>
+                            <Text style={styles.option}>{pack.name}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    ))}
+                  </View>
+                ));
             } else if (item.type == 0) {
               optionsMarkup = item.customizables
-                ?.map((cust) => {
-                  return `${cust.name}: ${cust.packs
-                    ?.map((e) => e.name)
-                    .join(", ")}; `;
-                })
-                .join("");
+                ?.map((cust, idx) => (
+                  <View key={idx}>
+                    <Text style={styles.bulletItem}>
+                      <Text style={styles.bullet}>•</Text>
+                      {cust.name}:
+                    </Text>
+                    {cust.packs.map((pack, pidx) => (
+                      <View key={pidx} style={styles.nestedBulletItem}>
+                        <Text style={styles.bullet}>◦</Text>
+                        <Text style={styles.option}>{pack.name}</Text>
+                      </View>
+                    ))}
+                  </View>
+                ));
             }
 
             return (
@@ -103,7 +122,7 @@ export default function OrdersDetail({ orderId }) {
                   {dictionary["amount"]}: {item.amount}
                 </Text>
                 {optionsMarkup ? (
-                  <Text style={styles.option}>Options:({optionsMarkup})</Text>
+                  <View>{optionsMarkup}</View>
                 ) : (
                   <Text style={styles.option}>Options:()</Text>
                 )}
@@ -133,5 +152,20 @@ const styles = StyleSheet.create({
   },
   productIcon: {
     fontSize: 25,
+  },
+  bulletItem: {
+    flexDirection: "row",
+    paddingHorizontal: 15,
+    marginVertical: 2,
+  },
+  nestedBulletItem: {
+    flexDirection: "row",
+    paddingHorizontal: 30,
+    marginVertical: 2,
+  },
+  bullet: {
+    fontSize: 18,
+    lineHeight: 22,
+    marginRight: 5,
   },
 });
