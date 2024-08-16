@@ -306,7 +306,7 @@ export const AuthProvider = ({ isConnected, children }) => {
       }}
     >
 
-      {userObject && showReload && (
+      {!isConnected && userObject && showReload && (
         Alert.alert("ALERT", "connection lost", [
           {
             text: "retry", onPress: () => {
