@@ -30,6 +30,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FFFFFF"
       },
+      "jsEngine": "hermes",
       "package": "com.kovzy.app",
       "softwareKeyboardLayoutMode": "pan",
       "versionCode": 11

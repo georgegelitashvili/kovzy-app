@@ -57,7 +57,8 @@ export const DomainScreen = ({ navigation }) => {
       />
       <Button
         mode="contained"
-        style={{ backgroundColor: '#000', color: '#fff' }}
+        textColor="white"
+        buttonColor="#000"
         onPress={onCheckPressed}
       >
         {dictionary['save']}

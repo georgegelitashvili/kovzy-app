@@ -85,7 +85,8 @@ export const LoginScreen = ({ navigation }) => {
       />
       <Button
         mode="contained"
-        style={{ backgroundColor: "#000", color: '#fff' }}
+        textColor="white"
+        buttonColor="#000"
         onPress={onLoginPressed}
       >
         {dictionary['login']}

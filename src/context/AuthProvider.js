@@ -107,6 +107,7 @@ export const AuthProvider = ({ isConnected, children }) => {
     } catch (error) {
       console.error('Error fetching data:', error.message || error);
       clearInterval(intervalId);
+      setShowReload(true);
     }
   };
 

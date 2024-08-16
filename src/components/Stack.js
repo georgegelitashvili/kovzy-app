@@ -18,7 +18,9 @@ const Header = ({ options, navigation }) => {
   const title = options?.headerTitle ?? options?.title ?? navigation?.route?.name;
 
   return (
-    <Appbar.Header theme={{ colors: { primary: theme.colors.surface } }} style={{ marginTop: headerStyle?.marginTop }}>
+    <Appbar.Header
+      theme={{ colors: { primary: theme.colors.surface } }}
+      style={{ marginTop: headerStyle?.marginTop, backgroundColor: 'white', }}>
       {navigation?.canGoBack() ? <Appbar.BackAction onPress={navigation.goBack} /> : null}
       <Appbar.Content
         title={title}
@@ -42,7 +44,6 @@ export const AuthNavigator = () => {
       <Stack.Screen
         name="Domain"
         options={{
-          headerShown: false,
           headerTitle: dictionary["domains.addDomain"],
           unmountOnBlur: true
         }}
