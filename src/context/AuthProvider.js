@@ -193,7 +193,7 @@ export const AuthProvider = ({ isConnected, children }) => {
   }, [domain, branchid, options, isConnected]);
 
   useEffect(() => {
-    if (options.url_authUser && isConnected) {
+    if (domain && options.url_authUser && isConnected) {
       loadUser();
     } else {
       setIsLoading(false);

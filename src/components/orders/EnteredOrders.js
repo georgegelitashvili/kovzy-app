@@ -402,7 +402,6 @@ export const EnteredOrdersList = () => {
         <FlatGrid
           itemDimension={cardSize}
           maxItemsPerRow={numColumns}
-          style={styles.gridView}
           data={orders}
           renderItem={renderEnteredOrdersList}
           keyExtractor={(item) => (item && item.id ? item.id.toString() : '')}
@@ -418,13 +417,8 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "flex-start",
   },
-  gridView: {
-    marginTop: 10,
-  },
   card: {
     backgroundColor: "#fff",
-    justifyContent: "flex-start",
-
     margin: 10,
     borderRadius: 10,
     shadowColor: "#000",
