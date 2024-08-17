@@ -177,9 +177,6 @@ export const AcceptedOrdersList = () => {
     const trackLink = [JSON.parse(item.deliveron_data)]?.map(link => {
       return link.trackLink ?? null;
     });
-    const isOpenCard = isOpen.includes(item.id);
-
-    console.log(isOpenCard);
 
     return (
       <Card key={item.id} style={styles.card}>
