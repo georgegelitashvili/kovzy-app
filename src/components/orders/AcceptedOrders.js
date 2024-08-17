@@ -27,6 +27,7 @@ import OrdersModal from "../modal/OrdersModal";
 import printRows from "../../PrintRows";
 
 const width = Dimensions.get("window").width;
+const height = Dimensions.get("window").height;
 
 const numColumns = printRows(width);
 const cardSize = width / numColumns;
@@ -176,9 +177,12 @@ export const AcceptedOrdersList = () => {
     const trackLink = [JSON.parse(item.deliveron_data)]?.map(link => {
       return link.trackLink ?? null;
     });
+    const isOpenCard = isOpen.includes(item.id);
+
+    console.log(isOpenCard);
 
     return (
-      <Card key={item.id}>
+      <Card key={item.id} style={styles.card}>
         <TouchableOpacity onPress={() => toggleContent(item.id)}>
           <Card.Content style={styles.head}>
             <Text variant="headlineMedium" style={styles.header}>
@@ -273,8 +277,6 @@ export const AcceptedOrdersList = () => {
     );
   };
 
-
-
   if (loading) {
     return <Loader show={loading} />;
   }
@@ -297,11 +299,11 @@ export const AcceptedOrdersList = () => {
         ) : null}
         <FlatGrid
           itemDimension={cardSize}
+          maxItemsPerRow={numColumns}
           data={orders}
           renderItem={renderEnteredOrdersList}
-          adjustGridToStyles={true}
-          contentContainerStyle={{ justifyContent: "flex-start" }}
           keyExtractor={(item) => (item && item.id ? item.id.toString() : '')}
+          onEndReachedThreshold={0.5}
         />
       </ScrollView>
       <View style={styles.paginationContainer}>
@@ -348,7 +350,6 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: "#fff",
-    justifyContent: "flex-start",
     margin: 10,
     borderRadius: 10,
     shadowColor: "#000",

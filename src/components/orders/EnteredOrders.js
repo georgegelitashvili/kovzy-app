@@ -286,7 +286,7 @@ export const EnteredOrdersList = () => {
 
   const renderEnteredOrdersList = ({ item }) => {
     return (
-      <Card key={item.id}>
+      <Card key={item.id} style={styles.card}>
         <TouchableOpacity onPress={() => toggleContent(item.id)}>
           <Card.Content style={styles.head}>
             <Text variant="headlineMedium" style={styles.header}>
@@ -401,10 +401,10 @@ export const EnteredOrdersList = () => {
         ) : null}
         <FlatGrid
           itemDimension={cardSize}
+          maxItemsPerRow={numColumns}
+          style={styles.gridView}
           data={orders}
           renderItem={renderEnteredOrdersList}
-          adjustGridToStyles={true}
-          contentContainerStyle={{ justifyContent: "flex-start" }}
           keyExtractor={(item) => (item && item.id ? item.id.toString() : '')}
           onEndReachedThreshold={0.5}
         />
@@ -415,8 +415,11 @@ export const EnteredOrdersList = () => {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 12,
+    flex: 1,
     justifyContent: "flex-start",
+  },
+  gridView: {
+    marginTop: 10,
   },
   card: {
     backgroundColor: "#fff",

@@ -10,7 +10,7 @@ import Toast from './src/components/generate/Toast';
 
 // Sentry initialization with environment-specific settings
 Sentry.init({
-  dsn: process.env.SENTRY_DSN || 'https://2ae499816c71fe2e649d2d50a9fe6f9c@o4506904411439104.ingest.us.sentry.io/4506904415764480',
+  dsn: 'https://2ae499816c71fe2e649d2d50a9fe6f9c@o4506904411439104.ingest.us.sentry.io/4506904415764480',
   enableInExpoDevelopment: false, // Disable in development if needed
   environment: Updates.releaseChannel || 'development', // Track environment
   release: Updates.manifest.version, // Track release version
@@ -40,6 +40,12 @@ function App() {
         handleAppCrash();
       } else {
         Sentry.captureException(error); // Capture non-fatal errors in Sentry
+        // Show a toast for non-fatal errors
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: 'Something went wrong, but the app is still running.',
+        });
       }
 
       if (previousHandler) {

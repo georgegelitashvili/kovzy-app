@@ -115,11 +115,11 @@ export const AuthProvider = ({ isConnected, children }) => {
     setIsLoading(true);
     const userObj = await getSecureData('user');
     if (userObj) {
-      console.log('object of user', userObj.id);
+      console.log('object of user', userObj);
       setUserObject(userObj);
       await axiosInstance.get(options.url_authUser)
         .then(response => {
-          if (response.data.user.id === userObj.id) {
+          if (response.data.user) {
             setUser(userObj);
           } else {
             setUser(null);
@@ -267,8 +267,6 @@ export const AuthProvider = ({ isConnected, children }) => {
         logout: async () => {
           setIsLoading(true);
           try {
-            const token = JSON.parse(await SecureStore.getItemAsync('token'));
-            axiosInstance.defaults.headers.common['Authorization'] = `Bearer ${token}`;
             const response = await axiosInstance.post(options.url_logout);
             if (response.data.message) {
               deleteItem("token");
@@ -282,10 +280,8 @@ export const AuthProvider = ({ isConnected, children }) => {
               setUser(null);
               setIsLoading(false);
               setUserObject(null);
-            } else {
-              logout();
             }
-          } catch (error) {
+          } catch (error) {-
             console.log('Error logging out:', error);
             deleteItem("token");
             deleteItem("credentials");

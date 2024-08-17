@@ -79,7 +79,7 @@ export default function OrdersDetail({ orderId }) {
           <View style={styles.body} key={`${item.cart_id}.${index}`}>
             <Text style={styles.header}>
               <Entypo name="dot-single" style={styles.productIcon} />
-              {item.name} X{item.amount}
+              {item.name} <Text style={{ fontWeight: "700", fontSize: 20, }}>X{item.amount}</Text>
             </Text>
             {item.type === 1 ? (
               item.children?.map((child) => (
@@ -119,7 +119,6 @@ export default function OrdersDetail({ orderId }) {
             )}
           </View>
         ))}
-
       </List.Accordion>
     </List.Section>
   );
