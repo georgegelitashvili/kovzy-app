@@ -193,12 +193,12 @@ export const AuthProvider = ({ isConnected, children }) => {
   }, [domain, branchid, options, isConnected]);
 
   useEffect(() => {
-    if (domain && options.url_authUser && isConnected) {
+    if (!user && options.url_authUser && isConnected) {
       loadUser();
     } else {
       setIsLoading(false);
     }
-  }, [domain, options, isConnected]);
+  }, [user, options, isConnected]);
 
 
   const handleReload = () => {
@@ -302,23 +302,23 @@ export const AuthProvider = ({ isConnected, children }) => {
       }}
     >
 
-      {!isConnected && userObject && showReload && (
+      {!isConnected && !user && showReload && (
         Alert.alert("ALERT", "connection lost", [
           {
             text: "retry", onPress: () => {
+              setIsLoading(true);
               handleReload();
-              console.log('deliveron null modal');
             }
           },
         ])
       )}
 
-      {userObject && !user && isLoading && (
-          <Loader text={dictionary["loading"]} />
-        )
-      }
+      {!user && userObject && isLoading ? (
+        <Loader text={dictionary["loading"]} />
+      ) : (
+        children
+      )}
 
-      { children }
 
       {!isVisible && (
         <TouchableOpacity onPress={handleClick}>

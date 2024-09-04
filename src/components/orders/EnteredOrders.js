@@ -285,6 +285,16 @@ export const EnteredOrdersList = () => {
   }, [orders]);
 
   const renderEnteredOrdersList = ({ item }) => {
+    const feeData = JSON.parse(item.fees_details || '{}');
+    const feesDetails = item.fees?.reduce((acc, fee) => {
+      const feeId = fee['id'];
+      if (feeData[feeId]) {
+        acc.push(`${fee['value']} : ${parseFloat(feeData[feeId])}`);
+      }
+      return acc;
+    }, []);
+
+
     return (
       <Card key={item.id} style={styles.card}>
         <TouchableOpacity onPress={() => toggleContent(item.id)}>
@@ -344,6 +354,17 @@ export const EnteredOrdersList = () => {
             <Divider />
 
             <Text variant="titleLarge">{item.price} GEL</Text>
+
+            {feesDetails?.length > 0 && (
+              <Text variant="titleSmall" style={styles.title}>
+                {dictionary["orders.fees"]}:
+                <ul>
+                  {feesDetails.map((fee, index) => (
+                    <li key={index} className="card-text">{fee}</li>
+                  ))}
+                </ul>
+              </Text>
+            )}
 
             <Card.Actions>
               <Button

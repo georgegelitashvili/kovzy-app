@@ -1,6 +1,6 @@
 import React, { useContext } from 'react';
 import { ActivityIndicator, StyleSheet, View, Text, Dimensions } from 'react-native';
-import { String, LanguageContext } from "../Language";
+import { LanguageContext } from "../Language";
 import Toast from './Toast';
 
 const WIDTH = Dimensions.get("screen").width;
@@ -10,9 +10,12 @@ export default function Loader(props) {
 
   return (
     <>
-      <View style={[styles.indicatorWrapper]}>
-        <ActivityIndicator animating={true} size="large" style={styles.indicator} />
-        <Text style={styles.indicatorText}>{dictionary['loading']}</Text>
+      <View style={styles.backgroundOverlay} />
+      <View style={styles.loaderContainer}>
+        <View style={styles.indicatorWrapper}>
+          <ActivityIndicator animating={true} size="large" color="#ffffff" />
+          <Text style={styles.indicatorText}>{dictionary['loading']}</Text>
+        </View>
       </View>
 
       {props.error ? (
@@ -21,35 +24,38 @@ export default function Loader(props) {
           title="Error"
           subtitle={props.error}
           animate={true}
-          addStyles={{ top: WIDTH, }}
+          addStyles={{ top: WIDTH }}
         />
-        ) : null}
-      </>
-    );
-  }
+      ) : null}
+    </>
+  );
+}
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    position: "relative"
+  backgroundOverlay: {
+    ...StyleSheet.absoluteFillObject, // Cover the entire screen
+    backgroundColor: 'rgba(0, 0, 0, 0.0)', // Semi-transparent background
+    zIndex: 10, // Ensure it's below the loader but above other elements
+    // Disable interactions with underlying components
+    pointerEvents: 'auto',
+  },
+  loaderContainer: {
+    ...StyleSheet.absoluteFillObject, // Cover the entire screen
+    justifyContent: 'center', // Center vertically
+    alignItems: 'center', // Center horizontally
+    zIndex: 20, // Ensure it's above the background overlay
   },
   indicatorWrapper: {
-    width: 200,
-    height: 300,
-    borderRadius: 13,
-    position: 'absolute',
-    top: '50%',
-    marginTop: '-25%',
-    alignSelf: 'center',
+    width: 150, // Set the width of the square
+    height: 150, // Set the height of the square to be the same as the width
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(100, 100, 100, 0.9)',
-    zIndex: 3,
-    elevation: 3
+    backgroundColor: 'rgba(100, 100, 100, 0.8)', // Semi-transparent background
+    borderRadius: 10, // Optional: Rounded corners
   },
   indicatorText: {
-    fontSize: 18,
+    fontSize: 13,
     marginTop: 12,
-    color: '#fff'
+    color: '#fff',
   },
 });

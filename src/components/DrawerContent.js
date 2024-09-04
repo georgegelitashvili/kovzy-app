@@ -38,7 +38,6 @@ export default function DrawerContent(props) {
 
   const onLogoutPressed = () => {
     props.navigation.closeDrawer();
-    setIsDataSet(false);
     clearInterval(intervalId);
     logout();
   };
