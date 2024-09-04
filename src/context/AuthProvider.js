@@ -194,7 +194,9 @@ export const AuthProvider = ({ isConnected, children }) => {
 
   useEffect(() => {
     if (!user && options.url_authUser && isConnected) {
-      loadUser();
+      if (appState.match(/active/)) {
+        loadUser();
+      }
     } else {
       setIsLoading(false);
     }
@@ -216,6 +218,7 @@ export const AuthProvider = ({ isConnected, children }) => {
         setUser,
         loginError,
         isLoading,
+        setIsLoading,
         setIsDataSet,
         branchid,
         setBranchid,

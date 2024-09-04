@@ -220,6 +220,7 @@
     "orders.details" : "დამატებითი გადასახადების დეტალები",
     "orders.warning" : "შეგახსენებთ, შემოვიდა შეკვეთა",
     "orders.takeAway": "ადგილიდან გატანა",
+    "orders.totalcost": "სულ გადახდილი",
     "slider.sliderPages": "სლაიდერის გვერდები",
     "slider.editingSliderPage": "სლაიდერის გვერდების შესწორება",
     "slider.product": "პროდუქტი",

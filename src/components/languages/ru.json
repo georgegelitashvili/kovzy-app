@@ -219,6 +219,7 @@
     "orders.details" : "Подробно",
     "orders.warning" : "Напоминание. Принят заказ. Требуется ваше действие",
     "orders.takeAway": "на вынос",
+    "orders.totalcost": "Выплачиваются в полном объеме",
     "slider.sliderPages": "Страницы слайдера",
     "slider.editingSliderPage": "Редактирование страницы слайдера",
     "slider.product": "Продукт",

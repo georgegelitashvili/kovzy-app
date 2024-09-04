@@ -223,6 +223,7 @@
     "orders.details" : "Details",
     "orders.warning" : "Reminder! An order is received. Action is required",
     "orders.takeAway": "Take away",
+    "orders.totalcost": "Paid in full",
     "slider.sliderPages": "Slider Pages",
     "slider.editingSliderPage": "Editing Slider Page",
     "slider.product": "Product",
