@@ -31,7 +31,7 @@ export const BranchScreen = ({ navigation }) => {
       setBranches(data.map((item) => ({
         label: item.title,
         value: item.id,
-        enabled: item.enabled
+        enabled: item.temp_close
       })));
       setErrorText("");
     } catch (error) {

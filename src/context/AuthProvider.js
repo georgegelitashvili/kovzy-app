@@ -176,7 +176,7 @@ export const AuthProvider = ({ isConnected, children }) => {
         // App has come to the foreground
         fetchData();
         startInterval();
-        if (!user && options.url_authUser && isConnected) {
+        if (!user && isConnected) {
           loadUser();
         }
       } else {
