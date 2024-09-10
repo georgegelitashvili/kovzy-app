@@ -34,7 +34,7 @@ const NotificationScreen = ({ navigation }) => {
                     setPlayingMusicId(savedMusicId);
                 } else {
                     setSelectedMusic(1);
-                    setPlayingMusicId('Plucky');
+                    setPlayingMusicId(1);
                 }
             } catch (error) {
                 console.log('Error loading saved music:', error);

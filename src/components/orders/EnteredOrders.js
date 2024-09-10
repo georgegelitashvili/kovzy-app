@@ -167,12 +167,10 @@ export const EnteredOrdersList = () => {
 
       // Clear any existing interval
       clearInterval(intervalId);
-
       // Start the interval with the correct languageId
       startInterval();
 
       console.log('Interval started.');
-
       return () => {
         clearInterval(intervalId); // Clear the interval in the cleanup function
         subscribe.remove();
