@@ -21,7 +21,6 @@ import OrdersDetail from "./OrdersDetail";
 import OrdersModal from "../modal/OrdersModal";
 import printRows from "../../PrintRows";
 import NotificationManager from '../../utils/NotificationManager';
-import { navigate } from '../../helpers/navigate';
 
 const width = Dimensions.get("window").width;
 
@@ -161,13 +160,13 @@ export const EnteredOrdersList = () => {
   useEffect(() => {
     apiOptions();
 
-    if (optionsIsLoaded && languageId) {
+    if (optionsIsLoaded) {
       const subscribe = AppState.addEventListener('change', handleAppStateChange);
       console.log('Starting interval...');
 
       // Clear any existing interval
       clearInterval(intervalId);
-      // Start the interval with the correct languageId
+      // Start the interval
       startInterval();
 
       console.log('Interval started.');
