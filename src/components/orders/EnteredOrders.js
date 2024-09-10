@@ -330,26 +330,26 @@ export const EnteredOrdersList = () => {
             <OrdersDetail orderId={item.id} />
             <Divider />
 
-            {feesDetails?.length > 0 && (
-              <View>
-                <Text variant="titleSmall" style={styles.title}>
-                  {dictionary["orders.additionalFees"]}: {additionalFees}
-                </Text>
-                <View style={styles.feeDetailsContainer}>
-                  {feesDetails.map((fee, index) => (
-                    <Text key={index} style={styles.feeDetailText}>
-                      {fee}
-                    </Text>
-                  ))}
-                </View>
-              </View>
-            )}
-
             <Text variant="titleMedium" style={styles.title}> {dictionary["orders.initialPrice"]}: {item.real_price} {currency}</Text>
 
             <Text variant="titleMedium" style={styles.title}> {dictionary["orders.discountedPrice"]}: {item.price} {currency}</Text>
 
             <Text variant="titleMedium" style={styles.title}> {dictionary["orders.deliveryPrice"]}: {deliveryPrice} {currency}</Text>
+
+            {feesDetails?.length > 0 && (
+              <View>
+                <Text variant="titleMedium" style={styles.title}>
+                  {dictionary["orders.additionalFees"]}: {additionalFees} {currency}
+                </Text>
+                <View style={styles.feeDetailsContainer}>
+                  {feesDetails.map((fee, index) => (
+                    <Text key={index} style={styles.feeDetailText}>
+                      {fee} {currency}
+                    </Text>
+                  ))}
+                </View>
+              </View>
+            )}
 
             <Text variant="titleMedium" style={styles.title}>
               {dictionary["orders.totalcost"]}: {item.total_cost} {currency}
