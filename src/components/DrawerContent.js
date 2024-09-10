@@ -109,6 +109,26 @@ export default function DrawerContent(props) {
         </View>
 
         <Drawer.Section style={styles.drawerSection}>
+          <TouchableRipple onPress={toggleDeliveron}>
+            <View style={styles.preference}>
+              <Text>{dictionary["dv.deliveron"]}</Text>
+              <View pointerEvents="none">
+                <Switch value={deliveronEnabled} />
+              </View>
+            </View>
+          </TouchableRipple>
+
+          <TouchableRipple onPress={toggleBranch}>
+            <View style={styles.preference}>
+              <Text>{dictionary["orders.branch"]}</Text>
+              <View pointerEvents="none">
+                <Switch value={branchEnabled} />
+              </View>
+            </View>
+          </TouchableRipple>
+        </Drawer.Section>
+
+
           <DrawerItem
             icon={({ color, size }) => (
               <MaterialCommunityIcons
@@ -153,27 +173,6 @@ export default function DrawerContent(props) {
             label={dictionary.logout}
             onPress={onLogoutPressed}
           />
-        </Drawer.Section>
-
-        <Drawer.Section>
-          <TouchableRipple onPress={toggleDeliveron}>
-            <View style={styles.preference}>
-              <Text>{dictionary["dv.deliveron"]}</Text>
-              <View pointerEvents="none">
-                <Switch value={deliveronEnabled} />
-              </View>
-            </View>
-          </TouchableRipple>
-
-          <TouchableRipple onPress={toggleBranch}>
-            <View style={styles.preference}>
-              <Text>{dictionary["orders.branch"]}</Text>
-              <View pointerEvents="none">
-                <Switch value={branchEnabled} />
-              </View>
-            </View>
-          </TouchableRipple>
-        </Drawer.Section>
 
       </View>
     </DrawerContentScrollView>
@@ -210,13 +209,13 @@ const styles = StyleSheet.create({
     marginRight: 3,
   },
   drawerSection: {
-    marginTop: 15,
+    marginTop: 6,
+    marginBottom: 10
   },
   preference: {
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingVertical: 12,
-    paddingHorizontal: 15,
-    marginTop: 5,
+    paddingVertical: 1,
+    paddingHorizontal: 20,
   },
 });

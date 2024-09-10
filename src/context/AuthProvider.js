@@ -176,6 +176,9 @@ export const AuthProvider = ({ isConnected, children }) => {
         // App has come to the foreground
         fetchData();
         startInterval();
+        if (!user && options.url_authUser && isConnected) {
+          loadUser();
+        }
       } else {
         // App has gone to the background
         stopInterval();
@@ -190,13 +193,11 @@ export const AuthProvider = ({ isConnected, children }) => {
       stopInterval();
       subscribe.remove();
     };
-  }, [domain, branchid, options, isConnected]);
+  }, [appState, domain, branchid, options, isConnected, user]);
 
   useEffect(() => {
     if (!user && options.url_authUser && isConnected) {
-      if (appState.match(/active/)) {
-        loadUser();
-      }
+      loadUser();
     } else {
       setIsLoading(false);
     }
