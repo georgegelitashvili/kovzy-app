@@ -28,6 +28,8 @@ const SettingsScreen = ({ navigation }) => {
             const title = await AsyncStorage.getItem('selectedMusicTitle');
             if (title) {
                 setMusicTitle(title);
+            } else {
+                setMusicTitle('Plucky');
             }
         } catch (error) {
             console.log('Error loading music title:', error);

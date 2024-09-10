@@ -100,10 +100,6 @@ export const EnteredOrdersList = () => {
     setVisible(true);
   };
 
-  const handleNavigateToAuth = () => {
-    navigate('Auth', { screen: 'Login' });
-  };
-
   const fetchEnteredOrders = async () => {
     try {
       if (!user || !options.url_unansweredOrders) {
@@ -125,24 +121,7 @@ export const EnteredOrdersList = () => {
       console.log('Error fetching entered orders full:', error);
       const statusCode = error?.status || 'Unknown';
       console.log('Status code entered orders:', statusCode);
-      if (statusCode === 401) {
-        console.log('Error fetching entered orders:', statusCode);
-        setOrders([]);
-        setOptions({});
-        setOptionsIsLoaded(false);
-        setIsDeliveronOptions(false);
-        Alert.alert("ALERT", "your session expired", [
-          {
-            text: "Login", onPress: () => {
-              clearInterval(intervalId);
-              setShouldRenderAuthScreen(true);
-            }
-          },
-        ]);
-        return clearInterval(intervalId); // Clear the interval here
-      } else {
-        handleReload();
-      }
+      handleReload();
     } finally {
       setLoading(false);
     }
@@ -178,12 +157,6 @@ export const EnteredOrdersList = () => {
       setOrders([]);
     }
   }, [domain, branchid, apiOptions]);
-
-  useEffect(() => {
-    if (shouldRenderAuthScreen) {
-      handleNavigateToAuth();
-    }
-  }, [shouldRenderAuthScreen]);
 
   useEffect(() => {
     apiOptions();
