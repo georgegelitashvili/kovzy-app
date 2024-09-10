@@ -35,6 +35,9 @@ const cardSize = width / numColumns;
 export const AcceptedOrdersList = () => {
   const { domain, branchid, setUser, user, deleteItem, setIsDataSet, intervalId } = useContext(AuthContext);
   const [orders, setOrders] = useState([]);
+  const [fees, setFees] = useState([]);
+  const [currency, setCurrency] = useState("");
+
   const [page, setPage] = useState(0);
   const [options, setOptions] = useState({
     url_getAcceptedOrders: "",
@@ -100,7 +103,10 @@ export const AcceptedOrdersList = () => {
         type: 0
       }));
       const data = resp.data.data;
+      const feesData = resp.data.fees;
       setOrders(data);
+      setFees(feesData);
+      setCurrency(resp.data.currency);
     } catch (error) {
       console.log('Error fetching accepted orders full:', error);
       const statusCode = error?.status || 'Unknown';
@@ -178,6 +184,17 @@ export const AcceptedOrdersList = () => {
       return link.trackLink ?? null;
     });
 
+    const deliveryPrice = parseFloat(item.delivery_price);
+    const additionalFees = parseFloat(item.service_fee) / 100;
+    const feeData = JSON.parse(item.fees_details || '{}');
+    const feesDetails = fees?.reduce((acc, fee) => {
+      const feeId = fee['id'];
+      if (feeData[feeId]) {
+        acc.push(`${fee['value']} : ${parseFloat(feeData[feeId])}`);
+      }
+      return acc;
+    }, []);
+
     return (
       <Card key={item.id} style={styles.card}>
         <TouchableOpacity onPress={() => toggleContent(item.id)}>
@@ -244,7 +261,30 @@ export const AcceptedOrdersList = () => {
             <OrdersDetail orderId={item.id} />
             <Divider />
 
-            <Text variant="titleLarge">{item.price} GEL</Text>
+            <Text variant="titleMedium" style={styles.title}> {dictionary["orders.initialPrice"]}: {item.real_price} {currency}</Text>
+
+            <Text variant="titleMedium" style={styles.title}> {dictionary["orders.discountedPrice"]}: {item.price} {currency}</Text>
+
+            <Text variant="titleMedium" style={styles.title}> {dictionary["orders.deliveryPrice"]}: {deliveryPrice} {currency}</Text>
+
+            {feesDetails?.length > 0 && (
+              <View>
+                <Text variant="titleMedium" style={styles.title}>
+                  {dictionary["orders.additionalFees"]}: {additionalFees} {currency}
+                </Text>
+                <View style={styles.feeDetailsContainer}>
+                  {feesDetails.map((fee, index) => (
+                    <Text key={index} style={styles.feeDetailText}>
+                      {fee} {currency}
+                    </Text>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            <Text variant="titleMedium" style={styles.title}>
+              {dictionary["orders.totalcost"]}: {item.total_cost} {currency}
+            </Text>
 
             <Card.Actions>
               <Button
@@ -400,5 +440,13 @@ const styles = StyleSheet.create({
   paginationText: {
     fontSize: 17,
     fontWeight: "bold",
+  },
+  feeDetailsContainer: {
+    paddingLeft: 10,
+    marginBottom: 15
+  },
+  feeDetailText: {
+    fontSize: 15,
+    color: '#333',
   },
 });

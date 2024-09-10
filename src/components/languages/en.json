@@ -223,6 +223,7 @@
     "orders.details" : "Details",
     "orders.warning" : "Reminder! An order is received. Action is required",
     "orders.takeAway": "Take away",
+    "orders.totalcost": "Paid in full",
     "slider.sliderPages": "Slider Pages",
     "slider.editingSliderPage": "Editing Slider Page",
     "slider.product": "Product",
@@ -441,5 +442,6 @@
     "dv.disrupt": "Courier has canceled your order. Replacement is available from the Current Orders section",
     "dv.status": "Status deliveron",
     "dv.cancelOrder": "Courier cancellation",
-    "dv.empty": "No active courier found, please try again later or disable the Deliveron module and deliver by yourself."
+    "dv.empty": "No active courier found, please try again later or disable the Deliveron module and deliver by yourself.",
+    "settings": "Settings"
 }

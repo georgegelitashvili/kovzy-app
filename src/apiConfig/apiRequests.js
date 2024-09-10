@@ -1,6 +1,5 @@
 import axios from "axios";
 import * as SecureStore from 'expo-secure-store';
-import { navigate } from '../helpers/navigate';
 import { removeData } from "../helpers/storage";
 
 const axiosInstance = axios.create({

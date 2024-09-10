@@ -486,5 +486,6 @@
     "contentCreatedSucessfully": "Բովանդակությունը հաջողությամբ վերբեռնվեց",
     "newAdmin_message": "օգտագործողի անունը: :username\nգաղտնաբառը: :pwd",
     "newOrder_message": "Պատվերը հասել է,\nմասնաճյուղ: :title",
-    "loading": "Բեռնվում է..."
+    "loading": "Բեռնվում է...",
+    "settings": "կարգավորումները"
 }

@@ -121,6 +121,15 @@ export default function Products({ navigation }) {
     return unsubscribe;
   }, [navigation]);
 
+  useEffect(() => {
+    if (!showFilter) {
+      setSelected("");
+    }
+    if (!showSearch) {
+      setSearchQuery("");
+    }
+  }, [showFilter, showSearch]);
+
   const onRefresh = () => {
     // setPage(1);
     setRefreshing(true);

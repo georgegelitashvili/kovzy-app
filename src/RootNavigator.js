@@ -1,7 +1,7 @@
 import React, { useContext } from "react";
 import { createDrawerNavigator } from "@react-navigation/drawer";
 import { AuthContext } from "./context/AuthProvider";
-import { OrdersNavigator, ProductsNavigator, AuthNavigator } from "./components/Stack";
+import { OrdersNavigator, ProductsNavigator, AuthNavigator, SettingsNavigator } from "./components/Stack";
 import DrawerContent from "./components/DrawerContent";
 import { LanguageContext } from "./components/Language";
 
@@ -31,6 +31,11 @@ const RootNavigator = () => {
             name="Products"
             component={ProductsNavigator}
             options={{ title: dictionary["nav.products"], unmountOnBlur: true }}
+          />
+          <Drawer.Screen
+            name="Settings"
+            component={SettingsNavigator}
+            options={{ title: dictionary["Settings"], unmountOnBlur: true }}
           />
         </Drawer.Navigator>
       ) : (
