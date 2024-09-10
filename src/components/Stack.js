@@ -9,6 +9,8 @@ import { LoginScreen } from "../startScreens/LoginScreen";
 import Orders from "../Orders";
 import Products from "../Products";
 import ProductsDetail from "./products/ProductsDetail";
+import SettingsScreen from '../SettingsScreen';
+import NotificationScreen from './settings/NotificationScreen';
 
 const Stack = createStackNavigator();
 
@@ -113,6 +115,37 @@ export const ProductsNavigator = () => {
           ...route.params?.options, // Pass route params as options
         })}
       />
+    </Stack.Navigator>
+  );
+};
+
+export const SettingsNavigator = () => {
+  const { dictionary } = useContext(LanguageContext);
+
+  return (
+    <Stack.Navigator
+      screenOptions={({ navigation, route }) => ({
+        headerMode: "screen",
+        headerBackTitleVisible: false,
+        header: (props) => <Header {...props} />,
+        ...route.params?.options, // Pass route params as options
+      })}
+    >
+      <Stack.Screen
+        name="Setting"
+        options={{ headerShown: false, unmountOnBlur: true }}
+        component={SettingsScreen}
+      />
+      <Stack.Screen
+        name="MusicList"
+        options={({ route }) => ({
+          headerTitle: "Notifications",
+          headerStyle: { marginTop: 0 },
+          headerContentStyle: { fontSize: 10 },
+          unmountOnBlur: true,
+          ...route.params?.options, // Pass route params as options
+        })}
+        component={NotificationScreen} />
     </Stack.Navigator>
   );
 };

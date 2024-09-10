@@ -442,5 +442,6 @@
     "dv.disrupt": "Courier has canceled your order. Replacement is available from the Current Orders section",
     "dv.status": "Status deliveron",
     "dv.cancelOrder": "Courier cancellation",
-    "dv.empty": "No active courier found, please try again later or disable the Deliveron module and deliver by yourself."
+    "dv.empty": "No active courier found, please try again later or disable the Deliveron module and deliver by yourself.",
+    "settings": "Settings"
 }

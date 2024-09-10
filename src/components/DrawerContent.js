@@ -2,7 +2,7 @@ import React, { useState, useContext, useEffect } from "react";
 import { View, StyleSheet } from "react-native";
 import { DrawerItem, DrawerContentScrollView } from "@react-navigation/drawer";
 import { Drawer, Text, TouchableRipple, Switch } from "react-native-paper";
-import { MaterialCommunityIcons, Fontisto } from "@expo/vector-icons";
+import { MaterialCommunityIcons, Fontisto, SimpleLineIcons } from "@expo/vector-icons";
 import { AuthContext, AuthProvider } from "../context/AuthProvider";
 import LanguageSelector from "./generate/LanguageSelector";
 import axiosInstance from "../apiConfig/apiRequests";
@@ -133,6 +133,17 @@ export default function DrawerContent(props) {
             label={dictionary["nav.onlineOrders"]}
             onPress={() => {
               props.navigation.navigate("Orders");
+            }}
+          />
+          <DrawerItem
+            icon={({ color, size }) => (
+              <SimpleLineIcons name="settings"
+                color={color}
+                size={size} />
+            )}
+            label={dictionary["settings"]}
+            onPress={() => {
+              props.navigation.navigate("Settings");
             }}
           />
           <DrawerItem

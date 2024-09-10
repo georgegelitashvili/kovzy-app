@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useContext } from "react";
+import React, { useState, useEffect, useCallback, useContext, useRef } from "react";
 import {
   StyleSheet,
   Dimensions,
@@ -11,7 +11,6 @@ import {
 import { Text, Button, Divider, Card } from "react-native-paper";
 import { FlatGrid } from "react-native-super-grid";
 import { MaterialCommunityIcons, SimpleLineIcons } from "@expo/vector-icons";
-import { Audio } from "expo-av";
 import * as Updates from 'expo-updates';
 
 import { AuthContext, AuthProvider } from "../../context/AuthProvider";
@@ -21,7 +20,7 @@ import axiosInstance from "../../apiConfig/apiRequests";
 import OrdersDetail from "./OrdersDetail";
 import OrdersModal from "../modal/OrdersModal";
 import printRows from "../../PrintRows";
-
+import NotificationManager from '../../utils/NotificationManager';
 import { navigate } from '../../helpers/navigate';
 
 const width = Dimensions.get("window").width;
@@ -35,7 +34,10 @@ let temp = 0;
 // render entered orders function
 export const EnteredOrdersList = () => {
   const { domain, branchid, setUser, user, intervalId, setIntervalId, shouldRenderAuthScreen, setShouldRenderAuthScreen } = useContext(AuthContext);
+  const notificationManagerRef = useRef(null);
   const [orders, setOrders] = useState([]);
+  const [fees, setFees] = useState([]);
+  const [currency, setCurrency] = useState("");
 
   const [appState, setAppState] = useState(AppState.currentState);
 
@@ -55,7 +57,6 @@ export const EnteredOrdersList = () => {
   const [itemTakeAway, setItemTakeAway] = useState(0);
   const [isOpen, setOpenState] = useState([]); // my accordion state
   const [modalType, setModalType] = useState("");
-  const [sound, setSound] = useState(new Audio.Sound());
 
   const [loading, setLoading] = useState(true);
   const [loadingOptions, setLoadingOptions] = useState(false);
@@ -77,35 +78,6 @@ export const EnteredOrdersList = () => {
 
     let index = isOpen.indexOf(value);
     if (index > -1) setOpenState([...isOpen.filter((i) => i !== value)]);
-  };
-
-  const onStopPlaySound = async () => {
-    sound.stopAsync();
-  };
-
-  const onPlaySound = async () => {
-    const source = require("../../assets/audio/alert.mp3");
-    try {
-      await sound.loadAsync(source);
-      await sound
-        .playAsync()
-        .then(async (PlaybackStatus) => {
-          setTimeout(() => {
-            sound.unloadAsync();
-          }, PlaybackStatus.playableDurationMillis);
-        })
-        .catch((error) => {
-          console.log(error);
-        });
-    } catch (error) {
-      console.log(error);
-    }
-  };
-
-  const orderReceived = () => {
-    Alert.alert("ALERT", "***New Order Received***", [
-      { text: "OK", onPress: () => onStopPlaySound() },
-    ]);
   };
 
   const handleReload = async () => {
@@ -145,7 +117,10 @@ export const EnteredOrdersList = () => {
         Languageid: languageId
       });
       const data = resp.data.data;
+      const feesData = resp.data.fees;
       setOrders(data);
+      setFees(feesData);
+      setCurrency(resp.data.currency);
     } catch (error) {
       console.log('Error fetching entered orders full:', error);
       const statusCode = error?.status || 'Unknown';
@@ -277,23 +252,25 @@ export const EnteredOrdersList = () => {
     if (orders) {
       ordersCount = Object.keys(orders).length;
       if (ordersCount > temp) {
-        onPlaySound();
-        orderReceived();
+        if (notificationManagerRef.current) {
+          notificationManagerRef.current.orderReceived();
+        }
       }
       temp = ordersCount;
     }
   }, [orders]);
 
   const renderEnteredOrdersList = ({ item }) => {
+    const deliveryPrice = parseFloat(item.delivery_price);
+    const additionalFees = parseFloat(item.service_fee) / 100;
     const feeData = JSON.parse(item.fees_details || '{}');
-    const feesDetails = item.fees?.reduce((acc, fee) => {
+    const feesDetails = fees?.reduce((acc, fee) => {
       const feeId = fee['id'];
       if (feeData[feeId]) {
         acc.push(`${fee['value']} : ${parseFloat(feeData[feeId])}`);
       }
       return acc;
     }, []);
-
 
     return (
       <Card key={item.id} style={styles.card}>
@@ -353,18 +330,30 @@ export const EnteredOrdersList = () => {
             <OrdersDetail orderId={item.id} />
             <Divider />
 
-            <Text variant="titleLarge">{item.price} GEL</Text>
-
             {feesDetails?.length > 0 && (
-              <Text variant="titleSmall" style={styles.title}>
-                {dictionary["orders.fees"]}:
-                <ul>
+              <View>
+                <Text variant="titleSmall" style={styles.title}>
+                  {dictionary["orders.additionalFees"]}: {additionalFees}
+                </Text>
+                <View style={styles.feeDetailsContainer}>
                   {feesDetails.map((fee, index) => (
-                    <li key={index} className="card-text">{fee}</li>
+                    <Text key={index} style={styles.feeDetailText}>
+                      {fee}
+                    </Text>
                   ))}
-                </ul>
-              </Text>
+                </View>
+              </View>
             )}
+
+            <Text variant="titleMedium" style={styles.title}> {dictionary["orders.initialPrice"]}: {item.real_price} {currency}</Text>
+
+            <Text variant="titleMedium" style={styles.title}> {dictionary["orders.discountedPrice"]}: {item.price} {currency}</Text>
+
+            <Text variant="titleMedium" style={styles.title}> {dictionary["orders.deliveryPrice"]}: {deliveryPrice} {currency}</Text>
+
+            <Text variant="titleMedium" style={styles.title}>
+              {dictionary["orders.totalcost"]}: {item.total_cost} {currency}
+            </Text>
 
             <Card.Actions>
               <Button
@@ -406,6 +395,7 @@ export const EnteredOrdersList = () => {
   return (
     <View>
       {loadingOptions ? <Loader /> : null}
+      <NotificationManager ref={notificationManagerRef} />
       <ScrollView horizontal={true} showsVerticalScrollIndicator={false}>
         {visible ? (
           <OrdersModal
@@ -473,5 +463,13 @@ const styles = StyleSheet.create({
   },
   title: {
     paddingVertical: 10,
+  },
+  feeDetailsContainer: {
+    paddingLeft: 10,
+    marginBottom: 15
+  },
+  feeDetailText: {
+    fontSize: 15,
+    color: '#333',
   },
 });
