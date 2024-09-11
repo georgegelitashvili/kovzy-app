@@ -33,8 +33,8 @@ const NotificationScreen = ({ navigation }) => {
                     setSelectedMusic(savedMusicId);
                     setPlayingMusicId(savedMusicId);
                 } else {
-                    setSelectedMusic(1);
-                    setPlayingMusicId(1);
+                    setSelectedMusic('1');
+                    setPlayingMusicId('1');
                 }
             } catch (error) {
                 console.log('Error loading saved music:', error);
@@ -141,7 +141,7 @@ const NotificationScreen = ({ navigation }) => {
     const handlePressOut = () => {
         setPressedCardId(null);
     };
-
+    console.log(selectedMusic, playingMusicId);
     return (
         <TouchableWithoutFeedback onPress={handleOutsidePress}>
             <View style={styles.container}>

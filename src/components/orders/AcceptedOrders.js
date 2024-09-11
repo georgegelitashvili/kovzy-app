@@ -111,6 +111,7 @@ export const AcceptedOrdersList = () => {
       console.log('Error fetching accepted orders full:', error);
       const statusCode = error?.status || 'Unknown';
       console.log('Status code accepted orders:', statusCode);
+      clearInterval(intervalId);
     } finally {
       setLoading(false);
     }

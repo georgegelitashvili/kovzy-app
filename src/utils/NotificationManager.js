@@ -61,7 +61,7 @@ const NotificationManager = forwardRef((props, ref) => {
             if (savedMusicId) {
                 await onPlaySound(savedMusicId);
             } else {
-                await onPlaySound(1);
+                await onPlaySound('1');
             }
         } catch (error) {
             console.log('Error loading saved music:', error);

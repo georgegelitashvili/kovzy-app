@@ -120,6 +120,7 @@ export const EnteredOrdersList = () => {
       console.log('Error fetching entered orders full:', error);
       const statusCode = error?.status || 'Unknown';
       console.log('Status code entered orders:', statusCode);
+      clearInterval(intervalId);
       handleReload();
     } finally {
       setLoading(false);

@@ -15,6 +15,7 @@ export const AuthProvider = ({ isConnected, children }) => {
   const [user, setUser] = useState(null);
   const [userObject, setUserObject] = useState(null);
   const [domain, setDomain] = useState(null);
+  const [previousDomain, setPreviousDomain] = useState(null);
   const [branchid, setBranchid] = useState(null);
   const [branchName, setBranchName] = useState(null);
   const [isLoading, setIsLoading] = useState(false);

@@ -70,7 +70,7 @@ export default function DrawerContent(props) {
   useEffect(() => {
     setBranchChangeOptions((prev) => ({
       ...prev,
-      data: { branchid: branchid, enabled: branchEnabled ? 0 : 1 },
+      data: { branchid: branchid, enabled: branchEnabled ? 1 : 0 },
     }));
     setIsBranchEnabled(true);
   }, [branchEnabled, branchid]);
@@ -217,5 +217,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingVertical: 1,
     paddingHorizontal: 20,
+    marginTop: 6,
   },
 });
