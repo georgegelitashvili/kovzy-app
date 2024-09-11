@@ -6,7 +6,8 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
-  AppState
+  AppState,
+  FlatList
 } from "react-native";
 import { Text, Button, Divider, Card } from "react-native-paper";
 import { FlatGrid } from "react-native-super-grid";
@@ -60,6 +61,10 @@ export const EnteredOrdersList = () => {
   const [loading, setLoading] = useState(true);
   const [loadingOptions, setLoadingOptions] = useState(false);
 
+  const [width, setWidth] = useState(Dimensions.get('window').width);
+  const [numColumns, setNumColumns] = useState(printRows(width));
+  const [cardSize, setCardSize] = useState(width / numColumns);
+
   const { dictionary, languageId } = useContext(LanguageContext);
 
   const onChangeModalState = (newState) => {
@@ -98,6 +103,20 @@ export const EnteredOrdersList = () => {
     setModalType(type);
     setVisible(true);
   };
+
+  // Update layout on dimension change
+  useEffect(() => {
+    const updateLayout = () => {
+      const newWidth = Dimensions.get('window').width;
+      const columns = printRows(newWidth);
+      setWidth(newWidth);
+      setNumColumns(columns);
+      setCardSize(newWidth / columns);
+    };
+
+    const subscription = Dimensions.addEventListener('change', updateLayout);
+    return () => subscription?.remove();
+  }, []);
 
   const fetchEnteredOrders = async () => {
     try {
@@ -269,7 +288,7 @@ export const EnteredOrdersList = () => {
               {dictionary["orders.status"]}: {dictionary["orders.pending"]}
             </Text>
 
-            <Text variant="titleSmall" style={styles.title}>
+            <Text variant="titleSmall" style={styles.title} numberOfLines={2} ellipsizeMode="tail">
               {dictionary["orders.fName"]}: {item.firstname} {item.lastname}
             </Text>
 
@@ -277,23 +296,23 @@ export const EnteredOrdersList = () => {
               {dictionary["orders.phone"]}: {item.phone_number}
             </Text>
 
-            <Text variant="titleSmall" style={styles.title}>
+            <Text variant="titleSmall" style={styles.title} ellipsizeMode="tail">
               {dictionary["orders.address"]}: {item.address}
             </Text>
 
             {item.delivery_scheduled ? (
-              <Text variant="titleSmall" style={styles.title}>
+              <Text variant="titleSmall" style={styles.title} numberOfLines={2} ellipsizeMode="tail">
                 {dictionary["orders.scheduledDeliveryTime"]}: {item.delivery_scheduled}
               </Text>
             ) : null}
 
             {item.comment ? (
-              <Text variant="titleSmall" style={styles.title}>
+              <Text variant="titleSmall" style={styles.title} numberOfLines={2} ellipsizeMode="tail">
                 {dictionary["orders.comment"]}: {item.comment}
               </Text>
             ) : null}
 
-            <Text variant="titleSmall" style={styles.title}>
+            <Text variant="titleSmall" style={styles.title} numberOfLines={2} ellipsizeMode="tail">
               {dictionary["orders.paymentMethod"]}: {item.payment_type}
             </Text>
 
@@ -364,31 +383,36 @@ export const EnteredOrdersList = () => {
   }
 
   return (
-    <View>
+    <View style={{ flex: 1, width: width, }}>
       {loadingOptions ? <Loader /> : null}
       <NotificationManager ref={notificationManagerRef} />
-      <ScrollView horizontal={true} showsVerticalScrollIndicator={false}>
-        {visible ? (
-          <OrdersModal
-            isVisible={visible}
-            onChangeState={onChangeModalState}
-            orders={orders}
-            hasItemId={itemId}
-            deliveron={deliveron ?? null}
-            deliveronOptions={deliveronOptions}
-            type={modalType}
-            options={options}
-            takeAway={itemTakeAway}
+      <ScrollView horizontal={false} showsVerticalScrollIndicator={false}>
+        <View style={{ flexDirection: 'row', flexWrap: 'nowrap', flex: 1 }}>
+          {visible && (
+            <OrdersModal
+              isVisible={visible}
+              onChangeState={onChangeModalState}
+              orders={orders}
+              hasItemId={itemId}
+              deliveron={deliveron ?? null}
+              deliveronOptions={deliveronOptions}
+              type={modalType}
+              options={options}
+              takeAway={itemTakeAway}
+            />
+          )}
+          <FlatGrid
+            adjustGridToStyles={true}
+            itemDimension={cardSize}
+            spacing={10}
+            data={orders}
+            renderItem={renderEnteredOrdersList}
+            keyExtractor={(item) => (item && item.id ? item.id.toString() : '')}
+            itemContainerStyle={{ justifyContent: 'space-between' }}
+            style={{ flex: 1 }}
+            onEndReachedThreshold={0.5}
           />
-        ) : null}
-        <FlatGrid
-          itemDimension={cardSize}
-          maxItemsPerRow={numColumns}
-          data={orders}
-          renderItem={renderEnteredOrdersList}
-          keyExtractor={(item) => (item && item.id ? item.id.toString() : '')}
-          onEndReachedThreshold={0.5}
-        />
+        </View>
       </ScrollView>
     </View>
   );
@@ -410,7 +434,7 @@ const styles = StyleSheet.create({
     },
     shadowOpacity: 0.3,
     shadowRadius: 4.65,
-
+    flexWrap: 'nowrap',
     elevation: 8,
   },
   head: {
@@ -434,6 +458,9 @@ const styles = StyleSheet.create({
   },
   title: {
     paddingVertical: 10,
+    lineHeight: 24,
+    fontSize: 14,
+    flexWrap: 'wrap',
   },
   feeDetailsContainer: {
     paddingLeft: 10,

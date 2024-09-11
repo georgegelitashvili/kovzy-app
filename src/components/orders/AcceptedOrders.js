@@ -27,7 +27,6 @@ import OrdersModal from "../modal/OrdersModal";
 import printRows from "../../PrintRows";
 
 const width = Dimensions.get("window").width;
-const height = Dimensions.get("window").height;
 
 const numColumns = printRows(width);
 const cardSize = width / numColumns;
@@ -56,7 +55,11 @@ export const AcceptedOrdersList = () => {
   const [modalType, setModalType] = useState("");
   const [loading, setLoading] = useState(true);
   const [loadingOptions, setLoadingOptions] = useState(false);
-  const [credentials, setCredentials] = useState({});
+
+  const [width, setWidth] = useState(Dimensions.get('window').width);
+  const [numColumns, setNumColumns] = useState(printRows(width));
+  const [cardSize, setCardSize] = useState(width / numColumns);
+
   const { dictionary, languageId } = useContext(LanguageContext);
 
   const increment = () => { setPage(page + 1); setLoading(true) };
@@ -85,6 +88,20 @@ export const AcceptedOrdersList = () => {
     setModalType(type);
     setVisible(true);
   };
+
+  // Update layout on dimension change
+  useEffect(() => {
+    const updateLayout = () => {
+      const newWidth = Dimensions.get('window').width;
+      const columns = printRows(newWidth);
+      setWidth(newWidth);
+      setNumColumns(columns);
+      setCardSize(newWidth / columns);
+    };
+
+    const subscription = Dimensions.addEventListener('change', updateLayout);
+    return () => subscription?.remove();
+  }, []);
 
   const fetchAcceptedOrders = async () => {
     setOptionsIsLoaded(true);
@@ -216,7 +233,7 @@ export const AcceptedOrdersList = () => {
               {dictionary["orders.status"]}: {dictionary["orders.pending"]}
             </Text>
 
-            <Text variant="titleSmall" style={styles.title}>
+            <Text variant="titleSmall" style={styles.title} numberOfLines={2} ellipsizeMode="tail">
               {dictionary["orders.fName"]}: {item.firstname} {item.lastname}
             </Text>
 
@@ -224,7 +241,7 @@ export const AcceptedOrdersList = () => {
               {dictionary["orders.phone"]}: {item.phone_number}
             </Text>
 
-            <Text variant="titleSmall" style={styles.title}>
+            <Text variant="titleSmall" style={styles.title} numberOfLines={2} ellipsizeMode="tail">
               {dictionary["orders.address"]}: {item.address}
             </Text>
 
@@ -237,18 +254,18 @@ export const AcceptedOrdersList = () => {
             ) : null}
 
             {item.delivery_scheduled ? (
-              <Text variant="titleSmall" style={styles.title}>
+              <Text variant="titleSmall" style={styles.title} numberOfLines={2} ellipsizeMode="tail">
                 {dictionary["orders.scheduledDeliveryTime"]}: {item.delivery_scheduled}
               </Text>
             ) : null}
 
             {item.comment ? (
-              <Text variant="titleSmall" style={styles.title}>
+              <Text variant="titleSmall" style={styles.title} numberOfLines={2} ellipsizeMode="tail">
                 {dictionary["orders.comment"]}: {item.comment}
               </Text>
             ) : null}
 
-            <Text variant="titleSmall" style={styles.title}>
+            <Text variant="titleSmall" style={styles.title} numberOfLines={2} ellipsizeMode="tail">
               {dictionary["orders.paymentMethod"]}: {item.payment_type}
             </Text>
 
@@ -314,9 +331,10 @@ export const AcceptedOrdersList = () => {
   }
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1, width: width, }}>
       {loadingOptions ? <Loader /> : null}
-      <ScrollView horizontal={true} showsVerticalScrollIndicator={false}>
+      <ScrollView horizontal={false} showsVerticalScrollIndicator={false}>
+        <View style={{ flexDirection: 'row', flexWrap: 'nowrap', flex: 1 }}>
         {visible ? (
           <OrdersModal
             isVisible={visible}
@@ -329,15 +347,20 @@ export const AcceptedOrdersList = () => {
             options={options}
           />
         ) : null}
-        <FlatGrid
-          itemDimension={cardSize}
-          maxItemsPerRow={numColumns}
-          data={orders}
-          renderItem={renderEnteredOrdersList}
-          keyExtractor={(item) => (item && item.id ? item.id.toString() : '')}
-          onEndReachedThreshold={0.5}
-        />
+          <FlatGrid
+            adjustGridToStyles={true}
+            itemDimension={cardSize}
+            spacing={10}
+            data={orders}
+            renderItem={renderEnteredOrdersList}
+            keyExtractor={(item) => (item && item.id ? item.id.toString() : '')}
+            itemContainerStyle={{ justifyContent: 'space-between' }}
+            style={{ flex: 1 }}
+            onEndReachedThreshold={0.5}
+          />
+        </View>
       </ScrollView>
+
       <View style={styles.paginationContainer}>
         <TouchableOpacity
           onPress={() => {
@@ -381,6 +404,7 @@ const styles = StyleSheet.create({
     justifyContent: "flex-start",
   },
   card: {
+    flexWrap: 'nowrap',
     backgroundColor: "#fff",
     margin: 10,
     borderRadius: 10,
@@ -414,6 +438,9 @@ const styles = StyleSheet.create({
   },
   title: {
     paddingVertical: 10,
+    lineHeight: 24,
+    fontSize: 14,
+    flexWrap: 'wrap',
   },
   paginationContainer: {
     flexDirection: "row",
