@@ -33,7 +33,7 @@
       "jsEngine": "hermes",
       "package": "com.kovzy.app",
       "softwareKeyboardLayoutMode": "pan",
-      "versionCode": 12
+      "versionCode": 13
     },
     "web": {
       "favicon": "./assets/favicon.png"
