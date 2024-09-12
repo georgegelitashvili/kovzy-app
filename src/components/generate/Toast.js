@@ -1,24 +1,24 @@
 import React, { useRef, useEffect, useState } from "react";
-import { View, Text, StyleSheet, Dimensions, Animated } from "react-native";
+import { View, Text, StyleSheet, Dimensions, Animated, useWindowDimensions } from "react-native";
 import Icon from "react-native-vector-icons/Ionicons";
-
-const WIDTH = Dimensions.get("screen").width;
 
 const Toast = ({ type, title, subtitle, animate, addStyles }) => {
   const [value, setValue] = useState(0);
   const ICON = type === "success" ? "checkmark-circle" : "alert-circle";
 
   const COLOR = {
-    "success" : "#21A67A",
-    "warning" : "#FFAB00",
+    "success": "#21A67A",
+    "warning": "#FFAB00",
     "failed": "#f14c4c"
-  }
+  };
+
+  const { width: screenWidth } = useWindowDimensions(); // Get current screen width
 
   useEffect(() => {
-    if(animate) {
+    if (animate) {
       animateToast();
       setValue(1200);
-    }else {
+    } else {
       setValue(0);
     }
   }, [animate]);
@@ -45,8 +45,8 @@ const Toast = ({ type, title, subtitle, animate, addStyles }) => {
     <Animated.View
       style={{ transform: [{ translateY: slideAnim }], marginBottom: 25 }}
     >
-      <View style={[styles.toastBox, addStyles]}>
-        <View style={[styles.uiLine, { backgroundColor: COLOR }]} />
+      <View style={[styles.toastBox, addStyles, { width: screenWidth - 25 }]}>
+        <View style={[styles.uiLine, { backgroundColor: COLOR[type] }]} />
         <Icon
           name={ICON}
           size={24}
@@ -69,7 +69,6 @@ const styles = StyleSheet.create({
   toastBox: {
     position: "absolute",
     top: -125,
-    width: WIDTH - 25,
     zIndex: 1024,
     height: 70,
     flexDirection: "row",
@@ -84,7 +83,6 @@ const styles = StyleSheet.create({
     },
     shadowOpacity: 0.41,
     shadowRadius: 9.11,
-
     elevation: 14,
     marginHorizontal: 10,
   },

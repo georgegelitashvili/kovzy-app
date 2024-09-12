@@ -383,37 +383,44 @@ export const EnteredOrdersList = () => {
   }
 
   return (
-    <View style={{ flex: 1, width: width, }}>
+    <View style={{ flex: 1, width: width }}>
       {loadingOptions ? <Loader /> : null}
       <NotificationManager ref={notificationManagerRef} />
-      <ScrollView horizontal={false} showsVerticalScrollIndicator={false}>
-        <View style={{ flexDirection: 'row', flexWrap: 'nowrap', flex: 1 }}>
-          {visible && (
-            <OrdersModal
-              isVisible={visible}
-              onChangeState={onChangeModalState}
-              orders={orders}
-              hasItemId={itemId}
-              deliveron={deliveron ?? null}
-              deliveronOptions={deliveronOptions}
-              type={modalType}
-              options={options}
-              takeAway={itemTakeAway}
+
+      <FlatList
+        data={[{}]} // Dummy data for the FlatList since we're using ListHeaderComponent for main content
+        renderItem={null} // No items in the FlatList itself
+        keyExtractor={() => 'dummy'} // Static key for the dummy item
+        showsVerticalScrollIndicator={false}
+        ListHeaderComponent={
+          <View style={{ flexDirection: 'row', flexWrap: 'nowrap', flex: 1 }}>
+            {visible && (
+              <OrdersModal
+                isVisible={visible}
+                onChangeState={onChangeModalState}
+                orders={orders}
+                hasItemId={itemId}
+                deliveron={deliveron ?? null}
+                deliveronOptions={deliveronOptions}
+                type={modalType}
+                options={options}
+                takeAway={itemTakeAway}
+              />
+            )}
+            <FlatGrid
+              adjustGridToStyles={true}
+              itemDimension={cardSize}
+              spacing={10}
+              data={orders}
+              renderItem={renderEnteredOrdersList}
+              keyExtractor={(item) => (item && item.id ? item.id.toString() : '')}
+              itemContainerStyle={{ justifyContent: 'space-between' }}
+              style={{ flex: 1 }}
+              onEndReachedThreshold={0.5}
             />
-          )}
-          <FlatGrid
-            adjustGridToStyles={true}
-            itemDimension={cardSize}
-            spacing={10}
-            data={orders}
-            renderItem={renderEnteredOrdersList}
-            keyExtractor={(item) => (item && item.id ? item.id.toString() : '')}
-            itemContainerStyle={{ justifyContent: 'space-between' }}
-            style={{ flex: 1 }}
-            onEndReachedThreshold={0.5}
-          />
-        </View>
-      </ScrollView>
+          </View>
+        }
+      />
     </View>
   );
 };

@@ -43,22 +43,16 @@ export default function DrawerContent(props) {
     logout();
   };
 
-  const toggleBranch = () => {
-    setBranchEnabled((data) => !data);
-    if (isBranchEnabled) {
-      axiosInstance
-        .post(options.url_branchActivity, branchChangeOptions.data)
-        .then((resp) => setBranchEnabled(resp.data.data));
-    }
+  const toggleBranch = async () => {
+    await axiosInstance
+      .post(options.url_branchActivity, branchChangeOptions.data)
+      .then((resp) => setBranchEnabled(resp.data.data));
   };
 
-  const toggleDeliveron = () => {
-    setDeliveronEnabled((data) => !data);
-    if (isDeliveronEnabled) {
-      axiosInstance
-        .post(options.url_deliveronActivity, deliveronChangeOptions.data)
-        .then((resp) => setDeliveronEnabled(resp.data.data));
-    }
+  const toggleDeliveron = async () => {
+    await axiosInstance
+      .post(options.url_deliveronActivity, deliveronChangeOptions.data)
+      .then((resp) => setDeliveronEnabled(resp.data.data));
   };
 
   useEffect(() => {
@@ -118,7 +112,7 @@ export default function DrawerContent(props) {
             </View>
           </TouchableRipple>
 
-          <TouchableRipple onPress={toggleBranch}>
+          <TouchableRipple style={styles.ripple} onPress={toggleBranch}>
             <View style={styles.preference}>
               <Text>{dictionary["orders.branch"]}</Text>
               <View pointerEvents="none">
@@ -212,11 +206,15 @@ const styles = StyleSheet.create({
     marginTop: 6,
     marginBottom: 10
   },
+  ripple: {
+    marginTop: 6,
+  },
   preference: {
     flexDirection: "row",
+    alignItems: 'center',
     justifyContent: "space-between",
     paddingVertical: 1,
     paddingHorizontal: 20,
-    marginTop: 6,
+    elevation: 2,
   },
 });

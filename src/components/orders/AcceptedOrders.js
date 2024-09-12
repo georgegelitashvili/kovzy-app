@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Linking,
   Alert,
+  FlatList,
   RefreshControl,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
@@ -333,33 +334,39 @@ export const AcceptedOrdersList = () => {
   return (
     <View style={{ flex: 1, width: width, }}>
       {loadingOptions ? <Loader /> : null}
-      <ScrollView horizontal={false} showsVerticalScrollIndicator={false}>
-        <View style={{ flexDirection: 'row', flexWrap: 'nowrap', flex: 1 }}>
-        {visible ? (
-          <OrdersModal
-            isVisible={visible}
-            onChangeState={onChangeModalState}
-            orders={orders}
-            hasItemId={itemId}
-            deliveron={deliveron}
-            deliveronOptions={deliveronOptions}
-            type={modalType}
-            options={options}
-          />
-        ) : null}
-          <FlatGrid
-            adjustGridToStyles={true}
-            itemDimension={cardSize}
-            spacing={10}
-            data={orders}
-            renderItem={renderEnteredOrdersList}
-            keyExtractor={(item) => (item && item.id ? item.id.toString() : '')}
-            itemContainerStyle={{ justifyContent: 'space-between' }}
-            style={{ flex: 1 }}
-            onEndReachedThreshold={0.5}
-          />
-        </View>
-      </ScrollView>
+      <FlatList
+        data={[{}]} // Dummy data for FlatList to use ListHeaderComponent
+        renderItem={null} // No actual items to render
+        keyExtractor={() => 'dummy'} // Static key for dummy data
+        showsVerticalScrollIndicator={false}
+        ListHeaderComponent={
+          <View style={{ flexDirection: 'row', flexWrap: 'nowrap', flex: 1 }}>
+            {visible ? (
+              <OrdersModal
+                isVisible={visible}
+                onChangeState={onChangeModalState}
+                orders={orders}
+                hasItemId={itemId}
+                deliveron={deliveron}
+                deliveronOptions={deliveronOptions}
+                type={modalType}
+                options={options}
+              />
+            ) : null}
+            <FlatGrid
+              adjustGridToStyles={true}
+              itemDimension={cardSize}
+              spacing={10}
+              data={orders}
+              renderItem={renderEnteredOrdersList}
+              keyExtractor={(item) => (item && item.id ? item.id.toString() : '')}
+              itemContainerStyle={{ justifyContent: 'space-between' }}
+              style={{ flex: 1 }}
+              onEndReachedThreshold={0.5}
+            />
+          </View>
+        }
+      />
 
       <View style={styles.paginationContainer}>
         <TouchableOpacity
