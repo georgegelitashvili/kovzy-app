@@ -3,7 +3,9 @@ import { StyleSheet, Button, View, Text } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as Sentry from '@sentry/react-native';
 import * as Updates from 'expo-updates';
+import Constants from 'expo-constants';
 import { useNetInfo } from '@react-native-community/netinfo';
+import { useKeepAwake } from 'expo-keep-awake';
 
 import Main from './src/Main';
 import Toast from './src/components/generate/Toast';
@@ -60,6 +62,11 @@ function App() {
 
   const handleReload = async () => {
     try {
+      if (Constants.appOwnership === 'expo') {
+        console.warn('App reloads not supported in Expo Go');
+        return;
+      }
+
       const update = await Updates.checkForUpdateAsync();
       if (update.isAvailable) {
         await Updates.fetchUpdateAsync();
@@ -77,6 +84,7 @@ function App() {
 
   return (
     <SafeAreaProvider>
+      {useKeepAwake()}
       <ErrorBoundary>
         <Main isConnected={isConnected} />
       </ErrorBoundary>
