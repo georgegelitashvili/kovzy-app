@@ -121,6 +121,15 @@ export default function Products({ navigation }) {
     return unsubscribe;
   }, [navigation]);
 
+  useEffect(() => {
+    if (!showFilter) {
+      setSelected("");
+    }
+    if (!showSearch) {
+      setSearchQuery("");
+    }
+  }, [showFilter, showSearch]);
+
   const onRefresh = () => {
     // setPage(1);
     setRefreshing(true);
@@ -185,9 +194,6 @@ export default function Products({ navigation }) {
       }
     });
   };
-
-
-  console.log(checkedItems);
 
   const renderProductList = ({ item }) => {
     const isExcluded = excluded.some((excludedItem) => excludedItem.productid === item.id);
@@ -279,7 +285,6 @@ export default function Products({ navigation }) {
       <View style={{ paddingLeft: 10, paddingRight: 10 }}>
         {showSearch && (
           <TextField
-            style={styles.input}
             placeholder="Search..."
             editable={true}
             clearButtonMode='always'

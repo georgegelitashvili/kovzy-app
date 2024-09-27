@@ -2,7 +2,7 @@ import React, { useState, useContext, useEffect } from "react";
 import { View, StyleSheet } from "react-native";
 import { DrawerItem, DrawerContentScrollView } from "@react-navigation/drawer";
 import { Drawer, Text, TouchableRipple, Switch } from "react-native-paper";
-import { MaterialCommunityIcons, Fontisto } from "@expo/vector-icons";
+import { MaterialCommunityIcons, Fontisto, SimpleLineIcons } from "@expo/vector-icons";
 import { AuthContext, AuthProvider } from "../context/AuthProvider";
 import LanguageSelector from "./generate/LanguageSelector";
 import axiosInstance from "../apiConfig/apiRequests";
@@ -10,7 +10,7 @@ import { String, LanguageContext } from "./Language";
 
 export default function DrawerContent(props) {
 
-  const { domain, branchid, branchName, branchEnabled, setBranchEnabled, setDeliveronEnabled, deliveronEnabled, logout, setIsDataSet, intervalId } = useContext(AuthContext);
+  const { domain, branchid, branchName, branchEnabled, setBranchEnabled, setDeliveronEnabled, deliveronEnabled, logout, intervalId, setIsLoading } = useContext(AuthContext);
   const { dictionary, userLanguageChange } = useContext(LanguageContext);
 
   const [options, setOptions] = useState({
@@ -37,28 +37,22 @@ export default function DrawerContent(props) {
   };
 
   const onLogoutPressed = () => {
+    setIsLoading(true);
     props.navigation.closeDrawer();
-    setIsDataSet(false);
     clearInterval(intervalId);
     logout();
   };
 
-  const toggleBranch = () => {
-    setBranchEnabled((data) => !data);
-    if (isBranchEnabled) {
-      axiosInstance
-        .post(options.url_branchActivity, branchChangeOptions.data)
-        .then((resp) => setBranchEnabled(resp.data.data));
-    }
+  const toggleBranch = async () => {
+    await axiosInstance
+      .post(options.url_branchActivity, branchChangeOptions.data)
+      .then((resp) => setBranchEnabled(resp.data.data));
   };
 
-  const toggleDeliveron = () => {
-    setDeliveronEnabled((data) => !data);
-    if (isDeliveronEnabled) {
-      axiosInstance
-        .post(options.url_deliveronActivity, deliveronChangeOptions.data)
-        .then((resp) => setDeliveronEnabled(resp.data.data));
-    }
+  const toggleDeliveron = async () => {
+    await axiosInstance
+      .post(options.url_deliveronActivity, deliveronChangeOptions.data)
+      .then((resp) => setDeliveronEnabled(resp.data.data));
   };
 
   useEffect(() => {
@@ -70,7 +64,7 @@ export default function DrawerContent(props) {
   useEffect(() => {
     setBranchChangeOptions((prev) => ({
       ...prev,
-      data: { branchid: branchid, enabled: branchEnabled ? 0 : 1 },
+      data: { branchid: branchid, enabled: branchEnabled ? 1 : 0 },
     }));
     setIsBranchEnabled(true);
   }, [branchEnabled, branchid]);
@@ -109,6 +103,26 @@ export default function DrawerContent(props) {
         </View>
 
         <Drawer.Section style={styles.drawerSection}>
+          <TouchableRipple onPress={toggleDeliveron}>
+            <View style={styles.preference}>
+              <Text>{dictionary["dv.deliveron"]}</Text>
+              <View pointerEvents="none">
+                <Switch value={deliveronEnabled} />
+              </View>
+            </View>
+          </TouchableRipple>
+
+          <TouchableRipple style={styles.ripple} onPress={toggleBranch}>
+            <View style={styles.preference}>
+              <Text>{dictionary["orders.branch"]}</Text>
+              <View pointerEvents="none">
+                <Switch value={branchEnabled} />
+              </View>
+            </View>
+          </TouchableRipple>
+        </Drawer.Section>
+
+
           <DrawerItem
             icon={({ color, size }) => (
               <MaterialCommunityIcons
@@ -137,32 +151,22 @@ export default function DrawerContent(props) {
           />
           <DrawerItem
             icon={({ color, size }) => (
+              <SimpleLineIcons name="settings"
+                color={color}
+                size={size} />
+            )}
+            label={dictionary["settings"]}
+            onPress={() => {
+              props.navigation.navigate("Settings");
+            }}
+          />
+          <DrawerItem
+            icon={({ color, size }) => (
               <MaterialCommunityIcons name="logout" color={color} size={size} />
             )}
             label={dictionary.logout}
             onPress={onLogoutPressed}
           />
-        </Drawer.Section>
-
-        <Drawer.Section>
-          <TouchableRipple onPress={toggleDeliveron}>
-            <View style={styles.preference}>
-              <Text>{dictionary["dv.deliveron"]}</Text>
-              <View pointerEvents="none">
-                <Switch value={deliveronEnabled} />
-              </View>
-            </View>
-          </TouchableRipple>
-
-          <TouchableRipple onPress={toggleBranch}>
-            <View style={styles.preference}>
-              <Text>{dictionary["orders.branch"]}</Text>
-              <View pointerEvents="none">
-                <Switch value={branchEnabled} />
-              </View>
-            </View>
-          </TouchableRipple>
-        </Drawer.Section>
 
       </View>
     </DrawerContentScrollView>
@@ -199,13 +203,18 @@ const styles = StyleSheet.create({
     marginRight: 3,
   },
   drawerSection: {
-    marginTop: 15,
+    marginTop: 6,
+    marginBottom: 10
+  },
+  ripple: {
+    marginTop: 6,
   },
   preference: {
     flexDirection: "row",
+    alignItems: 'center',
     justifyContent: "space-between",
-    paddingVertical: 12,
-    paddingHorizontal: 15,
-    marginTop: 5,
+    paddingVertical: 1,
+    paddingHorizontal: 20,
+    elevation: 2,
   },
 });

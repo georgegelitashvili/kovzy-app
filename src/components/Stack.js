@@ -9,6 +9,8 @@ import { LoginScreen } from "../startScreens/LoginScreen";
 import Orders from "../Orders";
 import Products from "../Products";
 import ProductsDetail from "./products/ProductsDetail";
+import SettingsScreen from '../SettingsScreen';
+import NotificationScreen from './settings/NotificationScreen';
 
 const Stack = createStackNavigator();
 
@@ -18,11 +20,18 @@ const Header = ({ options, navigation }) => {
   const title = options?.headerTitle ?? options?.title ?? navigation?.route?.name;
 
   return (
-    <Appbar.Header theme={{ colors: { primary: theme.colors.surface } }} style={{ marginTop: headerStyle?.marginTop }}>
-      {navigation?.canGoBack() ? <Appbar.BackAction onPress={navigation.goBack} /> : null}
+    <Appbar.Header
+      theme={{ colors: { primary: theme.colors.surface } }}
+      style={{ marginTop: headerStyle?.marginTop, backgroundColor: 'white', }}>
+      {navigation?.canGoBack() ?
+        <Appbar.BackAction
+          style={{ color: '#000', fontWeight: 'bold' }}
+          onPress={navigation.goBack}
+        />
+        : null}
       <Appbar.Content
         title={title}
-        titleStyle={{ fontSize: headerStyle?.fontSize }}
+        titleStyle={{ fontSize: headerStyle?.fontSize, color: '#000', fontWeight: 'bold' }}
       />
     </Appbar.Header>
   );
@@ -34,14 +43,35 @@ export const AuthNavigator = () => {
   return (
     <Stack.Navigator
       screenOptions={({ navigation, route }) => ({
-        headerMode: "screen",
+        headerMode: 'screen',
         header: (props) => <Header {...props} />,
         ...route.params?.options, // Pass route params as options
       })}
     >
-      <Stack.Screen name="Domain" options={{ headerShown: true, headerTitle: dictionary["domains.addDomain"] }} component={DomainScreen} />
-      <Stack.Screen name="Branch" options={{ headerTitle: dictionary["branches.branches"] }} component={BranchScreen} />
-      <Stack.Screen name="Login" options={{ headerTitle: dictionary["nav.auth"] }} component={LoginScreen} />
+      <Stack.Screen
+        name="Domain"
+        options={{
+          headerTitle: dictionary["domains.addDomain"],
+          unmountOnBlur: true
+        }}
+        component={DomainScreen}
+      />
+      <Stack.Screen
+        name="Branch"
+        options={{
+          headerTitle: dictionary["branches.branches"],
+          unmountOnBlur: true
+        }}
+        component={BranchScreen}
+      />
+      <Stack.Screen
+        name="Login"
+        options={{
+          headerTitle: dictionary["nav.auth"],
+          unmountOnBlur: true
+        }}
+        component={LoginScreen}
+      />
     </Stack.Navigator>
   );
 }
@@ -79,11 +109,43 @@ export const ProductsNavigator = () => {
         component={ProductsDetail}
         options={({ route }) => ({
           headerTitle: dictionary["prod.customizable"],
-          headerStyle: { marginTop: -65 },
+          headerStyle: { marginTop: 0 },
           headerContentStyle: { fontSize: 10 },
+          unmountOnBlur: true,
           ...route.params?.options, // Pass route params as options
         })}
       />
+    </Stack.Navigator>
+  );
+};
+
+export const SettingsNavigator = () => {
+  const { dictionary } = useContext(LanguageContext);
+
+  return (
+    <Stack.Navigator
+      screenOptions={({ navigation, route }) => ({
+        headerMode: "screen",
+        headerBackTitleVisible: false,
+        header: (props) => <Header {...props} />,
+        ...route.params?.options, // Pass route params as options
+      })}
+    >
+      <Stack.Screen
+        name="Setting"
+        options={{ headerShown: false, unmountOnBlur: true }}
+        component={SettingsScreen}
+      />
+      <Stack.Screen
+        name="MusicList"
+        options={({ route }) => ({
+          headerTitle: "Notifications",
+          headerStyle: { marginTop: 0 },
+          headerContentStyle: { fontSize: 10 },
+          unmountOnBlur: true,
+          ...route.params?.options, // Pass route params as options
+        })}
+        component={NotificationScreen} />
     </Stack.Navigator>
   );
 };

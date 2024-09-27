@@ -3,7 +3,7 @@
     "name": "kovzy",
     "slug": "kovzy",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "splash": {
@@ -30,9 +30,10 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FFFFFF"
       },
+      "jsEngine": "hermes",
       "package": "com.kovzy.app",
       "softwareKeyboardLayoutMode": "pan",
-      "versionCode": 11
+      "versionCode": 13
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -44,6 +45,9 @@
     },
     "runtimeVersion": {
       "policy": "appVersion"
-    }
+    },
+    "plugins": [
+      "expo-secure-store"
+    ]
   }
 }

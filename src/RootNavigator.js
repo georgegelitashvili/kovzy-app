@@ -1,77 +1,23 @@
-import React, { useContext, useState, useEffect, useCallback } from "react";
+import React, { useContext } from "react";
 import { createDrawerNavigator } from "@react-navigation/drawer";
 import { AuthContext } from "./context/AuthProvider";
-import { OrdersNavigator, ProductsNavigator, AuthNavigator } from "./components/Stack";
+import { OrdersNavigator, ProductsNavigator, AuthNavigator, SettingsNavigator } from "./components/Stack";
 import DrawerContent from "./components/DrawerContent";
 import { LanguageContext } from "./components/Language";
-import Loader from "./components/generate/loader";
-import axiosInstance from "./apiConfig/apiRequests";
-import { getSecureData } from "./helpers/storage";
+
 
 const Drawer = createDrawerNavigator();
 
 const RootNavigator = () => {
-  const { user, setUser, domain, intervalId, setIntervalId } = useContext(AuthContext);
-  const [isLoading, setIsLoading] = useState(true);
-  const [options, setOptions] = useState({
-    url_authUser: "",
-  });
+  const { user, isLoading } = useContext(AuthContext);
+
   const { dictionary } = useContext(LanguageContext);
-
-  const apiOptions = useCallback(() => {
-    if (domain) {
-      setOptions({
-        url_authUser: `https://${domain}/api/v1/admin/auth/authorized`,
-      });
-    }
-  }, [domain]);
-
-  useEffect(() => {
-    apiOptions();
-  }, [apiOptions]);
-
-  useEffect(() => {
-    const loadUser = async () => {
-      try {
-        const response = await axiosInstance.get(options.url_authUser);
-        console.log('check auth resposne: ', response.data);
-        if (response.data.user) {
-          setIsLoading(true);
-          const userObj = await getSecureData('user'); // Await the async function
-          setUser(userObj);
-        } else {
-          setUser(null);
-          clearInterval(intervalId);
-          setIntervalId(null);
-          setIsLoading(false);
-        }
-      } catch (error) {
-        console.error("Error loading user:", error);
-        setUser(null);
-        clearInterval(intervalId);
-        setIntervalId(null);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    if (options.url_authUser) {
-      setIsLoading(true);
-      loadUser();
-    } else {
-      setIsLoading(false);
-    }
-  }, [domain, options.url_authUser]);
 
   console.log("user:", user);
 
-  if (isLoading) {
-    return <Loader text={dictionary["loading"]} />;
-  }
-
   return (
     <>
-      {user ? (
+      {user !== null ? (
         <Drawer.Navigator
           drawerContent={(props) => <DrawerContent {...props} />}
           initialRouteName="Order"
@@ -85,6 +31,11 @@ const RootNavigator = () => {
             name="Products"
             component={ProductsNavigator}
             options={{ title: dictionary["nav.products"], unmountOnBlur: true }}
+          />
+          <Drawer.Screen
+            name="Settings"
+            component={SettingsNavigator}
+            options={{ title: dictionary["Settings"], unmountOnBlur: true }}
           />
         </Drawer.Navigator>
       ) : (

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useContext } from "react";
+import React, { useState, useEffect, useCallback, useContext, useRef } from "react";
 import {
   StyleSheet,
   Dimensions,
@@ -6,12 +6,12 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
-  AppState
+  AppState,
+  FlatList
 } from "react-native";
 import { Text, Button, Divider, Card } from "react-native-paper";
 import { FlatGrid } from "react-native-super-grid";
 import { MaterialCommunityIcons, SimpleLineIcons } from "@expo/vector-icons";
-import { Audio } from "expo-av";
 import * as Updates from 'expo-updates';
 
 import { AuthContext, AuthProvider } from "../../context/AuthProvider";
@@ -21,8 +21,7 @@ import axiosInstance from "../../apiConfig/apiRequests";
 import OrdersDetail from "./OrdersDetail";
 import OrdersModal from "../modal/OrdersModal";
 import printRows from "../../PrintRows";
-
-import { navigate } from '../../helpers/navigate';
+import NotificationManager from '../../utils/NotificationManager';
 
 const width = Dimensions.get("window").width;
 
@@ -35,7 +34,10 @@ let temp = 0;
 // render entered orders function
 export const EnteredOrdersList = () => {
   const { domain, branchid, setUser, user, intervalId, setIntervalId, shouldRenderAuthScreen, setShouldRenderAuthScreen } = useContext(AuthContext);
+  const notificationManagerRef = useRef(null);
   const [orders, setOrders] = useState([]);
+  const [fees, setFees] = useState([]);
+  const [currency, setCurrency] = useState("");
 
   const [appState, setAppState] = useState(AppState.currentState);
 
@@ -52,12 +54,16 @@ export const EnteredOrdersList = () => {
   const [deliveron, setDeliveron] = useState([]);
   const [visible, setVisible] = useState(false); // modal state
   const [itemId, setItemId] = useState(null); //item id for modal
+  const [itemTakeAway, setItemTakeAway] = useState(0);
   const [isOpen, setOpenState] = useState([]); // my accordion state
   const [modalType, setModalType] = useState("");
-  const [sound, setSound] = useState(new Audio.Sound());
 
   const [loading, setLoading] = useState(true);
   const [loadingOptions, setLoadingOptions] = useState(false);
+
+  const [width, setWidth] = useState(Dimensions.get('window').width);
+  const [numColumns, setNumColumns] = useState(printRows(width));
+  const [cardSize, setCardSize] = useState(width / numColumns);
 
   const { dictionary, languageId } = useContext(LanguageContext);
 
@@ -76,35 +82,6 @@ export const EnteredOrdersList = () => {
 
     let index = isOpen.indexOf(value);
     if (index > -1) setOpenState([...isOpen.filter((i) => i !== value)]);
-  };
-
-  const onStopPlaySound = async () => {
-    sound.stopAsync();
-  };
-
-  const onPlaySound = async () => {
-    const source = require("../../assets/audio/alert.mp3");
-    try {
-      await sound.loadAsync(source);
-      await sound
-        .playAsync()
-        .then(async (PlaybackStatus) => {
-          setTimeout(() => {
-            sound.unloadAsync();
-          }, PlaybackStatus.playableDurationMillis);
-        })
-        .catch((error) => {
-          console.log(error);
-        });
-    } catch (error) {
-      console.log(error);
-    }
-  };
-
-  const orderReceived = () => {
-    Alert.alert("ALERT", "***New Order Received***", [
-      { text: "OK", onPress: () => onStopPlaySound() },
-    ]);
   };
 
   const handleReload = async () => {
@@ -127,9 +104,19 @@ export const EnteredOrdersList = () => {
     setVisible(true);
   };
 
-  const handleNavigateToAuth = () => {
-    navigate('Auth', { screen: 'Login' });
-  };
+  // Update layout on dimension change
+  useEffect(() => {
+    const updateLayout = () => {
+      const newWidth = Dimensions.get('window').width;
+      const columns = printRows(newWidth);
+      setWidth(newWidth);
+      setNumColumns(columns);
+      setCardSize(newWidth / columns);
+    };
+
+    const subscription = Dimensions.addEventListener('change', updateLayout);
+    return () => subscription?.remove();
+  }, []);
 
   const fetchEnteredOrders = async () => {
     try {
@@ -144,29 +131,16 @@ export const EnteredOrdersList = () => {
         Languageid: languageId
       });
       const data = resp.data.data;
+      const feesData = resp.data.fees;
       setOrders(data);
+      setFees(feesData);
+      setCurrency(resp.data.currency);
     } catch (error) {
       console.log('Error fetching entered orders full:', error);
       const statusCode = error?.status || 'Unknown';
       console.log('Status code entered orders:', statusCode);
-      if (statusCode === 401) {
-        console.log('Error fetching entered orders:', statusCode);
-        setOrders([]);
-        setOptions({});
-        setOptionsIsLoaded(false);
-        setIsDeliveronOptions(false);
-        Alert.alert("ALERT", "your session expired", [
-          {
-            text: "Login", onPress: () => {
-              clearInterval(intervalId);
-              setShouldRenderAuthScreen(true);
-            }
-          },
-        ]);
-        return clearInterval(intervalId); // Clear the interval here
-      } else {
-        handleReload();
-      }
+      clearInterval(intervalId);
+      handleReload();
     } finally {
       setLoading(false);
     }
@@ -204,26 +178,18 @@ export const EnteredOrdersList = () => {
   }, [domain, branchid, apiOptions]);
 
   useEffect(() => {
-    if (shouldRenderAuthScreen) {
-      handleNavigateToAuth();
-    }
-  }, [shouldRenderAuthScreen]);
-
-  useEffect(() => {
     apiOptions();
 
-    if (optionsIsLoaded && languageId) {
+    if (optionsIsLoaded) {
       const subscribe = AppState.addEventListener('change', handleAppStateChange);
       console.log('Starting interval...');
 
       // Clear any existing interval
       clearInterval(intervalId);
-
-      // Start the interval with the correct languageId
+      // Start the interval
       startInterval();
 
       console.log('Interval started.');
-
       return () => {
         clearInterval(intervalId); // Clear the interval in the cleanup function
         subscribe.remove();
@@ -234,12 +200,12 @@ export const EnteredOrdersList = () => {
 
   // set deliveron data
   useEffect(() => {
-    if (itemId) {
+    if (itemId && itemTakeAway !== 1) {
       setDeliveronOptions((prev) => ({ ...prev, data: { orderId: itemId } }));
       setIsDeliveronOptions(true);
       setLoadingOptions(true);
     }
-  }, [itemId]);
+  }, [itemId, itemTakeAway]);
 
   useEffect(() => {
     if (isDeliveronOptions) {
@@ -276,16 +242,28 @@ export const EnteredOrdersList = () => {
     if (orders) {
       ordersCount = Object.keys(orders).length;
       if (ordersCount > temp) {
-        onPlaySound();
-        orderReceived();
+        if (notificationManagerRef.current) {
+          notificationManagerRef.current.orderReceived();
+        }
       }
       temp = ordersCount;
     }
   }, [orders]);
 
   const renderEnteredOrdersList = ({ item }) => {
+    const deliveryPrice = parseFloat(item.delivery_price);
+    const additionalFees = parseFloat(item.service_fee) / 100;
+    const feeData = JSON.parse(item.fees_details || '{}');
+    const feesDetails = fees?.reduce((acc, fee) => {
+      const feeId = fee['id'];
+      if (feeData[feeId]) {
+        acc.push(`${fee['value']} : ${parseFloat(feeData[feeId])}`);
+      }
+      return acc;
+    }, []);
+
     return (
-      <Card key={item.id}>
+      <Card key={item.id} style={styles.card}>
         <TouchableOpacity onPress={() => toggleContent(item.id)}>
           <Card.Content style={styles.head}>
             <Text variant="headlineMedium" style={styles.header}>
@@ -295,6 +273,7 @@ export const EnteredOrdersList = () => {
               />
               {item.id}
             </Text>
+            <Text style={styles.takeAway}>{item.take_away === 1 ? "("+dictionary["orders.takeAway"] + ")" : ""}</Text>
             <Text variant="headlineMedium" style={styles.header}>
               <SimpleLineIcons
                 name={!isOpen.includes(item.id) ? "arrow-up" : "arrow-down"}
@@ -309,7 +288,7 @@ export const EnteredOrdersList = () => {
               {dictionary["orders.status"]}: {dictionary["orders.pending"]}
             </Text>
 
-            <Text variant="titleSmall" style={styles.title}>
+            <Text variant="titleSmall" style={styles.title} numberOfLines={2} ellipsizeMode="tail">
               {dictionary["orders.fName"]}: {item.firstname} {item.lastname}
             </Text>
 
@@ -317,23 +296,23 @@ export const EnteredOrdersList = () => {
               {dictionary["orders.phone"]}: {item.phone_number}
             </Text>
 
-            <Text variant="titleSmall" style={styles.title}>
+            <Text variant="titleSmall" style={styles.title} ellipsizeMode="tail">
               {dictionary["orders.address"]}: {item.address}
             </Text>
 
             {item.delivery_scheduled ? (
-              <Text variant="titleSmall" style={styles.title}>
+              <Text variant="titleSmall" style={styles.title} numberOfLines={2} ellipsizeMode="tail">
                 {dictionary["orders.scheduledDeliveryTime"]}: {item.delivery_scheduled}
               </Text>
             ) : null}
 
             {item.comment ? (
-              <Text variant="titleSmall" style={styles.title}>
+              <Text variant="titleSmall" style={styles.title} numberOfLines={2} ellipsizeMode="tail">
                 {dictionary["orders.comment"]}: {item.comment}
               </Text>
             ) : null}
 
-            <Text variant="titleSmall" style={styles.title}>
+            <Text variant="titleSmall" style={styles.title} numberOfLines={2} ellipsizeMode="tail">
               {dictionary["orders.paymentMethod"]}: {item.payment_type}
             </Text>
 
@@ -341,7 +320,30 @@ export const EnteredOrdersList = () => {
             <OrdersDetail orderId={item.id} />
             <Divider />
 
-            <Text variant="titleLarge">{item.price} GEL</Text>
+            <Text variant="titleMedium" style={styles.title}> {dictionary["orders.initialPrice"]}: {item.real_price} {currency}</Text>
+
+            <Text variant="titleMedium" style={styles.title}> {dictionary["orders.discountedPrice"]}: {item.price} {currency}</Text>
+
+            <Text variant="titleMedium" style={styles.title}> {dictionary["orders.deliveryPrice"]}: {deliveryPrice} {currency}</Text>
+
+            {feesDetails?.length > 0 && (
+              <View>
+                <Text variant="titleMedium" style={styles.title}>
+                  {dictionary["orders.additionalFees"]}: {additionalFees} {currency}
+                </Text>
+                <View style={styles.feeDetailsContainer}>
+                  {feesDetails.map((fee, index) => (
+                    <Text key={index} style={styles.feeDetailText}>
+                      {fee} {currency}
+                    </Text>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            <Text variant="titleMedium" style={styles.title}>
+              {dictionary["orders.totalcost"]}: {item.total_cost} {currency}
+            </Text>
 
             <Card.Actions>
               <Button
@@ -349,6 +351,7 @@ export const EnteredOrdersList = () => {
                 buttonColor="#2fa360"
                 onPress={() => {
                   setItemId(item.id);
+                  setItemTakeAway(item.take_away);
                   showModal("accept");
                 }}
               >
@@ -380,44 +383,55 @@ export const EnteredOrdersList = () => {
   }
 
   return (
-    <View>
+    <View style={{ flex: 1, width: width }}>
       {loadingOptions ? <Loader /> : null}
-      <ScrollView horizontal={true} showsVerticalScrollIndicator={false}>
-        {visible ? (
-          <OrdersModal
-            isVisible={visible}
-            onChangeState={onChangeModalState}
-            orders={orders}
-            hasItemId={itemId}
-            deliveron={deliveron ?? null}
-            deliveronOptions={deliveronOptions}
-            type={modalType}
-            options={options}
-          />
-        ) : null}
-        <FlatGrid
-          itemDimension={cardSize}
-          data={orders}
-          renderItem={renderEnteredOrdersList}
-          adjustGridToStyles={true}
-          contentContainerStyle={{ justifyContent: "flex-start" }}
-          keyExtractor={(item) => (item && item.id ? item.id.toString() : '')}
-          onEndReachedThreshold={0.5}
-        />
-      </ScrollView>
+      <NotificationManager ref={notificationManagerRef} />
+
+      <FlatList
+        data={[{}]} // Dummy data for the FlatList since we're using ListHeaderComponent for main content
+        renderItem={null} // No items in the FlatList itself
+        keyExtractor={() => 'dummy'} // Static key for the dummy item
+        showsVerticalScrollIndicator={false}
+        ListHeaderComponent={
+          <View style={{ flexDirection: 'row', flexWrap: 'nowrap', flex: 1 }}>
+            {visible && (
+              <OrdersModal
+                isVisible={visible}
+                onChangeState={onChangeModalState}
+                orders={orders}
+                hasItemId={itemId}
+                deliveron={deliveron ?? null}
+                deliveronOptions={deliveronOptions}
+                type={modalType}
+                options={options}
+                takeAway={itemTakeAway}
+              />
+            )}
+            <FlatGrid
+              adjustGridToStyles={true}
+              itemDimension={cardSize}
+              spacing={10}
+              data={orders}
+              renderItem={renderEnteredOrdersList}
+              keyExtractor={(item) => (item && item.id ? item.id.toString() : '')}
+              itemContainerStyle={{ justifyContent: 'space-between' }}
+              style={{ flex: 1 }}
+              onEndReachedThreshold={0.5}
+            />
+          </View>
+        }
+      />
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    flex: 12,
+    flex: 1,
     justifyContent: "flex-start",
   },
   card: {
     backgroundColor: "#fff",
-    justifyContent: "flex-start",
-
     margin: 10,
     borderRadius: 10,
     shadowColor: "#000",
@@ -427,7 +441,7 @@ const styles = StyleSheet.create({
     },
     shadowOpacity: 0.3,
     shadowRadius: 4.65,
-
+    flexWrap: 'nowrap',
     elevation: 8,
   },
   head: {
@@ -436,6 +450,10 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingVertical: 10,
+  },
+  takeAway: {
+    paddingVertical: 20,
+    fontSize: 15,
   },
   leftIcon: {
     marginRight: 3,
@@ -447,5 +465,16 @@ const styles = StyleSheet.create({
   },
   title: {
     paddingVertical: 10,
+    lineHeight: 24,
+    fontSize: 14,
+    flexWrap: 'wrap',
+  },
+  feeDetailsContainer: {
+    paddingLeft: 10,
+    marginBottom: 15
+  },
+  feeDetailText: {
+    fontSize: 15,
+    color: '#333',
   },
 });

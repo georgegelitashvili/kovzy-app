@@ -2,7 +2,8 @@ import React, { useState, useEffect, useContext } from "react";
 import { StyleSheet } from "react-native";
 import Background from "../components/generate/Background";
 import Logo from "../components/generate/Logo";
-import Button from "../components/generate/Button";
+import Header from "../components/generate/Header";
+import { Text, Button } from "react-native-paper";
 import TextField from "../components/generate/TextField";
 import { theme } from "../core/theme";
 import { nameValidator } from "../helpers/nameValidator";
@@ -84,7 +85,8 @@ export const LoginScreen = ({ navigation }) => {
       />
       <Button
         mode="contained"
-        style={{ backgroundColor: "#000" }}
+        textColor="white"
+        buttonColor="#000"
         onPress={onLoginPressed}
       >
         {dictionary['login']}

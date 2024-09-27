@@ -1,6 +1,5 @@
 import axios from "axios";
 import * as SecureStore from 'expo-secure-store';
-import { navigate } from '../helpers/navigate';
 import { removeData } from "../helpers/storage";
 
 const axiosInstance = axios.create({
@@ -43,7 +42,7 @@ axiosInstance.interceptors.response.use(
       removeData("domain");
       removeData("branch");
       removeData("branchName");
-      navigate('Domain', { screen: 'Domain', message: 'Not allowed' });
+      removeData("user");
     } else {
       // Handle other types of errors (e.g., network errors)
       console.error("An error occurred (axios):", error.message);

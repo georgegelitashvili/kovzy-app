@@ -3,14 +3,19 @@ import { StyleSheet, Button, View, Text } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as Sentry from '@sentry/react-native';
 import * as Updates from 'expo-updates';
+import Constants from 'expo-constants';
 import { useNetInfo } from '@react-native-community/netinfo';
+import { useKeepAwake } from 'expo-keep-awake';
 
 import Main from './src/Main';
 import Toast from './src/components/generate/Toast';
 
+// Sentry initialization with environment-specific settings
 Sentry.init({
   dsn: 'https://2ae499816c71fe2e649d2d50a9fe6f9c@o4506904411439104.ingest.us.sentry.io/4506904415764480',
-  enableInExpoDevelopment: true,
+  enableInExpoDevelopment: false, // Disable in development if needed
+  environment: Updates.releaseChannel || 'development', // Track environment
+  release: Updates.manifest.version, // Track release version
 });
 
 const ErrorBoundary = Sentry.withErrorBoundary(({ children }) => children);
@@ -27,20 +32,26 @@ function App() {
   useEffect(() => {
     const handleAppCrash = () => {
       setShowReloadButton(true);
-      handleReload();
+      Sentry.captureException(new Error('App crashed')); // Capture the crash in Sentry
+      handleReload(); // Reload the app
     };
 
-    // Capture unhandled exceptions
     const previousHandler = ErrorUtils.getGlobalHandler();
     ErrorUtils.setGlobalHandler((error, isFatal) => {
-      // Check for specific error conditions and handle them
-      if (isMemoryLeak(error) || isUnhandledException(error) || isIncorrectNativeModuleUsage(error)) {
+      if (isFatal) {
         handleAppCrash();
       } else {
-        // Call the previous error handler if it exists
-        if (previousHandler) {
-          previousHandler(error, isFatal);
-        }
+        Sentry.captureException(error); // Capture non-fatal errors in Sentry
+        // Show a toast for non-fatal errors
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: 'Something went wrong, but the app is still running.',
+        });
+      }
+
+      if (previousHandler) {
+        previousHandler(error, isFatal);
       }
     });
 
@@ -50,14 +61,32 @@ function App() {
   }, []);
 
   const handleReload = async () => {
-    Sentry.captureEvent('Reloaded the app');
-    await Updates.reloadAsync();
+    try {
+      if (Constants.appOwnership === 'expo') {
+        console.warn('App reloads not supported in Expo Go');
+        return;
+      }
+
+      const update = await Updates.checkForUpdateAsync();
+      if (update.isAvailable) {
+        await Updates.fetchUpdateAsync();
+        Sentry.captureMessage('App Updated and Reloaded');
+        await Updates.reloadAsync();
+      } else {
+        Sentry.captureMessage('App Reload Triggered without Update');
+        await Updates.reloadAsync();
+      }
+    } catch (error) {
+      Sentry.captureException(error);
+      console.error('Failed to reload app:', error);
+    }
   };
 
   return (
     <SafeAreaProvider>
+      {useKeepAwake()}
       <ErrorBoundary>
-        <Main />
+        <Main isConnected={isConnected} />
       </ErrorBoundary>
       {!isConnected && (
         <Toast
@@ -72,7 +101,7 @@ function App() {
           <Text style={styles.reloadText}>
             {!isConnected ? 'Connection Error' : 'App has crashed'}
           </Text>
-          <Button style={styles.reloadButton} title="Reload App" onPress={handleReload} />
+          <Button title="Reload App" onPress={handleReload} />
         </View>
       )}
     </SafeAreaProvider>
@@ -86,10 +115,9 @@ const styles = StyleSheet.create({
   },
   reloadText: {
     marginBottom: 10,
+    fontSize: 16,
+    fontWeight: 'bold',
   },
-  reloadButton: {
-    marginBottom: 10,
-  }
 });
 
 export default Sentry.wrap(App);

@@ -12,13 +12,13 @@ import { navigationRef } from './helpers/navigate';
 
 import RootNavigator from "./RootNavigator";
 
-export default function Main() {
+export default function Main({ isConnected }) {
   return (
     <LanguageProvider>
       
       <PaperProvider>
 
-        <AuthProvider>
+        <AuthProvider isConnected={isConnected}>
 
           <NavigationContainer ref={navigationRef}>
             <RootNavigator />

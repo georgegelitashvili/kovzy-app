@@ -1,13 +1,11 @@
 import React, { useEffect, useCallback, useState, useMemo, useContext } from "react";
-import { StyleSheet, View, Dimensions, Platform, Alert, } from "react-native";
+import { StyleSheet, View, Dimensions, Platform, Alert, useWindowDimensions } from "react-native";
 import Modal from "react-native-modal";
 import { AuthContext, AuthProvider } from "../../context/AuthProvider";
 import OrdersModalAccept from "./OrdersModalAccept";
 import OrdersModalReject from "./OrdersModalReject";
 import OrdersModalStatus from "./OrdersModalStatus";
 
-const deviceWidth = Dimensions.get("window").width;
-const deviceHeight = Dimensions.get("window").height;
 
 export default function OrdersModal({
   isVisible,
@@ -17,10 +15,12 @@ export default function OrdersModal({
   deliveron,
   deliveronOptions,
   type,
-  options
+  options,
+  takeAway
 }) {
   const [visible, setVisible] = useState(isVisible);
   const { intervalId, setIntervalId } = useContext(AuthContext);
+  const { width: deviceWidth, height: deviceHeight } = useWindowDimensions();
 
   useEffect(() => {
     setVisible(isVisible);
@@ -66,6 +66,7 @@ export default function OrdersModal({
             deliveronOptions={deliveronOptions}
             options={options}
             items={items}
+            takeAway={takeAway}
             hideModal={hideModal}
           />
         )
@@ -76,6 +77,7 @@ export default function OrdersModal({
             deliveron={deliveron.original ?? deliveron}
             orders={orders}
             options={options}
+            takeAway={takeAway}
             hideModal={hideModal}
           />
         )
@@ -87,13 +89,14 @@ export default function OrdersModal({
             deliveron={deliveron.original ?? deliveron}
             options={options}
             deliveronOptions={deliveronOptions}
+            takeAway={takeAway}
             hideModal={hideModal}
           />
         )
     }
   }
 
-  if (deliveron.length === 0 || deliveron.original?.content.length === 0) {
+  if (takeAway !== 1 && (deliveron.length === 0 || deliveron.original?.content.length === 0)) {
     return null;
   }
 
@@ -115,7 +118,9 @@ export default function OrdersModal({
           backdropTransitionInTiming={600}
           backdropTransitionOutTiming={1000}
         >
-          {loadModalComponent()}
+          <View style={styles.modalContent}>
+            {loadModalComponent()}
+          </View>
         </Modal>
       </View>
     </>
@@ -126,14 +131,16 @@ export default function OrdersModal({
 const styles = StyleSheet.create({
   modal: {
     flex: 1,
-    height: 500,
-    backgroundColor: "#fff",
-    alignItems: "center",
+    justifyContent: 'center', // Center the content vertically
+    alignItems: 'center', // Center the content horizontally
+    backgroundColor: 'transparent', // Ensure the background is transparent
+  },
+  modalContent: {
+    backgroundColor: '#fff', // Background color of the modal content
     borderRadius: 13,
-    borderColor: "rgba(0, 0, 0, 0.1)",
-    ...(Platform.OS === "android" && {
-      textAlignVertical: "top",
-    }),
+    borderColor: 'rgba(0, 0, 0, 0.1)',
+    width: '90%', // Adjust the width as needed
+    padding: 20, // Add padding as needed
   },
   buttonModal: {
     flexDirection: "row",

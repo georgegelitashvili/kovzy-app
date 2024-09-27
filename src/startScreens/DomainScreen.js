@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext } from 'react';
 import Background from '../components/generate/Background';
 import Logo from '../components/generate/Logo';
-import Button from '../components/generate/Button';
+import { Text, Button } from "react-native-paper";
 import TextField from '../components/generate/TextField';
 import { AuthContext, AuthProvider } from '../context/AuthProvider';
 import { domainValidator } from '../helpers/domainValidator';
@@ -57,7 +57,8 @@ export const DomainScreen = ({ navigation }) => {
       />
       <Button
         mode="contained"
-        style={{ backgroundColor: '#000' }}
+        textColor="white"
+        buttonColor="#000"
         onPress={onCheckPressed}
       >
         {dictionary['save']}

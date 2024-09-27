@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Linking,
   Alert,
+  FlatList,
   RefreshControl,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
@@ -34,6 +35,9 @@ const cardSize = width / numColumns;
 export const AcceptedOrdersList = () => {
   const { domain, branchid, setUser, user, deleteItem, setIsDataSet, intervalId } = useContext(AuthContext);
   const [orders, setOrders] = useState([]);
+  const [fees, setFees] = useState([]);
+  const [currency, setCurrency] = useState("");
+
   const [page, setPage] = useState(0);
   const [options, setOptions] = useState({
     url_getAcceptedOrders: "",
@@ -52,7 +56,11 @@ export const AcceptedOrdersList = () => {
   const [modalType, setModalType] = useState("");
   const [loading, setLoading] = useState(true);
   const [loadingOptions, setLoadingOptions] = useState(false);
-  const [credentials, setCredentials] = useState({});
+
+  const [width, setWidth] = useState(Dimensions.get('window').width);
+  const [numColumns, setNumColumns] = useState(printRows(width));
+  const [cardSize, setCardSize] = useState(width / numColumns);
+
   const { dictionary, languageId } = useContext(LanguageContext);
 
   const increment = () => { setPage(page + 1); setLoading(true) };
@@ -82,6 +90,20 @@ export const AcceptedOrdersList = () => {
     setVisible(true);
   };
 
+  // Update layout on dimension change
+  useEffect(() => {
+    const updateLayout = () => {
+      const newWidth = Dimensions.get('window').width;
+      const columns = printRows(newWidth);
+      setWidth(newWidth);
+      setNumColumns(columns);
+      setCardSize(newWidth / columns);
+    };
+
+    const subscription = Dimensions.addEventListener('change', updateLayout);
+    return () => subscription?.remove();
+  }, []);
+
   const fetchAcceptedOrders = async () => {
     setOptionsIsLoaded(true);
     try {
@@ -99,17 +121,15 @@ export const AcceptedOrdersList = () => {
         type: 0
       }));
       const data = resp.data.data;
+      const feesData = resp.data.fees;
       setOrders(data);
+      setFees(feesData);
+      setCurrency(resp.data.currency);
     } catch (error) {
       console.log('Error fetching accepted orders full:', error);
       const statusCode = error?.status || 'Unknown';
       console.log('Status code accepted orders:', statusCode);
-      if (statusCode === 401) {
-        setOrders([]);
-        setOptionsIsLoaded(false);
-        setOptions({});
-        clearInterval(intervalId);
-      }
+      clearInterval(intervalId);
     } finally {
       setLoading(false);
     }
@@ -177,8 +197,19 @@ export const AcceptedOrdersList = () => {
       return link.trackLink ?? null;
     });
 
+    const deliveryPrice = parseFloat(item.delivery_price);
+    const additionalFees = parseFloat(item.service_fee) / 100;
+    const feeData = JSON.parse(item.fees_details || '{}');
+    const feesDetails = fees?.reduce((acc, fee) => {
+      const feeId = fee['id'];
+      if (feeData[feeId]) {
+        acc.push(`${fee['value']} : ${parseFloat(feeData[feeId])}`);
+      }
+      return acc;
+    }, []);
+
     return (
-      <Card key={item.id}>
+      <Card key={item.id} style={styles.card}>
         <TouchableOpacity onPress={() => toggleContent(item.id)}>
           <Card.Content style={styles.head}>
             <Text variant="headlineMedium" style={styles.header}>
@@ -188,6 +219,7 @@ export const AcceptedOrdersList = () => {
               />
               {item.id}
             </Text>
+            <Text style={styles.takeAway}>{item.take_away === 1 ? "(" + dictionary["orders.takeAway"] + ")" : ""}</Text>
             <Text variant="headlineMedium" style={styles.header}>
               <SimpleLineIcons
                 name={!isOpen.includes(item.id) ? "arrow-up" : "arrow-down"}
@@ -202,7 +234,7 @@ export const AcceptedOrdersList = () => {
               {dictionary["orders.status"]}: {dictionary["orders.pending"]}
             </Text>
 
-            <Text variant="titleSmall" style={styles.title}>
+            <Text variant="titleSmall" style={styles.title} numberOfLines={2} ellipsizeMode="tail">
               {dictionary["orders.fName"]}: {item.firstname} {item.lastname}
             </Text>
 
@@ -210,7 +242,7 @@ export const AcceptedOrdersList = () => {
               {dictionary["orders.phone"]}: {item.phone_number}
             </Text>
 
-            <Text variant="titleSmall" style={styles.title}>
+            <Text variant="titleSmall" style={styles.title} numberOfLines={2} ellipsizeMode="tail">
               {dictionary["orders.address"]}: {item.address}
             </Text>
 
@@ -223,18 +255,18 @@ export const AcceptedOrdersList = () => {
             ) : null}
 
             {item.delivery_scheduled ? (
-              <Text variant="titleSmall" style={styles.title}>
+              <Text variant="titleSmall" style={styles.title} numberOfLines={2} ellipsizeMode="tail">
                 {dictionary["orders.scheduledDeliveryTime"]}: {item.delivery_scheduled}
               </Text>
             ) : null}
 
             {item.comment ? (
-              <Text variant="titleSmall" style={styles.title}>
+              <Text variant="titleSmall" style={styles.title} numberOfLines={2} ellipsizeMode="tail">
                 {dictionary["orders.comment"]}: {item.comment}
               </Text>
             ) : null}
 
-            <Text variant="titleSmall" style={styles.title}>
+            <Text variant="titleSmall" style={styles.title} numberOfLines={2} ellipsizeMode="tail">
               {dictionary["orders.paymentMethod"]}: {item.payment_type}
             </Text>
 
@@ -242,7 +274,30 @@ export const AcceptedOrdersList = () => {
             <OrdersDetail orderId={item.id} />
             <Divider />
 
-            <Text variant="titleLarge">{item.price} GEL</Text>
+            <Text variant="titleMedium" style={styles.title}> {dictionary["orders.initialPrice"]}: {item.real_price} {currency}</Text>
+
+            <Text variant="titleMedium" style={styles.title}> {dictionary["orders.discountedPrice"]}: {item.price} {currency}</Text>
+
+            <Text variant="titleMedium" style={styles.title}> {dictionary["orders.deliveryPrice"]}: {deliveryPrice} {currency}</Text>
+
+            {feesDetails?.length > 0 && (
+              <View>
+                <Text variant="titleMedium" style={styles.title}>
+                  {dictionary["orders.additionalFees"]}: {additionalFees} {currency}
+                </Text>
+                <View style={styles.feeDetailsContainer}>
+                  {feesDetails.map((fee, index) => (
+                    <Text key={index} style={styles.feeDetailText}>
+                      {fee} {currency}
+                    </Text>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            <Text variant="titleMedium" style={styles.title}>
+              {dictionary["orders.totalcost"]}: {item.total_cost} {currency}
+            </Text>
 
             <Card.Actions>
               <Button
@@ -272,37 +327,47 @@ export const AcceptedOrdersList = () => {
     );
   };
 
-
-
   if (loading) {
     return <Loader show={loading} />;
   }
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1, width: width, }}>
       {loadingOptions ? <Loader /> : null}
-      <ScrollView horizontal={true} showsVerticalScrollIndicator={false}>
-        {visible ? (
-          <OrdersModal
-            isVisible={visible}
-            onChangeState={onChangeModalState}
-            orders={orders}
-            hasItemId={itemId}
-            deliveron={deliveron}
-            deliveronOptions={deliveronOptions}
-            type={modalType}
-            options={options}
-          />
-        ) : null}
-        <FlatGrid
-          itemDimension={cardSize}
-          data={orders}
-          renderItem={renderEnteredOrdersList}
-          adjustGridToStyles={true}
-          contentContainerStyle={{ justifyContent: "flex-start" }}
-          keyExtractor={(item) => (item && item.id ? item.id.toString() : '')}
-        />
-      </ScrollView>
+      <FlatList
+        data={[{}]} // Dummy data for FlatList to use ListHeaderComponent
+        renderItem={null} // No actual items to render
+        keyExtractor={() => 'dummy'} // Static key for dummy data
+        showsVerticalScrollIndicator={false}
+        ListHeaderComponent={
+          <View style={{ flexDirection: 'row', flexWrap: 'nowrap', flex: 1 }}>
+            {visible ? (
+              <OrdersModal
+                isVisible={visible}
+                onChangeState={onChangeModalState}
+                orders={orders}
+                hasItemId={itemId}
+                deliveron={deliveron}
+                deliveronOptions={deliveronOptions}
+                type={modalType}
+                options={options}
+              />
+            ) : null}
+            <FlatGrid
+              adjustGridToStyles={true}
+              itemDimension={cardSize}
+              spacing={10}
+              data={orders}
+              renderItem={renderEnteredOrdersList}
+              keyExtractor={(item) => (item && item.id ? item.id.toString() : '')}
+              itemContainerStyle={{ justifyContent: 'space-between' }}
+              style={{ flex: 1 }}
+              onEndReachedThreshold={0.5}
+            />
+          </View>
+        }
+      />
+
       <View style={styles.paginationContainer}>
         <TouchableOpacity
           onPress={() => {
@@ -346,8 +411,8 @@ const styles = StyleSheet.create({
     justifyContent: "flex-start",
   },
   card: {
+    flexWrap: 'nowrap',
     backgroundColor: "#fff",
-    justifyContent: "flex-start",
     margin: 10,
     borderRadius: 10,
     shadowColor: "#000",
@@ -366,6 +431,10 @@ const styles = StyleSheet.create({
   header: {
     paddingVertical: 10,
   },
+  takeAway: {
+    paddingVertical: 20,
+    fontSize: 15,
+  },
   leftIcon: {
     marginRight: 3,
     fontSize: 32,
@@ -376,6 +445,9 @@ const styles = StyleSheet.create({
   },
   title: {
     paddingVertical: 10,
+    lineHeight: 24,
+    fontSize: 14,
+    flexWrap: 'wrap',
   },
   paginationContainer: {
     flexDirection: "row",
@@ -397,5 +469,13 @@ const styles = StyleSheet.create({
   paginationText: {
     fontSize: 17,
     fontWeight: "bold",
+  },
+  feeDetailsContainer: {
+    paddingLeft: 10,
+    marginBottom: 15
+  },
+  feeDetailText: {
+    fontSize: 15,
+    color: '#333',
   },
 });
