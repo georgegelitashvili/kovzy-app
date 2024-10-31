@@ -4,7 +4,7 @@ import { removeData } from "../helpers/storage";
 
 const axiosInstance = axios.create({
   headers: {
-    'Accept': "application/json",
+    'Accept': 'application/json',
     'Content-Type': 'application/json',
   },
   withCredentials: true,
@@ -20,9 +20,11 @@ axiosInstance.interceptors.request.use(
     return config;
   },
   (error) => {
+    console.error("Interceptor error:", error);
     return Promise.reject(error);
   },
 );
+
 
 axiosInstance.interceptors.response.use(
   (response) => {

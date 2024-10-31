@@ -127,7 +127,16 @@ export default function OrdersModalContent(props) {
         ...orderData,
         data: {
           Orderid: props.itemId,
+          orderDelyTime: forClient.value,
           orderPrepTime: forDelivery.value,
+        },
+      });
+      setAcceptData({
+        ...acceptData,
+        data: {
+          Orderid: props.itemId,
+          orderPrepTime: forDelivery.value,
+          orderDelyTime: forClient.value,
         },
       });
     }
