@@ -103,14 +103,14 @@ export default function DrawerContent(props) {
         </View>
 
         <Drawer.Section style={styles.drawerSection}>
-          <TouchableRipple onPress={toggleDeliveron}>
+          {/* <TouchableRipple onPress={toggleDeliveron}>
             <View style={styles.preference}>
               <Text>{dictionary["dv.deliveron"]}</Text>
               <View pointerEvents="none">
                 <Switch value={deliveronEnabled} />
               </View>
             </View>
-          </TouchableRipple>
+          </TouchableRipple> */}
 
           <TouchableRipple style={styles.ripple} onPress={toggleBranch}>
             <View style={styles.preference}>
