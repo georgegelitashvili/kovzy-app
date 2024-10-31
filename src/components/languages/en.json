@@ -4,6 +4,8 @@
     "save": "Save",
     "remove": "Remove",
     "close": "Close",
+    "cancel":"Cancel",
+    "confirm":"Confirm",
     "finish": "Finish",
     "update": "Update",
     "refund": "Refund",
@@ -444,5 +446,6 @@
     "dv.status": "Status deliveron",
     "dv.cancelOrder": "Courier cancellation",
     "dv.empty": "No active courier found, please try again later or disable the Deliveron module and deliver by yourself.",
+    "dv.deliveronOff": "Please note that you will be disconnecting from courier services, and you will need to organize the delivery of the order yourself.",
     "settings": "Settings"
 }
