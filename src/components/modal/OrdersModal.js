@@ -16,7 +16,8 @@ export default function OrdersModal({
   deliveronOptions,
   type,
   options,
-  takeAway
+  takeAway,
+  PendingOrders
 }) {
   const [visible, setVisible] = useState(isVisible);
   const { intervalId, setIntervalId } = useContext(AuthContext);
@@ -78,6 +79,7 @@ export default function OrdersModal({
             orders={orders}
             options={options}
             takeAway={takeAway}
+            PendingOrders={PendingOrders}
             hideModal={hideModal}
           />
         )

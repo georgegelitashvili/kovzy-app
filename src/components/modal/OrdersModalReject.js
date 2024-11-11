@@ -35,6 +35,7 @@ export default function OrdersModalContent(props) {
             ...orderData, data: {
               Orderid: props.itemId,
               deliveronOrderId: deliveronId['order_id_deliveron'] ?? null,
+              PendingOrders: props.PendingOrders
             }
           })
         }
@@ -43,6 +44,7 @@ export default function OrdersModalContent(props) {
       setOrderData({
         ...orderData, data: {
           Orderid: props.itemId,
+          PendingOrders: props.PendingOrders
         }
       })
     }
