@@ -20,9 +20,11 @@
     "@sentry/react-native": "~5.24.3",
     "@types/react": "~18.2.79",
     "axios": "^1.7.4",
-    "expo": "~51.0.28",
+    "expo": "~51.0.39",
     "expo-av": "~14.0.6",
+    "expo-haptics": "~13.0.1",
     "expo-keep-awake": "~13.0.2",
+    "expo-linear-gradient": "~13.0.2",
     "expo-secure-store": "~13.0.2",
     "expo-updates": "~0.25.22",
     "lodash.throttle": "^4.1.1",
@@ -39,6 +41,7 @@
     "react-native-status-bar-height": "^2.6.0",
     "react-native-super-grid": "^6.0.1",
     "react-native-tab-view": "^3.5.2",
+    "react-native-timer-picker": "^1.10.3",
     "react-native-vector-icons": "^10.0.3"
   },
   "resolutions": {
