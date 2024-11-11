@@ -300,27 +300,27 @@ export const AcceptedOrdersList = () => {
             </Text>
 
             <Card.Actions>
-              <Button
-                textColor="white"
-                buttonColor="#2fa360"
+              <TouchableOpacity
+                style={styles.buttonAccept}
                 onPress={() => {
                   setItemId(item.id);
                   showModal("status");
                 }}
               >
-                {dictionary["orders.finish"]}
-              </Button>
-              <Button
-                textColor="white"
-                buttonColor="#f14c4c"
+                <MaterialCommunityIcons name="check-decagram-outline" size={30} color="white" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.buttonReject}
                 onPress={() => {
                   setItemId(item.id);
                   showModal("reject");
                 }}
               >
-                {dictionary["orders.reject"]}
-              </Button>
+                <MaterialCommunityIcons name="close-circle-outline" size={30} color="white" />
+              </TouchableOpacity>
             </Card.Actions>
+
           </Card.Content>
         ) : null}
       </Card>
@@ -351,6 +351,7 @@ export const AcceptedOrdersList = () => {
                 deliveronOptions={deliveronOptions}
                 type={modalType}
                 options={options}
+                PendingOrders={false}
               />
             ) : null}
             <FlatGrid
@@ -442,6 +443,28 @@ const styles = StyleSheet.create({
   rightIcon: {
     marginRight: 15,
     fontSize: 25,
+  },
+  buttonAccept: {
+    width: 85,
+    height: 45,
+    borderRadius: 21,
+    borderWidth: 1,
+    borderColor: "#2fa360",
+    backgroundColor: "#2fa360",
+    justifyContent: "center",
+    alignItems: "center",
+    marginHorizontal: 5,
+  },
+  buttonReject: {
+    width: 85,
+    height: 45,
+    borderRadius: 21,
+    borderWidth: 1,
+    borderColor: "#f14c4c",
+    backgroundColor: "#f14c4c",
+    justifyContent: "center",
+    alignItems: "center",
+    marginHorizontal: 5,
   },
   title: {
     paddingVertical: 10,
