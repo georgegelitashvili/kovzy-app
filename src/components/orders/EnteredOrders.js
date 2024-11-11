@@ -3,12 +3,13 @@ import {
   StyleSheet,
   Dimensions,
   View,
-  ScrollView,
+  Modal,
   TouchableOpacity,
   Alert,
   AppState,
   FlatList
 } from "react-native";
+
 import { Text, Button, Divider, Card } from "react-native-paper";
 import { FlatGrid } from "react-native-super-grid";
 import { MaterialCommunityIcons, SimpleLineIcons } from "@expo/vector-icons";
@@ -16,6 +17,7 @@ import * as Updates from 'expo-updates';
 
 import { AuthContext, AuthProvider } from "../../context/AuthProvider";
 import Loader from "../generate/loader";
+import TimePicker from "../generate/TimePicker";
 import { String, LanguageContext } from "../Language";
 import axiosInstance from "../../apiConfig/apiRequests";
 import OrdersDetail from "./OrdersDetail";
@@ -38,6 +40,8 @@ export const EnteredOrdersList = () => {
   const [orders, setOrders] = useState([]);
   const [fees, setFees] = useState([]);
   const [currency, setCurrency] = useState("");
+  const [scheduled, setScheduled] = useState([]);
+  const [deliveryScheduled, setDeliveryScheduled] = useState(null);
 
   const [appState, setAppState] = useState(AppState.currentState);
 
@@ -60,6 +64,8 @@ export const EnteredOrdersList = () => {
 
   const [loading, setLoading] = useState(true);
   const [loadingOptions, setLoadingOptions] = useState(false);
+
+  const [isPickerVisible, setPickerVisible] = useState(false);
 
   const [width, setWidth] = useState(Dimensions.get('window').width);
   const [numColumns, setNumColumns] = useState(printRows(width));
@@ -91,6 +97,7 @@ export const EnteredOrdersList = () => {
   const apiOptions = useCallback(() => {
     setOptions({
       url_unansweredOrders: `https://${domain}/api/v1/admin/getUnansweredOrders`,
+      url_delayOrders: `https://${domain}/api/v1/admin/postponeOrder`,
       url_deliveronRecheck: `https://${domain}/api/v1/admin/deliveronRecheck`,
       url_acceptOrder: `https://${domain}/api/v1/admin/acceptOrder`,
       url_rejectOrder: `https://${domain}/api/v1/admin/rejectOrder`,
@@ -135,6 +142,7 @@ export const EnteredOrdersList = () => {
       setOrders(data);
       setFees(feesData);
       setCurrency(resp.data.currency);
+      setScheduled(resp.data.scheduled);
     } catch (error) {
       console.log('Error fetching entered orders full:', error);
       const statusCode = error?.status || 'Unknown';
@@ -150,7 +158,7 @@ export const EnteredOrdersList = () => {
     console.log('call interval');
     const newIntervalId = setInterval(() => {
       if (optionsIsLoaded) {
-        console.log('fetchEnteredOrders called');
+        // console.log('fetchEnteredOrders called');
         fetchEnteredOrders();
       } else {
         console.log('Options not loaded');
@@ -200,12 +208,12 @@ export const EnteredOrdersList = () => {
 
   // set deliveron data
   useEffect(() => {
-    if (itemId && itemTakeAway !== 1) {
+    if (itemTakeAway !== 1) {
       setDeliveronOptions((prev) => ({ ...prev, data: { orderId: itemId } }));
       setIsDeliveronOptions(true);
       setLoadingOptions(true);
     }
-  }, [itemId, itemTakeAway]);
+  }, [itemTakeAway]);
 
   useEffect(() => {
     if (isDeliveronOptions) {
@@ -250,6 +258,108 @@ export const EnteredOrdersList = () => {
     }
   }, [orders]);
 
+  const parseTimeToMinutes = (time) => {
+    const [hours, minutes, seconds] = time.split(':').map(Number);
+    return hours * 60 + minutes + seconds / 60;
+  };
+
+  const formatDateToLocal = (date) => {
+    if (!(date instanceof Date) || isNaN(date)) return "Invalid Date";
+    const pad = (num) => num.toString().padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+  };
+
+  const subtractTime = (baseTime, hours = 0, minutes = 0, seconds = 0) => {
+    const time = new Date(baseTime);
+    if (isNaN(time)) return "Invalid base time";
+    time.setHours(time.getHours() - hours);
+    time.setMinutes(time.getMinutes() - minutes);
+    time.setSeconds(time.getSeconds() - seconds);
+    return time;
+  };
+
+  const handleDelaySet = (delay) => {
+    console.log("Delay set for:", delay);
+    console.log("Delivery scheduled:", deliveryScheduled);
+    console.log("Order id:", itemId);
+
+    if (!deliveryScheduled) {
+      alert("Delivery scheduled time is not set. Please provide a valid time.");
+      return false;
+    }
+
+    const deliveryScheduledTime = new Date(deliveryScheduled.replace(' ', 'T'));
+    if (isNaN(deliveryScheduledTime)) {
+      alert("Invalid delivery scheduled time format.");
+      return false;
+    }
+
+    // Check if the provided delay is less than the default delay time
+    const delayMinutes = parseTimeToMinutes(delay);
+    const defaultDelayMinutes = parseTimeToMinutes(scheduled.delay_time);
+
+    // Use default delay time if provided delay is less than the default delay
+    const effectiveDelay = delayMinutes < defaultDelayMinutes ? scheduled.delay_time : delay;
+    console.log("Effective Delay:", effectiveDelay);
+
+    const [delayHours, delayMinutesUsed, delaySeconds] = effectiveDelay.split(':').map(Number);
+    const adjustedTime = subtractTime(deliveryScheduledTime, delayHours, delayMinutesUsed, delaySeconds);
+
+    if (isNaN(adjustedTime)) {
+      console.error("Invalid adjusted time:", adjustedTime);
+      return false;
+    }
+
+    const adjustedTimeStamp = adjustedTime.getTime();
+    const deliveryScheduledStamp = deliveryScheduledTime.getTime();
+    const currentTimeStamp = new Date().getTime();
+
+    // Check if adjusted time is earlier than the current time
+    if (adjustedTimeStamp < currentTimeStamp) {
+      alert("The adjusted delivery time is in the past. Please select a valid time.");
+      return false;
+    }
+
+    // Check if the adjusted time is after or equal to the scheduled delivery time
+    if (adjustedTimeStamp >= deliveryScheduledStamp) {
+      alert("The adjusted delivery time is later than the scheduled time. The order cannot be delayed.");
+      return false;
+    }
+
+    console.log("Order delay till:", formatDateToLocal(adjustedTime));
+
+    try {
+      axiosInstance
+        .post(options.url_delayOrders, {
+          Orderid: itemId,
+          orderDelayTime: formatDateToLocal(adjustedTime)
+        })
+        .then((resp) => {
+          return resp.data.data
+        })
+        .then((data) => {
+          console.log(data);
+          if (data.status === 0) {
+            Alert.alert(
+              "ALERT",
+              `Order delay till: ${formatDateToLocal(adjustedTime)}`,
+              [
+                {
+                  text: "Okay",
+                  onPress: () => setPickerVisible(false),
+                },
+              ]
+            );
+
+          }
+        });
+    } catch (error) {
+      console.error("Error delaying order:", error);
+      Alert.alert("Error", "There was a problem delaying the order. Please try again.");
+    }
+  };
+
+
   const renderEnteredOrdersList = ({ item }) => {
     const deliveryPrice = parseFloat(item.delivery_price);
     const additionalFees = parseFloat(item.service_fee) / 100;
@@ -261,6 +371,8 @@ export const EnteredOrdersList = () => {
       }
       return acc;
     }, []);
+
+    const isScheduled = item.take_away ? scheduled.scheduled_takeaway : scheduled.scheduled_delivery;
 
     return (
       <Card key={item.id} style={styles.card}>
@@ -344,30 +456,42 @@ export const EnteredOrdersList = () => {
             <Text variant="titleMedium" style={styles.title}>
               {dictionary["orders.totalcost"]}: {item.total_cost} {currency}
             </Text>
-
             <Card.Actions>
-              <Button
-                textColor="white"
-                buttonColor="#2fa360"
+              <TouchableOpacity
+                style={styles.buttonAccept}
                 onPress={() => {
                   setItemId(item.id);
                   setItemTakeAway(item.take_away);
                   showModal("accept");
                 }}
               >
-                {dictionary["orders.accept"]}
-              </Button>
-              <Button
-                textColor="white"
-                buttonColor="#f14c4c"
+                <MaterialCommunityIcons name="check-decagram-outline" size={30} color="white" />
+              </TouchableOpacity>
+
+              {item.delivery_scheduled !== null && isScheduled && (
+                <TouchableOpacity
+                  style={styles.buttonDelay}
+                  onPress={() => {
+                    setItemId(item.id);
+                    setDeliveryScheduled(item.delivery_scheduled);
+                    setPickerVisible(true);
+                  }}
+                >
+                  <MaterialCommunityIcons name="bell-ring-outline" size={30} color="white" />
+                </TouchableOpacity>
+              )}
+
+              <TouchableOpacity
+                style={styles.buttonReject}
                 onPress={() => {
                   setItemId(item.id);
                   showModal("reject");
                 }}
               >
-                {dictionary["orders.reject"]}
-              </Button>
+                <MaterialCommunityIcons name="close-circle-outline" size={30} color="white" />
+              </TouchableOpacity>
             </Card.Actions>
+
           </Card.Content>
         ) : null}
       </Card>
@@ -405,8 +529,25 @@ export const EnteredOrdersList = () => {
                 type={modalType}
                 options={options}
                 takeAway={itemTakeAway}
+                PendingOrders={true}
               />
             )}
+
+            <Modal
+              transparent={true}
+              visible={isPickerVisible}
+              animationType="fade"
+              onRequestClose={() => setPickerVisible(false)}
+            >
+              <View style={styles.modalContainer}>
+                <TimePicker
+                  scheduled={scheduled}
+                  onDelaySet={handleDelaySet}
+                  onClose={() => setPickerVisible(false)} // Close when done
+                />
+              </View>
+            </Modal>
+
             <FlatGrid
               adjustGridToStyles={true}
               itemDimension={cardSize}
@@ -463,6 +604,39 @@ const styles = StyleSheet.create({
     marginRight: 15,
     fontSize: 25,
   },
+  buttonAccept: {
+    width: 85,
+    height: 45,
+    borderRadius: 21,
+    borderWidth: 1,
+    borderColor: "#2fa360",
+    backgroundColor: "#2fa360",
+    justifyContent: "center",
+    alignItems: "center",
+    marginHorizontal: 5,
+  },
+  buttonDelay: {
+    width: 85,
+    height: 45,
+    borderRadius: 21,
+    borderWidth: 1,
+    borderColor: "#3490dc",
+    backgroundColor: "#3490dc",
+    justifyContent: "center",
+    alignItems: "center",
+    marginHorizontal: 5,
+  },
+  buttonReject: {
+    width: 85,
+    height: 45,
+    borderRadius: 21,
+    borderWidth: 1,
+    borderColor: "#f14c4c",
+    backgroundColor: "#f14c4c",
+    justifyContent: "center",
+    alignItems: "center",
+    marginHorizontal: 5,
+  },
   title: {
     paddingVertical: 10,
     lineHeight: 24,
@@ -476,5 +650,18 @@ const styles = StyleSheet.create({
   feeDetailText: {
     fontSize: 15,
     color: '#333',
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.7)", // Semi-transparent background
+  },
+  modalContent: {
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    padding: 20,
+    elevation: 5,
+    width: "80%",
   },
 });

@@ -821,10 +821,10 @@
   dependencies:
     uuid "^8.0.0"
 
-"@expo/cli@0.18.30":
-  version "0.18.30"
-  resolved "https://registry.yarnpkg.com/@expo/cli/-/cli-0.18.30.tgz#0cb4829aa11e98ae350a5c15958b9816e9a1d2f0"
-  integrity sha512-V90TUJh9Ly8stYo8nwqIqNWCsYjE28GlVFWEhAFCUOp99foiQr8HSTpiiX5GIrprcPoWmlGoY+J5fQA29R4lFg==
+"@expo/cli@0.18.31":
+  version "0.18.31"
+  resolved "https://registry.yarnpkg.com/@expo/cli/-/cli-0.18.31.tgz#d07b7f1b2d10d146ec8b732ce1353b90912c56bd"
+  integrity sha512-v9llw9fT3Uv+TCM6Xllo54t672CuYtinEQZ2LPJ2EJsCwuTc4Cd2gXQaouuIVD21VoeGQnr5JtJuWbF97sBKzQ==
   dependencies:
     "@babel/runtime" "^7.20.0"
     "@expo/code-signing-certificates" "0.0.5"
@@ -912,7 +912,28 @@
     node-forge "^1.2.1"
     nullthrows "^1.1.1"
 
-"@expo/config-plugins@8.0.10", "@expo/config-plugins@~8.0.8":
+"@expo/config-plugins@8.0.11":
+  version "8.0.11"
+  resolved "https://registry.yarnpkg.com/@expo/config-plugins/-/config-plugins-8.0.11.tgz#b814395a910f4c8b7cc95d9719dccb6ca53ea4c5"
+  integrity sha512-oALE1HwnLFthrobAcC9ocnR9KXLzfWEjgIe4CPe+rDsfC6GDs8dGYCXfRFoCEzoLN4TGYs9RdZ8r0KoCcNrm2A==
+  dependencies:
+    "@expo/config-types" "^51.0.3"
+    "@expo/json-file" "~8.3.0"
+    "@expo/plist" "^0.1.0"
+    "@expo/sdk-runtime-versions" "^1.0.0"
+    chalk "^4.1.2"
+    debug "^4.3.1"
+    find-up "~5.0.0"
+    getenv "^1.0.0"
+    glob "7.1.6"
+    resolve-from "^5.0.0"
+    semver "^7.5.4"
+    slash "^3.0.0"
+    slugify "^1.6.6"
+    xcode "^3.0.1"
+    xml2js "0.6.0"
+
+"@expo/config-plugins@~8.0.8":
   version "8.0.10"
   resolved "https://registry.yarnpkg.com/@expo/config-plugins/-/config-plugins-8.0.10.tgz#5cda076f38bc04675cb42d8acdd23d6e460a62de"
   integrity sha512-KG1fnSKRmsudPU9BWkl59PyE0byrE2HTnqbOrgwr2FAhqh7tfr9nRs6A9oLS/ntpGzmFxccTEcsV0L4apsuxxg==
@@ -3747,6 +3768,11 @@ expo-font@~12.0.10:
   dependencies:
     fontfaceobserver "^2.1.0"
 
+expo-haptics@~13.0.1:
+  version "13.0.1"
+  resolved "https://registry.yarnpkg.com/expo-haptics/-/expo-haptics-13.0.1.tgz#35679c7fde4ae1c21ae3bc2d2cb34c266049dc2c"
+  integrity sha512-qG0EOLDE4bROVT3DtUSyV9g3iB3YFu9j3711X7SNNEnBDXc+2/p3wGDPTnJvPW0ao6HG3/McAOrBQA5hVSdWng==
+
 expo-json-utils@~0.13.0:
   version "0.13.1"
   resolved "https://registry.yarnpkg.com/expo-json-utils/-/expo-json-utils-0.13.1.tgz#e49b697198e11c573d346f08ab91c467095934a9"
@@ -3756,6 +3782,11 @@ expo-keep-awake@~13.0.2:
   version "13.0.2"
   resolved "https://registry.yarnpkg.com/expo-keep-awake/-/expo-keep-awake-13.0.2.tgz#5ef31311a339671eec9921b934fdd90ab9652b0e"
   integrity sha512-kKiwkVg/bY0AJ5q1Pxnm/GvpeB6hbNJhcFsoOWDh2NlpibhCLaHL826KHUM+WsnJRbVRxJ+K9vbPRHEMvFpVyw==
+
+expo-linear-gradient@~13.0.2:
+  version "13.0.2"
+  resolved "https://registry.yarnpkg.com/expo-linear-gradient/-/expo-linear-gradient-13.0.2.tgz#21bd7bc7c71ef4f7c089521daa16db729d2aec5f"
+  integrity sha512-EDcILUjRKu4P1rtWcwciN6CSyGtH7Bq4ll3oTRV7h3h8oSzSilH1g6z7kTAMlacPBKvMnkkWOGzW6KtgMKEiTg==
 
 expo-manifests@~0.14.0:
   version "0.14.3"
@@ -3821,15 +3852,15 @@ expo-updates@~0.25.22:
     ignore "^5.3.1"
     resolve-from "^5.0.0"
 
-expo@~51.0.28:
-  version "51.0.38"
-  resolved "https://registry.yarnpkg.com/expo/-/expo-51.0.38.tgz#e4127b230454a34a507cfb9f1a2e4b3855cb0579"
-  integrity sha512-/B9npFkOPmv6WMIhdjQXEY0Z9k/67UZIVkodW8JxGIXwKUZAGHL+z1R5hTtWimpIrvVhyHUFU3f8uhfEKYhHNQ==
+expo@~51.0.39:
+  version "51.0.39"
+  resolved "https://registry.yarnpkg.com/expo/-/expo-51.0.39.tgz#d9efab081a91a0d3e925b0e4648722b13a8fceae"
+  integrity sha512-Cs/9xopyzJrpXWbyVUZnr37rprdFJorRgfSp6cdBfvbjxZeKnw2MEu7wJwV/s626i5lZTPGjZPHUF9uQvt51cg==
   dependencies:
     "@babel/runtime" "^7.20.0"
-    "@expo/cli" "0.18.30"
+    "@expo/cli" "0.18.31"
     "@expo/config" "9.0.4"
-    "@expo/config-plugins" "8.0.10"
+    "@expo/config-plugins" "8.0.11"
     "@expo/metro-config" "0.18.11"
     "@expo/vector-icons" "^14.0.3"
     babel-preset-expo "~11.0.15"
@@ -6482,6 +6513,11 @@ react-native-tab-view@^3.5.2:
   integrity sha512-nE5WqjbeEPsWQx4mtz81QGVvgHRhujTNIIZiMCx3Bj6CBFDafbk7XZp9ocmtzXUQaZ4bhtVS43R4FIiR4LboJw==
   dependencies:
     use-latest-callback "^0.1.5"
+
+react-native-timer-picker@^1.10.3:
+  version "1.10.3"
+  resolved "https://registry.yarnpkg.com/react-native-timer-picker/-/react-native-timer-picker-1.10.3.tgz#f383a3ee1609cfef7f4530fda543757b40e1e331"
+  integrity sha512-8WSKaniS0b2wUMa0uA+0KdmUjsFPSPIu8TRVv6XfVpsDzqq2ns5n79ZmasDlSq+f2IOt1LyQPxtwcVPF7WEVIw==
 
 react-native-vector-icons@^10.0.3:
   version "10.2.0"
