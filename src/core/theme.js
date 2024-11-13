@@ -1,5 +1,4 @@
 import { DefaultTheme } from 'react-native-paper'
-import Background from '../components/generate/Background'
 
 export const theme = {
   ...DefaultTheme,
@@ -10,4 +9,5 @@ export const theme = {
     error: '#f13a59',
     Background: '#fff',
   },
-}
+};
+
