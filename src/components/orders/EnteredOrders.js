@@ -233,9 +233,6 @@ export const EnteredOrdersList = () => {
         .post(options.url_deliveronRecheck, deliveronOptions.data)
         .then((resp) => resp.data.data)
         .then((data) => {
-          console.log("==================== deliveron Options");
-          console.log(data);
-          console.log("==================== end deliveron Options");
           const { status, content } = data.original ?? {};
           const alertHandler = (message, shouldClearData = false) => Alert.alert("ALERT", message, [
             {
@@ -309,9 +306,6 @@ export const EnteredOrdersList = () => {
   };
 
   const handleDelaySet = (delay) => {
-    console.log("Delay set for:", delay);
-    console.log("Delivery scheduled:", deliveryScheduled);
-    console.log("Order id:", itemId);
     setLoadingOptions(false);
     if (!deliveryScheduled) {
       alert("Delivery scheduled time is not set. Please provide a valid time.");
@@ -355,8 +349,6 @@ export const EnteredOrdersList = () => {
       alert("The adjusted delivery time is later than the scheduled time. The order cannot be delayed.");
       return false;
     }
-
-    console.log("Order delay till:", formatDateToLocal(adjustedTime));
 
     try {
       axiosInstance
