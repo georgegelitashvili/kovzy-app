@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useContext } from "react";
 import { Text, Button } from "react-native-paper";
-import TextField from "../generate/TextField";
 import SelectOption from "../generate/SelectOption";
 import Loader from "../generate/loader";
 import {
@@ -14,84 +13,60 @@ import axiosInstance from "../../apiConfig/apiRequests";
 import { String, LanguageContext } from "../Language";
 
 export default function OrdersModalContent(props) {
-  const [forClient, setForClient] = useState({ value: "", error: "" });
-  const [forDelivery, setForDelivery] = useState({ value: "", error: "" });
-
-  const [options, setOptions] = useState(
-    props.deliveron?.status !== -2 && props.takeAway !== 1
-      ? props.options.url_deliveronRecheck
-      : props.options.url_acceptOrder
-  );
+  // const [forClient, setForClient] = useState({ value: "", error: "" });
+  // const [forDelivery, setForDelivery] = useState({ value: "", error: "" });
 
   const [orderData, setOrderData] = useState({});
   const [acceptData, setAcceptData] = useState({});
   const [deliveron, setDeliveron] = useState({ data: [], error: "" });
   const [selected, setSelected] = useState(props.items ? props.items[0]?.value : null);
   const [loading, setLoading] = useState(false);
-  const [ready, setReady] = useState(false);
   const { dictionary } = useContext(LanguageContext);
 
-  const deliveronOff = () => {
-    let shouldReturn = false;
-    if (ready === false) {
-      shouldReturn = true;
-    }
-
-    if (props.deliveron?.status !== -2) {
-      axiosInstance.post(props.options.url_acceptOrder, acceptData.data)
-        .catch((error) => {
-          console.log(error);
-        });
-    }
-
-    return shouldReturn;
-  };
-
-  const acceptOrder = () => {
-    if (deliveron?.data != null && selected === null) {
-      setDeliveron({ ...deliveron, error: "delivery option must choose!" });
-      return false;
-    }
-
-    if (options) {
-      setLoading(true);
-      axiosInstance.post(options, orderData.data).then(resp => {
-        if (resp.data.data?.original?.status === -2 && resp.data.data?.original?.error !== "") {
-          setLoading(false);
-          setReady(false);
-          Alert.alert("ALERT", resp.data.data.original.error, [
-            { text: 'OK', onPress: () => props.hideModal() },
-          ]);
-
-          return false;
-        }
-
-        if (resp.data.data.status !== -2 || resp.data.data.status !== -1) {
-          setLoading(false);
-          setReady(true);
-          Alert.alert("ALERT", dictionary['dv.orderSuccess'], [
-            { text: 'OK', onPress: () => props.hideModal() },
-          ]);
-        }
-      }).catch((error) => {
-        console.log(error);
-      });
-    }
-  };
-
-  useEffect(() => {
-    const shouldReturn = deliveronOff();
-    if (shouldReturn) {
+  // console.log(props.forDelivery);
+  const acceptOrder = async () => {
+    if (props.takeAway !== 1 && props.deliveron?.status !== -2 && deliveron?.data != null && selected === null) {
+      setDeliveron({ ...deliveron, error: "Delivery option must be chosen!" });
       return;
     }
 
-    setReady(false);
-  }, [ready]);
+    setLoading(true);
+
+    try {
+      // Step 1: Send `url_deliveronRecheck` request if deliveron is enabled
+      if (props.deliveron?.status !== -2 && props.takeAway !== 1) {
+        const recheckResponse = await axiosInstance.post(props.options.url_deliveronRecheck, orderData.data);
+
+        // Check for error in the response
+        if (recheckResponse.data.data?.original?.status === -2 && recheckResponse.data.data?.original?.error) {
+          Alert.alert("ALERT", recheckResponse.data.data.original.error, [
+            { text: 'OK', onPress: () => props.hideModal() },
+          ]);
+          setLoading(false);
+          return;
+        }
+      }
+
+      // Step 2: Send `url_acceptOrder` request (either directly or after successful recheck)
+      await axiosInstance.post(props.options.url_acceptOrder, acceptData.data);
+
+      Alert.alert("ALERT", dictionary['dv.orderSuccess'], [
+        { text: 'OK', onPress: () => props.hideModal() },
+      ]);
+    } catch (error) {
+      console.log("Error in acceptOrder:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    setDeliveron({ data: props.items, error: "" });
-    setSelected(props.items ? props.items[0]?.value : null);
-  }, [props.deliveron]);
+    if (props.items) {
+      setDeliveron({ data: props.items, error: "" });
+      setSelected(props.items[0]?.value || null);
+    }
+  }, [props.deliveron, props.items]);
+
 
   useEffect(() => {
     if (props.takeAway !== 1 && selected && props.deliveron.content) {
@@ -107,8 +82,7 @@ export default function OrdersModalContent(props) {
               companyId: item.companyId,
               companyName: item.name ?? item.companyName,
               type: item.type == "glovo" || item.type == "wolt" ? item.type : item.type,
-              orderDelyTime: forClient.value,
-              orderPrepTime: forDelivery.value,
+              orderDelyTime: props.forDelivery.value,
             },
           });
 
@@ -116,8 +90,7 @@ export default function OrdersModalContent(props) {
             ...acceptData,
             data: {
               Orderid: props.itemId,
-              orderPrepTime: forDelivery.value,
-              orderDelyTime: forClient.value,
+              orderDelyTime: props.forDelivery.value,
             },
           });
         }
@@ -127,44 +100,28 @@ export default function OrdersModalContent(props) {
         ...orderData,
         data: {
           Orderid: props.itemId,
-          orderDelyTime: forClient.value,
-          orderPrepTime: forDelivery.value,
+          orderDelyTime: props.forDelivery.value,
         },
       });
       setAcceptData({
         ...acceptData,
         data: {
           Orderid: props.itemId,
-          orderPrepTime: forDelivery.value,
-          orderDelyTime: forClient.value,
+          orderDelyTime: props.forDelivery.value,
         },
       });
     }
-  }, [selected, forClient, forDelivery, props.deliveron, props.takeAway]);
+  }, [selected, props.forDelivery, props.deliveron, props.takeAway]);
 
   return (
     <>
       <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
         <View style={styles.content}>
           {loading ? <Loader /> : null}
-          <Text textColor="black" style={styles.contentTitle}>
-            {dictionary["orders.approvingWarning"]}
-          </Text>
-          <TextField
-            label={dictionary["general.AOPT"]}
-            editable={true}
-            clearButtonMode="always"
-            value={forClient?.value || ""}
-            onChangeText={(text) => setForClient({ value: text, error: "" })}
-            error={!!forClient?.error}
-            errorText={forClient?.error || ""}
-            autoCapitalize="none"
-            typeOfKeyboard="number"
-          />
 
           {props.deliveron?.status !== -2 && props.takeAway !== 1 ? (
             <>
-              <TextField
+              {/* <TextField
                 label={dictionary["general.AOPTD"]}
                 editable={true}
                 clearButtonMode="always"
@@ -174,7 +131,7 @@ export default function OrdersModalContent(props) {
                 errorText={forDelivery?.error || ""}
                 autoCapitalize="none"
                 typeOfKeyboard="number"
-              />
+              /> */}
               <SelectOption
                 value={selected}
                 onValueChange={(value) => {
@@ -195,6 +152,10 @@ export default function OrdersModalContent(props) {
               textColor="white"
               style={styles.buttonAccept}
               onPress={acceptOrder}
+              disabled={
+                (Array.isArray(props.deliveron) && props.deliveron.length === 0) &&
+                !(props.takeAway === 1 || props.takeAway === null)
+              }
             >
               {dictionary["orders.approve"]}
             </Button>

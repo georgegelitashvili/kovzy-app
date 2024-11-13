@@ -52,13 +52,13 @@ export const EnteredOrdersList = () => {
     url_rejectOrder: ""
   }); // api options
   const [optionsIsLoaded, setOptionsIsLoaded] = useState(false); // api options
-  const [deliveronOptions, setDeliveronOptions] = useState({});
+  const [deliveronOptions, setDeliveronOptions] = useState(null);
   const [isDeliveronOptions, setIsDeliveronOptions] = useState(false);
 
   const [deliveron, setDeliveron] = useState([]);
   const [visible, setVisible] = useState(false); // modal state
   const [itemId, setItemId] = useState(null); //item id for modal
-  const [itemTakeAway, setItemTakeAway] = useState(0);
+  const [itemTakeAway, setItemTakeAway] = useState(null);
   const [isOpen, setOpenState] = useState([]); // my accordion state
   const [modalType, setModalType] = useState("");
 
@@ -76,8 +76,10 @@ export const EnteredOrdersList = () => {
   const onChangeModalState = (newState) => {
     console.log("modal close: ", newState);
     setTimeout(() => {
-      setVisible(newState);
-      setIsDeliveronOptions(newState);
+      setVisible(false);
+      setIsDeliveronOptions(false);
+      setLoadingOptions(false);
+      setLoading(false);
       setItemId(null);
       setDeliveron([]);
     }, 0);
@@ -126,11 +128,10 @@ export const EnteredOrdersList = () => {
   }, []);
 
   const fetchEnteredOrders = async () => {
+    if (!user || !options.url_unansweredOrders) {
+      return null;
+    }
     try {
-      if (!user || !options.url_unansweredOrders) {
-        return null;
-      }
-
       const resp = await axiosInstance.post(options.url_unansweredOrders, {
         type: 0,
         page: 1,
@@ -167,6 +168,7 @@ export const EnteredOrdersList = () => {
 
     setIntervalId(newIntervalId); // Update the intervalId state immediately
   };
+
   const handleAppStateChange = (nextAppState) => {
     if (appState.match(/inactive|background/) && nextAppState === "active") {
       startInterval();
@@ -186,8 +188,6 @@ export const EnteredOrdersList = () => {
   }, [domain, branchid, apiOptions]);
 
   useEffect(() => {
-    apiOptions();
-
     if (optionsIsLoaded) {
       const subscribe = AppState.addEventListener('change', handleAppStateChange);
       console.log('Starting interval...');
@@ -208,43 +208,70 @@ export const EnteredOrdersList = () => {
 
   // set deliveron data
   useEffect(() => {
-    if (itemTakeAway !== 1) {
-      setDeliveronOptions((prev) => ({ ...prev, data: { orderId: itemId } }));
-      setIsDeliveronOptions(true);
-      setLoadingOptions(true);
+    // Exit early if `itemTakeAway` is null or 1
+    if (itemTakeAway === null || itemTakeAway === 1) return;
+
+    // If `itemId` is null, reset options and exit
+    if (!itemId) {
+      setIsDeliveronOptions(false);
+      return;
     }
-  }, [itemTakeAway]);
+
+    // Update `deliveronOptions` and set flags if necessary
+    setDeliveronOptions((prev) => ({
+      ...prev,
+      data: { orderId: itemId },
+    }));
+    setIsDeliveronOptions((prev) => prev || true);
+
+  }, [itemId, itemTakeAway]);
 
   useEffect(() => {
-    if (isDeliveronOptions) {
+    if (isDeliveronOptions && deliveronOptions.data.orderId) {
+      setLoadingOptions(true);
       axiosInstance
         .post(options.url_deliveronRecheck, deliveronOptions.data)
-        .then((resp) => {
-          return resp.data.data
-        })
+        .then((resp) => resp.data.data)
         .then((data) => {
-          if (data.original?.content.length === 0) {
-            Alert.alert("ALERT", dictionary["dv.empty"], [
-              {
-                text: "okay", onPress: () => {
+          const { status, content } = data.original ?? {};
+          const alertHandler = (message, shouldClearData = false) => Alert.alert("ALERT", message, [
+            {
+              text: "okay",
+              onPress: () => {
+                if (shouldClearData) {
                   setIsDeliveronOptions(false);
+                  setLoadingOptions(false);
+                  setDeliveronOptions(null);
+                  // setDeliveron([]);
+                } else {
+                  setVisible(false);
+                  setLoadingOptions(false);
+                  setIsDeliveronOptions(false);
+                  setDeliveronOptions(null);
                   setItemId(null);
-                  setDeliveron([]);
-                  console.log('deliveron null modal');
+                  // setDeliveron([]);
                 }
               },
-            ])
-          }
-          setDeliveron(data)
-        });
-    }
-  }, [isDeliveronOptions]);
+            },
+          ]);
 
-  useEffect(() => {
-    if (deliveron || deliveron.original) {
-      setLoadingOptions(false);
+          // Handle status -1 or -2 and module off case
+          if (status === -2 && content === "Module is off") {
+            alertHandler("Deliveron module is off", true);
+            setDeliveron(data);
+          } else if (status === -1) {
+            alertHandler("Order ID not passed or invalid.");
+          } else if (Array.isArray(content) && content.length === 0) {
+            alertHandler(dictionary["dv.empty"]);
+          } else {
+            setDeliveron(data);
+            setLoadingOptions(false);
+          }
+        })
+        .catch((error) => alertHandler("Error fetching deliveron options."));
     }
-  }, [deliveron, deliveron.original]);
+  }, [isDeliveronOptions, deliveronOptions]);
+
 
   useEffect(() => {
     if (orders) {
@@ -279,10 +306,7 @@ export const EnteredOrdersList = () => {
   };
 
   const handleDelaySet = (delay) => {
-    console.log("Delay set for:", delay);
-    console.log("Delivery scheduled:", deliveryScheduled);
-    console.log("Order id:", itemId);
-
+    setLoadingOptions(false);
     if (!deliveryScheduled) {
       alert("Delivery scheduled time is not set. Please provide a valid time.");
       return false;
@@ -326,8 +350,6 @@ export const EnteredOrdersList = () => {
       return false;
     }
 
-    console.log("Order delay till:", formatDateToLocal(adjustedTime));
-
     try {
       axiosInstance
         .post(options.url_delayOrders, {
@@ -352,6 +374,7 @@ export const EnteredOrdersList = () => {
             );
 
           }
+          setLoading(false);
         });
     } catch (error) {
       console.error("Error delaying order:", error);
@@ -475,6 +498,7 @@ export const EnteredOrdersList = () => {
                     setItemId(item.id);
                     setDeliveryScheduled(item.delivery_scheduled);
                     setPickerVisible(true);
+                    setLoadingOptions(false);
                   }}
                 >
                   <MaterialCommunityIcons name="bell-ring-outline" size={30} color="white" />
@@ -485,6 +509,7 @@ export const EnteredOrdersList = () => {
                 style={styles.buttonReject}
                 onPress={() => {
                   setItemId(item.id);
+                  setItemTakeAway(null);
                   showModal("reject");
                 }}
               >
@@ -497,6 +522,7 @@ export const EnteredOrdersList = () => {
       </Card>
     )
   };
+
 
   if (loading) {
     return <Loader show={loading} />;
@@ -537,13 +563,14 @@ export const EnteredOrdersList = () => {
               transparent={true}
               visible={isPickerVisible}
               animationType="fade"
-              onRequestClose={() => setPickerVisible(false)}
+              onRequestClose={() => { setPickerVisible(false); setLoadingOptions(false); }}
             >
               <View style={styles.modalContainer}>
                 <TimePicker
                   scheduled={scheduled}
+                  showButton={true}
                   onDelaySet={handleDelaySet}
-                  onClose={() => setPickerVisible(false)} // Close when done
+                  onClose={() => { setPickerVisible(false); setLoadingOptions(false); }} // Close when done
                 />
               </View>
             </Modal>

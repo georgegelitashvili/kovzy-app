@@ -1,15 +1,21 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useContext } from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { TimerPicker } from "react-native-timer-picker";
+import { LanguageContext } from "../Language";
 
-const TimePicker = ({ onDelaySet, onClose, scheduled, backgroundColor = "#F1F1F1" }) => {
+const TimePicker = ({ onDelaySet, onClose, scheduled, showButton, onChange, backgroundColor = "#F1F1F1" }) => {
     const [delayTime, setDelayTime] = useState(0); // Delay in minutes
     const delayTimePickerRef = useRef(null);
     const [isVisibleDelayTimeHours, setIsVisibleDelayTimeHours] = useState(false);
+    const { dictionary } = useContext(LanguageContext);
 
     const handleDurationChange = (duration) => {
         const totalMinutes = duration.hours * 60 + duration.minutes;
         setDelayTime(totalMinutes);
+
+        if (onChange) {
+            onChange(totalMinutes);
+        }
     };
 
     const handleIncreaseDelayTime = (minutesToAdd, showHours) => {
@@ -65,6 +71,7 @@ const TimePicker = ({ onDelaySet, onClose, scheduled, backgroundColor = "#F1F1F1
                     styles={{
                         pickerItem: { fontSize: 34 },
                         pickerContainer: {
+                            backgroundColor,
                             marginRight: 6,
                             display: "flex",
                             alignItems: "center",
@@ -84,14 +91,14 @@ const TimePicker = ({ onDelaySet, onClose, scheduled, backgroundColor = "#F1F1F1
                     <Text style={styles.buttonText}>+1 hour</Text>
                 </TouchableOpacity>
             </View>
-            <View style={styles.confirmContainer}>
+            {showButton ? <View style={styles.confirmContainer}>
                 <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
                     <Text style={styles.confirmText}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.confirmButton} onPress={() => onDelaySet(formatDelayTime())}>
                     <Text style={styles.confirmText}>Confirm</Text>
                 </TouchableOpacity>
-            </View>
+            </View> : null}
         </View>
     );
 };
@@ -103,7 +110,7 @@ const styles = StyleSheet.create({
         padding: 20,
         backgroundColor: "#fff",
         borderRadius: 10,
-        elevation: 5,
+        // elevation: 5,
     },
     pickerContainer: {
         alignItems: "center",
@@ -142,6 +149,11 @@ const styles = StyleSheet.create({
         marginHorizontal: 10,
     },
     confirmText: {
+        color: "#fff",
+        fontSize: 16,
+        textAlign: "center",
+    },
+    buttonText: {
         color: "#fff",
         fontSize: 16,
         textAlign: "center",

@@ -1,10 +1,33 @@
-import React, { useEffect, useCallback, useState, useMemo, useContext } from "react";
-import { StyleSheet, View, Dimensions, Platform, Alert, useWindowDimensions } from "react-native";
-import Modal from "react-native-modal";
-import { AuthContext, AuthProvider } from "../../context/AuthProvider";
+import React, { useState, useCallback, useMemo, useContext } from "react";
+import { StyleSheet, View, Modal, Text, ScrollView } from "react-native";
 import OrdersModalAccept from "./OrdersModalAccept";
 import OrdersModalReject from "./OrdersModalReject";
 import OrdersModalStatus from "./OrdersModalStatus";
+import TimePicker from "../generate/TimePicker";
+import { LanguageContext } from "../Language";
+
+// Utility function to generate items array
+const generateItems = (deliveron) => {
+  const { status, content } = deliveron.original ?? {};
+
+  if (status === -2 || status === -1 || !content) {
+    return null;
+  }
+
+  if (Array.isArray(content)) {
+    return content.map((item) => ({
+      label: `${item.name || item.companyName} - ${item.price ?? item.price_before_accept}`,
+      value: item.id ?? item.companyId ?? item.type,
+    }));
+  }
+
+  return [
+    {
+      label: `${content.name || content.companyName} - ${content.price ?? content.price_before_accept}`,
+      value: content.id ?? content.companyId ?? content.type,
+    },
+  ];
+};
 
 
 export default function OrdersModal({
@@ -19,113 +42,64 @@ export default function OrdersModal({
   takeAway,
   PendingOrders
 }) {
-  const [visible, setVisible] = useState(isVisible);
-  const { intervalId, setIntervalId } = useContext(AuthContext);
-  const { width: deviceWidth, height: deviceHeight } = useWindowDimensions();
+  const { dictionary } = useContext(LanguageContext);
+  const [forDelivery, setForDelivery] = useState({ value: "", error: "" });
+  const items = useMemo(() => generateItems(deliveron), [deliveron]);
 
-  useEffect(() => {
-    setVisible(isVisible);
-  }, [isVisible]);
+  const hideModal = useCallback(() => onChangeState(false), [onChangeState]);
 
-  const hideModal = useCallback(() => {
-    onChangeState(false);
-  }, [onChangeState]);
+  const modalContent = useMemo(() => {
+    const commonProps = {
+      itemId: hasItemId,
+      deliveron: deliveron.original ?? deliveron,
+      options,
+      takeAway,
+      hideModal
+    };
 
-  const handleChangeStateClick = useCallback(() => {
-    onChangeState(false);
-  });
-
-  const items = useMemo(() => {
-    if (deliveron.original?.status !== -2) {
-      const content = deliveron.original?.content;
-      if (!content) return null;
-      if (Array.isArray(content)) {
-        return content.map((item) => ({
-          label: !item.name ? item.companyName + ' - ' + item.price : item.name + ' - ' + item.price ?? item.price_before_accept,
-          value: !item.id ? item.companyId ?? item.type : item.id,
-        }));
-      } else {
-        return [
-          {
-            label: !content.name ? content.companyName + ' - ' + content.price : content.name + ' - ' + content.price_before_accept,
-            value: !content.id ? content.companyId ?? content.type : content.id,
-          },
-        ];
-      }
-    } else {
-      return null;
-    }
-  }, [deliveron.original?.content, deliveron.original?.status]);
-
-  const loadModalComponent = () => {
     switch (type) {
       case 'accept':
-        return (
-          <OrdersModalAccept
-            itemId={hasItemId}
-            deliveron={deliveron.original}
-            deliveronOptions={deliveronOptions}
-            options={options}
-            items={items}
-            takeAway={takeAway}
-            hideModal={hideModal}
-          />
-        )
+        return <OrdersModalAccept {...commonProps} items={items} deliveronOptions={deliveronOptions} forDelivery={forDelivery} />;
       case 'reject':
-        return (
-          <OrdersModalReject
-            itemId={hasItemId}
-            deliveron={deliveron.original ?? deliveron}
-            orders={orders}
-            options={options}
-            takeAway={takeAway}
-            PendingOrders={PendingOrders}
-            hideModal={hideModal}
-          />
-        )
+        return <OrdersModalReject {...commonProps} orders={orders} PendingOrders={PendingOrders} />;
       case 'status':
-        return (
-          <OrdersModalStatus
-            itemId={hasItemId}
-            orders={orders}
-            deliveron={deliveron.original ?? deliveron}
-            options={options}
-            deliveronOptions={deliveronOptions}
-            takeAway={takeAway}
-            hideModal={hideModal}
-          />
-        )
+        return <OrdersModalStatus {...commonProps} orders={orders} deliveronOptions={deliveronOptions} />;
+      default:
+        return <View><Text>Error: Invalid Modal Type</Text></View>; // Fallback for unknown type
     }
-  }
+  }, [type, hasItemId, deliveron, options, takeAway, items, deliveronOptions, orders]);
 
-  if (takeAway !== 1 && (deliveron.length === 0 || deliveron.original?.content.length === 0)) {
+  if (takeAway !== 1 && type !== 'reject' && type !== 'status' && (!deliveron?.original?.content?.length)) {
     return null;
   }
 
   return (
-    <>
-      {visible === false ? handleChangeStateClick() : null}
-
+    <Modal
+      visible={isVisible}
+      animationType="slide"
+      transparent={true}
+      onRequestClose={hideModal}
+    >
       <View style={styles.modal}>
-        <Modal
-          isVisible={visible}
-          deviceWidth={deviceWidth}
-          deviceHeight={deviceHeight}
-          backdropColor="#141414"
-          backdropOpacity={0.8}
-          animationIn="zoomInDown"
-          animationOut="slideOutDown"
-          animationInTiming={600}
-          animationOutTiming={1000}
-          backdropTransitionInTiming={600}
-          backdropTransitionOutTiming={1000}
-        >
-          <View style={styles.modalContent}>
-            {loadModalComponent()}
-          </View>
-        </Modal>
+        <View style={styles.modalContent}>
+          <ScrollView contentContainerStyle={styles.scrollContainer}>
+            {type === "accept" && (
+              <>
+                <Text style={styles.contentTitle}>
+                  {dictionary["orders.approvingWarning"]}
+                </Text>
+                <TimePicker
+                  onChange={(newTime) => setForDelivery({ value: newTime, error: "" })}
+                  showButton={false}
+                  backgroundColor={"white"}
+                />
+              </>
+            )}
+            {modalContent}
+          </ScrollView>
+        </View>
       </View>
-    </>
+    </Modal>
   );
 }
 
@@ -133,30 +107,25 @@ export default function OrdersModal({
 const styles = StyleSheet.create({
   modal: {
     flex: 1,
-    justifyContent: 'center', // Center the content vertically
-    alignItems: 'center', // Center the content horizontally
-    backgroundColor: 'transparent', // Ensure the background is transparent
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
   },
   modalContent: {
-    backgroundColor: '#fff', // Background color of the modal content
-    borderRadius: 13,
-    borderColor: 'rgba(0, 0, 0, 0.1)',
-    width: '90%', // Adjust the width as needed
-    padding: 20, // Add padding as needed
+    padding: 10,
+    width: '80%',
+    maxHeight: '80%',
+    backgroundColor: 'white',
+    borderRadius: 10,
+    elevation: 5,
   },
-  buttonModal: {
-    flexDirection: "row",
-    justifyContent: "space-around",
+  scrollContainer: {
+    paddingBottom: 20,
   },
-  buttonAccept: {
-    padding: 7,
-    justifyContent: "space-between",
-    backgroundColor: "#2fa360",
-    marginRight: 10,
-  },
-  buttonClose: {
-    padding: 7,
-    justifyContent: "space-between",
-    backgroundColor: "#6c757d",
+  contentTitle: {
+    fontSize: 18,
+    marginTop: 20,
+    marginBottom: 20,
+    textAlign: 'center',
   },
 });
