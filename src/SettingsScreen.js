@@ -1,5 +1,5 @@
 // screens/SettingsScreen.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
     StyleSheet,
     SafeAreaView,
@@ -9,19 +9,37 @@ import {
     TouchableOpacity,
     Switch,
     Image,
+    Modal,
 } from 'react-native';
 import FeatherIcon from 'react-native-vector-icons/Feather';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { TouchableRipple } from 'react-native-paper'; // Corrected import
+import { String, LanguageContext } from "./components/Language";
+import { AuthContext, AuthProvider } from "./context/AuthProvider";
+import axiosInstance from "./apiConfig/apiRequests";
+
+// import { Drawer, Text, TouchableRipple, Switch } from "react-native-paper";
 
 
 const SettingsScreen = ({ navigation }) => {
+    const { domain, setDeliveronEnabled, deliveronEnabled } = useContext(AuthContext);
+    const { dictionary } = useContext(LanguageContext);
+    
     const [form, setForm] = useState({
         darkMode: false,
         emailNotifications: true,
         pushNotifications: false,
     });
     const [musicTitle, setMusicTitle] = useState(''); // State for music title
+    
+    const [modalVisible, setModalVisible] = useState(false);
+    const [options, setOptions] = useState({
+        url_deliveronStatus: "",
+        url_deliveronActivity: "",
+    });
 
+    const [optionsIsLoaded, setOptionsIsLoaded] = useState(false); 
+    const [deliveronChangeOptions, setDeliveronChangeOptions] = useState({});
     // Function to load the music title from AsyncStorage
     const loadMusicTitle = async () => {
         try {
@@ -35,6 +53,37 @@ const SettingsScreen = ({ navigation }) => {
             console.log('Error loading music title:', error);
         }
     };
+    const [isDeliveronEnabled, setIsDeliveronEnabled] = useState(false);
+    const apiOptions = () => {
+        setOptions({
+          url_deliveronStatus: `https://${domain}/api/v1/admin/deliveronStatus`,
+          url_deliveronActivity: `https://${domain}/api/v1/admin/deliveronActivity`,
+        });
+        setOptionsIsLoaded(true);
+      };
+      const toggleDeliveron = () => {
+        if (deliveronEnabled == true) {
+            setModalVisible(true);
+        } else {
+            handleConfirmToggle(true);
+        }
+    };
+
+    const handleConfirmToggle = async (newValue) => {
+        setModalVisible(false);
+        setDeliveronEnabled(newValue); 
+        setDeliveronChangeOptions((prev) => ({
+            ...prev,
+            data: { enabled: newValue ? 0 : 1 },
+        }));
+        try {
+            await axiosInstance.post(options.url_deliveronActivity, deliveronChangeOptions.data);
+        } catch (error) {
+            console.error("Error toggling deliveron:", error);
+            setDeliveronEnabled(!newValue);
+        }
+    };
+
 
     // Fetch the music title when the screen mounts
     useEffect(() => {
@@ -48,6 +97,20 @@ const SettingsScreen = ({ navigation }) => {
         // Clean up the listener on unmount
         return unsubscribe;
     }, [navigation]);
+
+    useEffect(() => {
+        if (domain) {
+          apiOptions();
+        }
+      }, [domain]);
+
+    useEffect(() => {
+        setDeliveronChangeOptions((prev) => ({
+          ...prev,
+          data: { enabled: deliveronEnabled ? 0 : 1 },
+        }));
+        setIsDeliveronEnabled(true);
+    }, [deliveronEnabled]);
 
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: '#f6f6f6' }}>
@@ -231,6 +294,48 @@ const SettingsScreen = ({ navigation }) => {
                                 </View>
                             </View>
                         </View>
+                        <View style={[styles.section, styles.sectionContainer]}>
+                            <TouchableRipple onPress={toggleDeliveron}>
+                                <View style={[styles.row, styles.rowWrapper]}>
+                                    <Text style={styles.rowLabel}>{dictionary["dv.deliveron"]}</Text>
+                                    <Switch
+                                        style={styles.switch}
+                                        value={deliveronEnabled}
+                                        onValueChange={toggleDeliveron}
+                                    />
+                                </View>
+                            </TouchableRipple>
+                        </View>
+                        <Modal
+                            transparent={true}
+                            animationType="slide"
+                            visible={modalVisible}
+                            onRequestClose={() => setModalVisible(false)}
+                        >
+ <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+                <View style={styles.textContainer}>
+                    <Text style={styles.modalText}>
+                        {dictionary["dv.deliveronOff"]}
+                    </Text>
+                </View>
+                <View style={styles.buttonContainer}>
+                    <TouchableOpacity
+                        style={styles.cancelButton}
+                        onPress={() => setModalVisible(false)}
+                    >
+                        <Text style={styles.buttonText}>{dictionary['cancel']}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={styles.confirmButton}
+                        onPress={() => handleConfirmToggle(!deliveronEnabled)}
+                    >
+                        <Text style={styles.buttonText}>{dictionary['confirm']}</Text>
+                    </TouchableOpacity>
+                </View>
+            </View>
+        </View>
+                        </Modal>
                     </View>
 
                 </ScrollView>
@@ -240,6 +345,20 @@ const SettingsScreen = ({ navigation }) => {
 }
 
 const styles = StyleSheet.create({
+    sectionContainer: {
+        padding: 20,
+        paddingBottom: 1,
+        paddingTop: 1,
+        paddingEnd: 1,
+        marginVertical: 10,
+        backgroundColor: '#fff',  
+        borderRadius: 8,          
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,           
+    },
     container: {
         paddingVertical: 24,
         paddingHorizontal: 0,
@@ -337,7 +456,7 @@ const styles = StyleSheet.create({
     row: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'flex-start',
+        justifyContent: 'space-between',
         paddingRight: 16,
         height: 50,
     },
@@ -371,6 +490,57 @@ const styles = StyleSheet.create({
         fontWeight: '500',
         color: '#8B8B8B',
         marginRight: 4,
+    },
+    modalOverlay: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0, 0, 0, 0.5)', 
+    },
+    modalContent: {
+        width: '80%',
+        backgroundColor: 'white',
+        borderRadius: 10,
+        padding: 20,
+        elevation: 5,
+        shadowOpacity: 0.25,
+        shadowRadius: 4,
+    },
+    textContainer: {
+        alignSelf: 'flex-start',
+        marginBottom: 15,
+    },
+    modalText: {
+        marginBottom: 25,
+        marginTop: 10,
+        fontSize: 18,
+        color: 'rgb(255, 0, 0)',
+        fontWeight: 'bold',
+        textAlign: 'justify',
+        maxWidth: '100%',
+    },
+    buttonContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+    },
+    cancelButton: {
+        flex: 1,
+        padding: 10,
+        backgroundColor: '#ccc',
+        borderRadius: 5,
+        alignItems: 'center',
+        marginRight: 10,
+    },
+    confirmButton: {
+        flex: 1,
+        padding: 10,
+        backgroundColor: '#FCA510',
+        borderRadius: 5,
+        alignItems: 'center',
+    },
+    buttonText: {
+        color: 'white',
+        fontWeight: 'bold',
     },
 });
 
