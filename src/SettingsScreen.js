@@ -312,29 +312,29 @@ const SettingsScreen = ({ navigation }) => {
                             visible={modalVisible}
                             onRequestClose={() => setModalVisible(false)}
                         >
- <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-                <View style={styles.textContainer}>
-                    <Text style={styles.modalText}>
-                        {dictionary["dv.deliveronOff"]}
-                    </Text>
-                </View>
-                <View style={styles.buttonContainer}>
-                    <TouchableOpacity
-                        style={styles.cancelButton}
-                        onPress={() => setModalVisible(false)}
-                    >
-                        <Text style={styles.buttonText}>{dictionary['cancel']}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={styles.confirmButton}
-                        onPress={() => handleConfirmToggle(!deliveronEnabled)}
-                    >
-                        <Text style={styles.buttonText}>{dictionary['confirm']}</Text>
-                    </TouchableOpacity>
-                </View>
-            </View>
-        </View>
+                            <View style={styles.modalOverlay}>
+                                <View style={styles.modalContent}>
+                                    <View style={styles.textContainer}>
+                                        <Text style={styles.modalText}>
+                                            {dictionary["dv.deliveronOff"]}
+                                        </Text>
+                                    </View>
+                                    <View style={styles.buttonContainer}>
+                                        <TouchableOpacity
+                                            style={styles.cancelButton}
+                                            onPress={() => setModalVisible(false)}
+                                        >
+                                            <Text style={styles.buttonText}>{dictionary['cancel']}</Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                            style={styles.confirmButton}
+                                            onPress={() => handleConfirmToggle(!deliveronEnabled)}
+                                        >
+                                            <Text style={styles.buttonText}>{dictionary['confirm']}</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+                            </View>
                         </Modal>
                     </View>
 

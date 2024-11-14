@@ -11,10 +11,9 @@ export default function TabContent(props) {
 
   return (
     <Tab.Navigator
-      initialRouteName="Orders"
       screenOptions={{
         tabBarLabelStyle: {
-          fontSize: 14,
+          fontSize: 13,
         },
       }}
     >
@@ -23,6 +22,7 @@ export default function TabContent(props) {
         component={EnteredOrdersList}
         options={{ tabBarLabel: dictionary["nav.pendingOrders"], unmountOnBlur: true }}
       />
+
       <Tab.Screen
         name="AcceptedOrders"
         component={AcceptedOrdersList}
