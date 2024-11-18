@@ -7,7 +7,6 @@ import { String, LanguageContext } from '../Language';
 
 
 export default function OrdersModalContent(props) {
-  const [options, setOptions] = useState(props.options.url_rejectOrder);
   const [orderData, setOrderData] = useState({});
 
   const [loading, setLoading] = useState(false);
@@ -16,7 +15,8 @@ export default function OrdersModalContent(props) {
 
   const rejectOrder = () => {
     setLoading(true);
-    axiosInstance.post(options, orderData.data).then(resp => {
+    axiosInstance.post(props.options.url_rejectOrder, orderData.data).then(resp => {
+      console.log(resp.data);
       if (resp.data.data?.status == 0 || resp.data.data?.status == -1) {
         setLoading(false);
           Alert.alert("ALERT", dictionary['orders.declined'], [

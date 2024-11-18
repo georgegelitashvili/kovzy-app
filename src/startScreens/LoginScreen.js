@@ -38,6 +38,7 @@ export const LoginScreen = ({ navigation }) => {
       // Set the message to the state or handle it accordingly
       setName({ value: credentials.username, error: "" });
       setPassword({ value: credentials.password, error: "" });
+      clearInterval(intervalId);
     }
   }, [credentials]);
 
@@ -55,6 +56,7 @@ export const LoginScreen = ({ navigation }) => {
 
       setName({ ...name, error: usernameError });
       setPassword({ ...password, error: passwordError });
+      clearInterval(intervalId);
     }
   }, [loginError]);
 

@@ -24,6 +24,7 @@ import axiosInstance from "./apiConfig/apiRequests";
 const SettingsScreen = ({ navigation }) => {
     const { domain, setDeliveronEnabled, deliveronEnabled } = useContext(AuthContext);
     const { dictionary } = useContext(LanguageContext);
+    const [postponeOrderShow, setPostponeOrderShow] = useState(false);
     
     const [form, setForm] = useState({
         darkMode: false,
@@ -54,13 +55,47 @@ const SettingsScreen = ({ navigation }) => {
         }
     };
     const [isDeliveronEnabled, setIsDeliveronEnabled] = useState(false);
+
     const apiOptions = () => {
         setOptions({
           url_deliveronStatus: `https://${domain}/api/v1/admin/deliveronStatus`,
           url_deliveronActivity: `https://${domain}/api/v1/admin/deliveronActivity`,
         });
         setOptionsIsLoaded(true);
-      };
+    };
+
+    useEffect(() => {
+        const loadPostponeOrder = async () => {
+            try {
+                const storedValue = await AsyncStorage.getItem('postponeOrderShow');
+                if (storedValue !== null) {
+                    setPostponeOrderShow(JSON.parse(storedValue)); // Parse the stored string to boolean
+                }
+            } catch (error) {
+                console.error('Failed to load stored value', error);
+            }
+        };
+
+        loadPostponeOrder();
+    }, []);
+
+    // Save the value in AsyncStorage whenever the state changes
+    useEffect(() => {
+        const savePostponeOrder = async () => {
+            try {
+                await AsyncStorage.setItem('postponeOrderShow', JSON.stringify(postponeOrderShow));
+            } catch (error) {
+                console.error('Failed to save value', error);
+            }
+        };
+
+        savePostponeOrder();
+    }, [postponeOrderShow]);
+
+    const togglePostponeOrder = () => {
+        setPostponeOrderShow(prevState => !prevState);
+    };
+    
       const toggleDeliveron = () => {
         if (deliveronEnabled == true) {
             setModalVisible(true);
@@ -302,6 +337,18 @@ const SettingsScreen = ({ navigation }) => {
                                         style={styles.switch}
                                         value={deliveronEnabled}
                                         onValueChange={toggleDeliveron}
+                                    />
+                                </View>
+                            </TouchableRipple>
+                        </View>
+                        <View style={[styles.section, styles.sectionContainer]}>
+                            <TouchableRipple onPress={togglePostponeOrder}>
+                                <View style={[styles.row, styles.rowWrapper]}>
+                                    <Text style={styles.rowLabel}>{dictionary["st.postponeOrder"]}</Text>
+                                    <Switch
+                                        style={styles.switch}
+                                        value={postponeOrderShow}
+                                        onValueChange={togglePostponeOrder}
                                     />
                                 </View>
                             </TouchableRipple>

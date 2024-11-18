@@ -63,6 +63,7 @@ export const BranchScreen = ({ navigation }) => {
       setSelected(null);
       setErrorText("");
       branchApi();
+      clearInterval(intervalId);
     }
   }, [domain]);
 
@@ -75,6 +76,7 @@ export const BranchScreen = ({ navigation }) => {
       storeData("branch", selected);
       setIsDataSet((data) => !data);
       setBranchid(selected);
+      clearInterval(intervalId);
     }
   }, [selected]);
 
