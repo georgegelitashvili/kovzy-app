@@ -120,30 +120,17 @@ export default function OrdersModalContent(props) {
           {loading ? <Loader /> : null}
 
           {props.deliveron?.status !== -2 && props.takeAway !== 1 ? (
-            <>
-              {/* <TextField
-                label={dictionary["general.AOPTD"]}
-                editable={true}
-                clearButtonMode="always"
-                value={forDelivery?.value || ""}
-                onChangeText={(text) => setForDelivery({ value: text, error: "" })}
-                error={!!forDelivery?.error}
-                errorText={forDelivery?.error || ""}
-                autoCapitalize="none"
-                typeOfKeyboard="number"
-              /> */}
-              <SelectOption
-                value={selected}
-                onValueChange={(value) => {
-                  setSelected(value);
-                  setDeliveron({ ...deliveron, error: "" });
-                }}
-                items={deliveron?.data || []}
-                key={(item) => item?.id || ""}
-                error={!!deliveron?.error}
-                errorText={deliveron?.error || ""}
-              />
-            </>
+            <SelectOption
+              value={selected}
+              onValueChange={(value) => {
+                setSelected(value);
+                setDeliveron({ ...deliveron, error: "" });
+              }}
+              items={deliveron?.data || []}
+              key={(item) => item?.id || ""}
+              error={!!deliveron?.error}
+              errorText={deliveron?.error || ""}
+            />
           ) : null}
 
           <View style={styles.buttonModal}>

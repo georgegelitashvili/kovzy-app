@@ -155,6 +155,7 @@ export const AuthProvider = ({ isConnected, children }) => {
   useEffect(() => {
     readData();
     apiOptions();
+    stopInterval();
   }, [domain, isDataSet]);
 
   useEffect(() => {

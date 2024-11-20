@@ -42,6 +42,7 @@ export const EnteredOrdersList = () => {
   const [currency, setCurrency] = useState("");
   const [scheduled, setScheduled] = useState([]);
   const [deliveryScheduled, setDeliveryScheduled] = useState(null);
+  const [postponeOrder, setPostponeOrder] = useState(false);
 
   const [appState, setAppState] = useState(AppState.currentState);
 
@@ -136,7 +137,8 @@ export const EnteredOrdersList = () => {
         type: 0,
         page: 1,
         branchid: branchid,
-        Languageid: languageId
+        Languageid: languageId,
+        postponeOrder: false
       });
       const data = resp.data.data;
       const feesData = resp.data.fees;
@@ -274,7 +276,7 @@ export const EnteredOrdersList = () => {
 
 
   useEffect(() => {
-    if (orders) {
+    if (orders && appState) {
       ordersCount = Object.keys(orders).length;
       if (ordersCount > temp) {
         if (notificationManagerRef.current) {
@@ -283,7 +285,7 @@ export const EnteredOrdersList = () => {
       }
       temp = ordersCount;
     }
-  }, [orders]);
+  }, [orders, appState]);
 
   const parseTimeToMinutes = (time) => {
     const [hours, minutes, seconds] = time.split(':').map(Number);
@@ -351,6 +353,7 @@ export const EnteredOrdersList = () => {
     }
 
     try {
+      setPostponeOrder(true);
       axiosInstance
         .post(options.url_delayOrders, {
           Orderid: itemId,
@@ -360,7 +363,7 @@ export const EnteredOrdersList = () => {
           return resp.data.data
         })
         .then((data) => {
-          console.log(data);
+          setPostponeOrder(false);
           if (data.status === 0) {
             Alert.alert(
               "ALERT",

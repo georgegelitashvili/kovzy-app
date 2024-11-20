@@ -36,10 +36,12 @@ export const DomainScreen = ({ navigation }) => {
 
   useEffect(() => {
     setInputDomain({ value: domain || '', error: '' });
+    clearInterval(intervalId);
   }, [domain]);
 
   useEffect(() => {
     readData();
+    clearInterval(intervalId);
   }, []);
 
   return (

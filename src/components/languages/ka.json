@@ -48,8 +48,9 @@
     "inf.contract": "გთხოვთ გაეცნოთ კონტრაქტს და მონიშნოთ შესაბამისი ველი",
     "nav.auth": "ავტორიზაცია",
     "nav.ordersReport": "შეკვეთების რეპორტი",
-    "nav.pendingOrders": "მიმდინარე შეკვეთები",
-    "nav.acceptedOrders": "მიღებული შეკვეთები",
+    "nav.pendingOrders": "მიმდინარე",
+    "nav.plannedOrders": "დაგეგმილი",
+    "nav.acceptedOrders": "მიღებული",
     "nav.websiteThemes": "ვებგვერდის ვიზუალი",
     "nav.ingredients": "ინგრედიენტები",
     "nav.categories": "კატეგორიები",
@@ -334,7 +335,6 @@
     "branches.branches": "ფილიალები",
     "branches.editingBranches": "ფილიალების შესწორება",
     "branches.search": "ძიება",
-    "search": "ძიება",
     "branches.picture": "სურათი (რეკომენდებული პროპორცია 100:80 )",
     "branches.open": "ღიაა",
     "branches.excludeProducts": "პროდუქტების ამოღება",
@@ -445,5 +445,6 @@
     "dv.cancelOrder": "კურიერის გაუქმება",
     "dv.empty": "აქტიური საკურიერო არ მოიძებნა, ცადეთ მოგვიანებით ან გათიშეთ დელივერონის მოდული და მიაწოდეთ საკუთარი ძალებით.",
     "dv.deliveronOff": "გაითვალისწინეთ რომ წყვეტთ კავშირს საკურიერო სერვისებთან და თქვენ მოგიწევთ შეკვეთის მიწოდების ორგანიზება.",
-    "settings": "პარამეტრები"
+    "settings": "პარამეტრები",
+    "st.postponeOrder": "დაგეგმილი შეკვეთები"
 }

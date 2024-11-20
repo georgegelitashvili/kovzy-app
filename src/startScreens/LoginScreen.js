@@ -12,7 +12,7 @@ import { AuthContext } from "../context/AuthProvider";
 import { LanguageContext } from "../components/Language";
 
 export const LoginScreen = ({ navigation }) => {
-  const { login, loginError } = useContext(AuthContext);
+  const { login, loginError, intervalId } = useContext(AuthContext);
   const [credentials, setCredentials] = useState({});
 
   const [name, setName] = useState({ value: "", error: "" });
@@ -38,6 +38,7 @@ export const LoginScreen = ({ navigation }) => {
       // Set the message to the state or handle it accordingly
       setName({ value: credentials.username, error: "" });
       setPassword({ value: credentials.password, error: "" });
+      clearInterval(intervalId);
     }
   }, [credentials]);
 
@@ -55,6 +56,7 @@ export const LoginScreen = ({ navigation }) => {
 
       setName({ ...name, error: usernameError });
       setPassword({ ...password, error: passwordError });
+      clearInterval(intervalId);
     }
   }, [loginError]);
 

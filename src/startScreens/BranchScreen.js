@@ -10,7 +10,7 @@ import axiosInstance from "../apiConfig/apiRequests";
 import { LanguageContext } from "../components/Language";
 
 export const BranchScreen = ({ navigation }) => {
-  const { setIsDataSet, domain, branchid, setBranchid } = useContext(AuthContext);
+  const { setIsDataSet, domain, branchid, setBranchid, intervalId } = useContext(AuthContext);
   const [branches, setBranches] = useState([]);
   const [selected, setSelected] = useState(branchid);
   const [isLoading, setIsLoading] = useState(true);
@@ -63,6 +63,7 @@ export const BranchScreen = ({ navigation }) => {
       setSelected(null);
       setErrorText("");
       branchApi();
+      clearInterval(intervalId);
     }
   }, [domain]);
 
@@ -75,6 +76,7 @@ export const BranchScreen = ({ navigation }) => {
       storeData("branch", selected);
       setIsDataSet((data) => !data);
       setBranchid(selected);
+      clearInterval(intervalId);
     }
   }, [selected]);
 
