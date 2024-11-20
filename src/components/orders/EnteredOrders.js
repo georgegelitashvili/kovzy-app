@@ -276,7 +276,7 @@ export const EnteredOrdersList = () => {
 
 
   useEffect(() => {
-    if (orders) {
+    if (orders && appState) {
       ordersCount = Object.keys(orders).length;
       if (ordersCount > temp) {
         if (notificationManagerRef.current) {
@@ -285,7 +285,7 @@ export const EnteredOrdersList = () => {
       }
       temp = ordersCount;
     }
-  }, [orders]);
+  }, [orders, appState]);
 
   const parseTimeToMinutes = (time) => {
     const [hours, minutes, seconds] = time.split(':').map(Number);

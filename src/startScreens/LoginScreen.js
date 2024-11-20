@@ -12,7 +12,7 @@ import { AuthContext } from "../context/AuthProvider";
 import { LanguageContext } from "../components/Language";
 
 export const LoginScreen = ({ navigation }) => {
-  const { login, loginError } = useContext(AuthContext);
+  const { login, loginError, intervalId } = useContext(AuthContext);
   const [credentials, setCredentials] = useState({});
 
   const [name, setName] = useState({ value: "", error: "" });
