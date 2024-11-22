@@ -15,9 +15,6 @@ import RootNavigator from "./RootNavigator";
 export default function Main({ isConnected }) {
   return (
     <LanguageProvider>
-      
-      <PaperProvider>
-
         <AuthProvider isConnected={isConnected}>
 
           <NavigationContainer ref={navigationRef}>
@@ -25,9 +22,6 @@ export default function Main({ isConnected }) {
           </NavigationContainer>
           
         </AuthProvider>
-
-      </PaperProvider>
-      
     </LanguageProvider>
   );
 };

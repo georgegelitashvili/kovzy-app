@@ -93,7 +93,7 @@ export default function DrawerContent(props) {
             color={branchEnabled ? "#2fa360" : "#f14c4c"}
             style={{ fontSize: 20 }}
           />
-          <Text style={{ paddingLeft: 17, fontWeight: "bold" }}>
+          <Text style={{ paddingLeft: 17, color: '#090909', fontWeight: "bold" }}>
             {branchName}
           </Text>
         </View>
@@ -114,7 +114,7 @@ export default function DrawerContent(props) {
 
           <TouchableRipple style={styles.ripple} onPress={toggleBranch}>
             <View style={styles.preference}>
-              <Text>{dictionary["orders.branch"]}</Text>
+              <Text style={{ color: '#090909', fontWeight: "bold" }}>{dictionary["orders.branch"]}</Text>
               <View pointerEvents="none">
                 <Switch value={branchEnabled} />
               </View>

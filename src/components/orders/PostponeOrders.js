@@ -416,7 +416,6 @@ const styles = StyleSheet.create({
         justifyContent: "flex-start",
     },
     card: {
-        backgroundColor: "#fff",
         margin: 10,
         borderRadius: 10,
         shadowColor: "#000",

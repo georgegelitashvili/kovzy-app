@@ -413,7 +413,6 @@ const styles = StyleSheet.create({
   },
   card: {
     flexWrap: 'nowrap',
-    backgroundColor: "#fff",
     margin: 10,
     borderRadius: 10,
     shadowColor: "#000",
@@ -499,6 +498,5 @@ const styles = StyleSheet.create({
   },
   feeDetailText: {
     fontSize: 15,
-    color: '#333',
   },
 });

@@ -93,6 +93,12 @@ export const AuthProvider = ({ isConnected, children }) => {
     }
   };
 
+  // deleteItem("token");
+  // deleteItem("credentials");
+  // deleteItem("user");
+  // deleteItem("rcml-lang");
+  // deleteItem("languages");
+
   const fetchData = async () => {
     if (!domain || !branchid || !options) return;
 
@@ -115,7 +121,7 @@ export const AuthProvider = ({ isConnected, children }) => {
   const loadUser = async () => {
     setIsLoading(true);
     const userObj = await getSecureData('user');
-    if (userObj) {
+    if (userObj && options.url_authUser) {
       console.log('object of user', userObj);
       setUserObject(userObj);
       await axiosInstance.get(options.url_authUser)
@@ -161,7 +167,7 @@ export const AuthProvider = ({ isConnected, children }) => {
   useEffect(() => {
     if (languages.length > 0) {
       const defaultLanguage = languages.find(language => language.default === 1);
-      setDefaultLang(defaultLanguage ? defaultLanguage.lang : null);
+      // setDefaultLang(defaultLanguage ? defaultLanguage.lang : null);
       handleLanguageChange(defaultLanguage.lang);
       storeData('rcml-lang', defaultLanguage.lang);
       storeData('languages', languages);
@@ -170,6 +176,11 @@ export const AuthProvider = ({ isConnected, children }) => {
 
 
   useEffect(() => {
+    if (!options || !options.url_deliveronStatus || !options.url_branchStatus) {
+      console.error('Missing URL parameters in options');
+      return;
+    }
+    
     fetchData();
     startInterval();
 
@@ -178,7 +189,7 @@ export const AuthProvider = ({ isConnected, children }) => {
         // App has come to the foreground
         fetchData();
         startInterval();
-        if (!user && isConnected) {
+        if (!user && isConnected && options.url_authUser != "") {
           loadUser();
         }
       } else {
@@ -196,6 +207,7 @@ export const AuthProvider = ({ isConnected, children }) => {
       subscribe.remove();
     };
   }, [appState, domain, branchid, options, isConnected, user]);
+
 
   useEffect(() => {
     if (!user && options.url_authUser && isConnected) {

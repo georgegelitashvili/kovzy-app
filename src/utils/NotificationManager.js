@@ -1,7 +1,8 @@
-import React, { useState, useRef, useImperativeHandle, forwardRef } from 'react';
+import React, { useState, useContext, useRef, useImperativeHandle, forwardRef } from 'react';
 import { Alert, View } from 'react-native';
 import { Audio } from 'expo-av';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { String, LanguageContext } from "../components/Language";
 
 const musicList = [
     { id: '1', title: 'Plucky', source: require('../assets/audio/plucky.mp3') },
@@ -15,6 +16,7 @@ const musicList = [
 ];
 
 const NotificationManager = forwardRef((props, ref) => {
+    const { dictionary } = useContext(LanguageContext);
     const soundRef = useRef(null);
     const repeatIntervalRef = useRef(null);
 
@@ -71,8 +73,8 @@ const NotificationManager = forwardRef((props, ref) => {
     const orderReceived = async () => {
         await loadAndPlaySavedMusic();
         Alert.alert(
-            "ALERT",
-            "***New Order Received***",
+            dictionary["general.alerts"],
+            dictionary["orders.orderReceivedTitle"],
             [
                 {
                     text: "OK",

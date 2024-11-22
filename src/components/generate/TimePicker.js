@@ -13,7 +13,7 @@ const TimePicker = ({ onDelaySet, onClose, scheduled, showButton, onChange, back
         const totalMinutes = duration.hours * 60 + duration.minutes;
         setDelayTime(totalMinutes);
 
-        if (onChange) {
+        if (showButton === false) {
             onChange(totalMinutes);
         }
     };

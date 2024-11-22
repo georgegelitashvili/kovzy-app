@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useContext } from "react";
+import React, { useState, useCallback, useMemo, useContext, useEffect } from "react";
 import { StyleSheet, View, Modal, Text, ScrollView } from "react-native";
 import OrdersModalAccept from "./OrdersModalAccept";
 import OrdersModalReject from "./OrdersModalReject";
@@ -6,7 +6,6 @@ import OrdersModalStatus from "./OrdersModalStatus";
 import TimePicker from "../generate/TimePicker";
 import { LanguageContext } from "../Language";
 
-// Utility function to generate items array
 const generateItems = (deliveron) => {
   const { status, content } = deliveron.original ?? {};
 
@@ -29,7 +28,6 @@ const generateItems = (deliveron) => {
   ];
 };
 
-
 export default function OrdersModal({
   isVisible,
   onChangeState,
@@ -40,13 +38,21 @@ export default function OrdersModal({
   type,
   options,
   takeAway,
-  PendingOrders
+  PendingOrders,
 }) {
   const { dictionary } = useContext(LanguageContext);
-  const [forDelivery, setForDelivery] = useState({ value: "", error: "" });
+  const [forDelivery, setForDelivery] = useState(0); // Default to 0
+
   const items = useMemo(() => generateItems(deliveron), [deliveron]);
 
   const hideModal = useCallback(() => onChangeState(false), [onChangeState]);
+
+  // Reset forDelivery when the modal is visible
+  useEffect(() => {
+    if (isVisible) {
+      setForDelivery(0);
+    }
+  }, [isVisible]);
 
   const modalContent = useMemo(() => {
     const commonProps = {
@@ -54,22 +60,38 @@ export default function OrdersModal({
       deliveron: deliveron.original ?? deliveron,
       options,
       takeAway,
-      hideModal
+      hideModal,
     };
 
     switch (type) {
-      case 'accept':
-        return <OrdersModalAccept {...commonProps} items={items} deliveronOptions={deliveronOptions} forDelivery={forDelivery} />;
-      case 'reject':
+      case "accept":
+        return (
+          <OrdersModalAccept
+            {...commonProps}
+            items={items}
+            deliveronOptions={deliveronOptions}
+            forDelivery={forDelivery}
+          />
+        );
+      case "reject":
         return <OrdersModalReject {...commonProps} orders={orders} PendingOrders={PendingOrders} />;
-      case 'status':
+      case "status":
         return <OrdersModalStatus {...commonProps} orders={orders} deliveronOptions={deliveronOptions} />;
       default:
-        return <View><Text>Error: Invalid Modal Type</Text></View>; // Fallback for unknown type
+        return (
+          <View>
+            <Text>Error: Invalid Modal Type</Text>
+          </View>
+        ); // Fallback for unknown type
     }
-  }, [type, hasItemId, deliveron, options, takeAway, items, deliveronOptions, orders]);
+  }, [type, hasItemId, deliveron, options, takeAway, items, deliveronOptions, orders, forDelivery]);
 
-  if (takeAway !== 1 && type !== 'reject' && type !== 'status' && (!deliveron?.original?.content?.length)) {
+  if (
+    takeAway !== 1 &&
+    type !== "reject" &&
+    type !== "status" &&
+    (deliveron.length === 0 || deliveron.original?.content.length === 0)
+  ) {
     return null;
   }
 
@@ -89,7 +111,7 @@ export default function OrdersModal({
                   {dictionary["orders.approvingWarning"]}
                 </Text>
                 <TimePicker
-                  onChange={(newTime) => setForDelivery({ value: newTime, error: "" })}
+                  onChange={(newTime) => setForDelivery(newTime)}
                   showButton={false}
                   backgroundColor={"white"}
                 />
@@ -103,19 +125,18 @@ export default function OrdersModal({
   );
 }
 
-
 const styles = StyleSheet.create({
   modal: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
   },
   modalContent: {
     padding: 10,
-    width: '80%',
-    maxHeight: '80%',
-    backgroundColor: 'white',
+    width: "80%",
+    maxHeight: "80%",
+    backgroundColor: "white",
     borderRadius: 10,
     elevation: 5,
   },
@@ -126,6 +147,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     marginTop: 20,
     marginBottom: 20,
-    textAlign: 'center',
+    textAlign: "center",
   },
 });

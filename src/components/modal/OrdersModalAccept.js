@@ -13,9 +13,6 @@ import axiosInstance from "../../apiConfig/apiRequests";
 import { String, LanguageContext } from "../Language";
 
 export default function OrdersModalContent(props) {
-  // const [forClient, setForClient] = useState({ value: "", error: "" });
-  // const [forDelivery, setForDelivery] = useState({ value: "", error: "" });
-
   const [orderData, setOrderData] = useState({});
   const [acceptData, setAcceptData] = useState({});
   const [deliveron, setDeliveron] = useState({ data: [], error: "" });
@@ -82,7 +79,7 @@ export default function OrdersModalContent(props) {
               companyId: item.companyId,
               companyName: item.name ?? item.companyName,
               type: item.type == "glovo" || item.type == "wolt" ? item.type : item.type,
-              orderDelyTime: props.forDelivery.value,
+              orderDelyTime: props.forDelivery,
             },
           });
 
@@ -90,7 +87,7 @@ export default function OrdersModalContent(props) {
             ...acceptData,
             data: {
               Orderid: props.itemId,
-              orderDelyTime: props.forDelivery.value,
+              orderDelyTime: props.forDelivery,
             },
           });
         }
@@ -100,14 +97,14 @@ export default function OrdersModalContent(props) {
         ...orderData,
         data: {
           Orderid: props.itemId,
-          orderDelyTime: props.forDelivery.value,
+          orderDelyTime: props.forDelivery,
         },
       });
       setAcceptData({
         ...acceptData,
         data: {
           Orderid: props.itemId,
-          orderDelyTime: props.forDelivery.value,
+          orderDelyTime: props.forDelivery,
         },
       });
     }
@@ -163,7 +160,6 @@ export default function OrdersModalContent(props) {
 
 const styles = StyleSheet.create({
   content: {
-    backgroundColor: "#fff",
     width: "100%",
     padding: 20,
   },
@@ -175,7 +171,6 @@ const styles = StyleSheet.create({
   },
   contentInput: {
     width: "100%",
-    backgroundColor: "#fff",
     marginBottom: 25,
     paddingLeft: 1,
     fontSize: 14,

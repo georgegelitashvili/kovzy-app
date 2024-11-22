@@ -23,11 +23,11 @@ export const DomainScreen = ({ navigation }) => {
   };
 
   const onCheckPressed = async () => {
-    const domainError = domainValidator(inputDomain.value);
-    if (domainError) {
-      setInputDomain({ ...inputDomain, error: domainError });
-      return;
-    }
+    // const domainError = domainValidator(inputDomain.value);
+    // if (domainError) {
+    //   setInputDomain({ ...inputDomain, error: domainError });
+    //   return;
+    // }
     setDomain(inputDomain.value);
     storeData("domain", inputDomain.value);
 

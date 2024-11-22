@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext, useCallback } from "react";
 import { Text, Button } from "react-native-paper";
 import Background from "../components/generate/Background";
 import Logo from "../components/generate/Logo";
@@ -16,18 +16,32 @@ export const BranchScreen = ({ navigation }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [errorText, setErrorText] = useState("");
   const { dictionary, userLanguage } = useContext(LanguageContext);
+  const [options, setOptions] = useState({
+    url_branches: "",
+  }); // api options
+
+  const apiOptions = useCallback(() => {
+    if (domain) {
+      setOptions(prevOptions => ({
+        ...prevOptions,
+        url_branches: `https://${domain}/api/v1/admin/branches`,
+      }));
+    }
+  }, [domain]);
 
   const branchApi = async () => {
-    const url = `https://${domain}/api/v1/admin/branches`;
-    if (!url) {
+    if (!options.url_branches) {
       console.error("URL is empty");
       return;
     }
     try {
-      const response = await axiosInstance.post(url, {
+      setIsLoading(true);
+      const response = await axiosInstance.post(options.url_branches, {
         lang: userLanguage,
       });
+      console.log(response.data.branches);
       const data = response.data.branches || [];
+
       setBranches(data.map((item) => ({
         label: item.title,
         value: item.id,
@@ -58,14 +72,18 @@ export const BranchScreen = ({ navigation }) => {
   };
 
   useEffect(() => {
-    if (domain) {
+      apiOptions();
       setBranches([]);
       setSelected(null);
       setErrorText("");
       branchApi();
       clearInterval(intervalId);
-    }
   }, [domain]);
+
+  useEffect(() => {
+    branchApi();
+    clearInterval(intervalId);
+  }, [options]);
 
   useEffect(() => {
     if (selected !== null) {
@@ -79,6 +97,8 @@ export const BranchScreen = ({ navigation }) => {
       clearInterval(intervalId);
     }
   }, [selected]);
+
+  console.log(branches);
 
   if (isLoading) {
     return <Loader error={errorText} />;

@@ -59,8 +59,7 @@ export const LoginScreen = ({ navigation }) => {
       clearInterval(intervalId);
     }
   }, [loginError]);
-
-  console.log('login error: ', loginError);
+  
 
   return (
     <Background>

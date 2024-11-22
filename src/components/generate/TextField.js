@@ -9,7 +9,6 @@ export default function TextField({ errorText, description, ...props }) {
     <View style={styles.container}>
       <TextInput
         style={styles.input}
-        selectionColor={theme.colors.primary}
         underlineColor="transparent"
         mode="outlined"
         {...props}
@@ -29,16 +28,16 @@ const styles = StyleSheet.create({
     marginVertical: 12,
   },
   input: {
-    backgroundColor: theme.colors.surface,
+    // backgroundColor: theme.colors.surface,
     ...Platform.select({
       ios: {
         // fontFamily: 'Roboto',
-        placeholderTextColor: '#ccc',
+        // placeholderTextColor: '#ccc',
         textAlignVertical: 'top',
       },
       android: {
         fontFamily: 'Roboto',
-        placeholderTextColor: '#ccc',
+        // placeholderTextColor: '#ccc',
         textAlignVertical: 'top',
       },
     }),

@@ -17,7 +17,7 @@ const RootNavigator = () => {
 
   return (
     <>
-      {user !== null ? (
+      {user?.token ? (
         <Drawer.Navigator
           drawerContent={(props) => <DrawerContent {...props} />}
           initialRouteName="Order"

@@ -100,7 +100,6 @@ export default function OrdersModalContent(props) {
 
   const styles = StyleSheet.create({
     content: {
-      backgroundColor: '#fff',
       width: '100%',
       padding: 20,
     },
@@ -112,7 +111,6 @@ export default function OrdersModalContent(props) {
     },
     contentInput: {
       width: "100%",
-      backgroundColor: "#fff",
       marginBottom: 25,
       paddingLeft: 1,
       fontSize: 14,

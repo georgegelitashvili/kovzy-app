@@ -25,13 +25,13 @@ const Header = ({ options, navigation }) => {
       style={{ marginTop: headerStyle?.marginTop, backgroundColor: 'white', }}>
       {navigation?.canGoBack() ?
         <Appbar.BackAction
-          style={{ color: '#000', fontWeight: 'bold' }}
+          style={{ fontWeight: 'bold' }}
           onPress={navigation.goBack}
         />
         : null}
       <Appbar.Content
         title={title}
-        titleStyle={{ fontSize: headerStyle?.fontSize, color: '#000', fontWeight: 'bold' }}
+        titleStyle={{ fontSize: headerStyle?.fontSize, fontWeight: 'bold' }}
       />
     </Appbar.Header>
   );

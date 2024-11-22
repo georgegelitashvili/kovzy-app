@@ -10,8 +10,16 @@ const axiosInstance = axios.create({
   withCredentials: true,
 });
 
+// Request interceptor to check for empty URLs
 axiosInstance.interceptors.request.use(
   async (config) => {
+    // Check if the URL is empty or undefined
+    if (!config.url || config.url.trim() === '') {
+      console.error('Request URL is empty or invalid');
+      return Promise.reject(new Error('Invalid request URL'));
+    }
+
+    // Add Authorization token if available
     const token = await SecureStore.getItemAsync('token');
     if (token) {
       config.headers.Authorization = `Bearer ${JSON.parse(token)}`;
@@ -24,7 +32,6 @@ axiosInstance.interceptors.request.use(
     return Promise.reject(error);
   },
 );
-
 
 axiosInstance.interceptors.response.use(
   (response) => {

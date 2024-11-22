@@ -236,7 +236,7 @@ export const EnteredOrdersList = () => {
         .then((resp) => resp.data.data)
         .then((data) => {
           const { status, content } = data.original ?? {};
-          const alertHandler = (message, shouldClearData = false) => Alert.alert("ALERT", message, [
+          const alertHandler = (message, shouldClearData = false) => Alert.alert(dictionary["general.alerts"], message, [
             {
               text: "okay",
               onPress: () => {
@@ -259,7 +259,7 @@ export const EnteredOrdersList = () => {
 
           // Handle status -1 or -2 and module off case
           if (status === -2 && content === "Module is off") {
-            alertHandler("Deliveron module is off", true);
+            alertHandler(dictionary["dv.deliveronModuleOff"], true);
             setDeliveron(data);
           } else if (status === -1) {
             alertHandler("Order ID not passed or invalid.");
@@ -366,7 +366,7 @@ export const EnteredOrdersList = () => {
           setPostponeOrder(false);
           if (data.status === 0) {
             Alert.alert(
-              "ALERT",
+              dictionary["general.alerts"],
               `Order delay till: ${formatDateToLocal(adjustedTime)}`,
               [
                 {
@@ -455,7 +455,7 @@ export const EnteredOrdersList = () => {
             </Text>
 
             <Divider />
-            <OrdersDetail orderId={item.id} />
+              <OrdersDetail orderId={item.id} />
             <Divider />
 
             <Text variant="titleMedium" style={styles.title}> {dictionary["orders.initialPrice"]}: {item.real_price} {currency}</Text>
@@ -602,7 +602,6 @@ const styles = StyleSheet.create({
     justifyContent: "flex-start",
   },
   card: {
-    backgroundColor: "#fff",
     margin: 10,
     borderRadius: 10,
     shadowColor: "#000",
@@ -679,7 +678,6 @@ const styles = StyleSheet.create({
   },
   feeDetailText: {
     fontSize: 15,
-    color: '#333',
   },
   modalContainer: {
     flex: 1,

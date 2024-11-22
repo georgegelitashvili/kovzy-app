@@ -256,7 +256,7 @@ const SettingsScreen = ({ navigation }) => {
                         </View> */}
 
                         <View style={styles.section}>
-                            <Text style={styles.sectionTitle}>Notifications</Text>
+                            {/* <Text style={styles.sectionTitle}>Notifications</Text> */}
 
                             <View style={styles.sectionBody}>
                                 {/* <View style={[styles.rowWrapper, styles.rowFirst]}>
@@ -315,7 +315,7 @@ const SettingsScreen = ({ navigation }) => {
                                                 size={20} />
                                         </View>
 
-                                        <Text style={styles.rowLabel}>Sound</Text>
+                                        <Text style={styles.rowLabel}>{dictionary['sound']}</Text>
 
                                         <View style={styles.rowSpacer} />
 
