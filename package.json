@@ -11,7 +11,10 @@
   "expo": {
     "doctor": {
       "reactNativeDirectoryCheck": {
-        "listUnknownPackages": false
+        "listUnknownPackages": false,
+        "exclude": [
+          "expo-background-fetch"
+        ]
       }
     }
   },
