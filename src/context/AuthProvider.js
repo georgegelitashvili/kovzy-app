@@ -49,7 +49,7 @@ export const AuthProvider = ({ isConnected, children }) => {
 
   const readData = async () => {
     try {
-      const data = await getMultipleData(["domain", "branch", "branchName"]);
+      const data = await getMultipleData(["domain", "branch", "branchNames"]);
       const [domain, branchid, branchName] = data;
 
       if (domain && branchid && branchName) {
@@ -92,12 +92,6 @@ export const AuthProvider = ({ isConnected, children }) => {
       console.log('Error occurred while deleting secure storage:', error);
     }
   };
-
-  // deleteItem("token");
-  // deleteItem("credentials");
-  // deleteItem("user");
-  // deleteItem("rcml-lang");
-  // deleteItem("languages");
 
   const fetchData = async () => {
     if (!domain || !branchid || !options) return;
@@ -167,13 +161,12 @@ export const AuthProvider = ({ isConnected, children }) => {
   useEffect(() => {
     if (languages.length > 0) {
       const defaultLanguage = languages.find(language => language.default === 1);
-      // setDefaultLang(defaultLanguage ? defaultLanguage.lang : null);
+      setDefaultLang(defaultLanguage ? defaultLanguage.lang : null);
       handleLanguageChange(defaultLanguage.lang);
       storeData('rcml-lang', defaultLanguage.lang);
       storeData('languages', languages);
     }
   }, [languages]);
-
 
   useEffect(() => {
     if (!options || !options.url_deliveronStatus || !options.url_branchStatus) {
@@ -290,7 +283,7 @@ export const AuthProvider = ({ isConnected, children }) => {
               deleteItem("token");
               deleteItem("credentials");
               deleteItem("user");
-              removeData(["domain", "branch", "branchName"]);
+              removeData(["domain", "branch", "branchNames"]);
               setDomain(null);
               setBranchid(null);
               setBranchName(null);
@@ -306,7 +299,7 @@ export const AuthProvider = ({ isConnected, children }) => {
             deleteItem("user");
             deleteItem("rcml-lang");
             deleteItem("languages");
-            removeData(["domain", "branch", "branchName"]);
+            removeData(["domain", "branch", "branchNames"]);
             setDomain(null);
             setBranchid(null);
             setBranchName(null);
@@ -342,7 +335,7 @@ export const AuthProvider = ({ isConnected, children }) => {
         <TouchableOpacity onPress={handleClick}>
           <Toast
             type="failed"
-            title="Branch Error"
+            title={dictionary["info.warning"]}
             subtitle={dictionary["orders.branchEnabled"]}
             animate={false}
           />

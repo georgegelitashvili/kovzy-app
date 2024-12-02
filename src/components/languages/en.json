@@ -46,6 +46,7 @@
     "loading" : "Is loading...",
     "login": "Login",
     "sound": "Notification sounds",
+    "okay": "Okay",
     "inf.contract": "Please read the contract and select the appropriate field",
     "nav.auth": "Authorization",
     "nav.ordersReport": "Orders Report",
@@ -451,5 +452,7 @@
     "dv.empty": "No active courier found, please try again later or disable the Deliveron module and deliver by yourself.",
     "dv.deliveronOff": "Please note that you will be disconnecting from courier services, and you will need to organize the delivery of the order yourself.",
     "settings": "Settings",
-    "st.postponeOrder": "Planned orders"
+    "st.postponeOrder": "Planned orders",
+    "pr.warrning": "First check one of these checkboxes",
+    "info.warning": "Warning"
 }

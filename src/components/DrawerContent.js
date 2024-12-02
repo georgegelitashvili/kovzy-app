@@ -11,7 +11,7 @@ import { String, LanguageContext } from "./Language";
 export default function DrawerContent(props) {
 
   const { domain, branchid, branchName, branchEnabled, setBranchEnabled, setDeliveronEnabled, deliveronEnabled, logout, intervalId, setIsLoading } = useContext(AuthContext);
-  const { dictionary, userLanguageChange } = useContext(LanguageContext);
+  const { dictionary, userLanguage } = useContext(LanguageContext);
 
   const [options, setOptions] = useState({
     url_branchActivity: "",
@@ -94,7 +94,7 @@ export default function DrawerContent(props) {
             style={{ fontSize: 20 }}
           />
           <Text style={{ paddingLeft: 17, color: '#090909', fontWeight: "bold" }}>
-            {branchName}
+            {branchName?.titles[userLanguage]}
           </Text>
         </View>
 

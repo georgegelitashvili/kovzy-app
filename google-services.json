@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1030002956747",
+    "project_id": "kovzy-95fa9",
+    "storage_bucket": "kovzy-95fa9.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1030002956747:android:17053e64a50c32b518be4e",
+        "android_client_info": {
+          "package_name": "com.kovzy.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCf3_QeCNAuxLN9_HQTajI2OvBPU1yoxd4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

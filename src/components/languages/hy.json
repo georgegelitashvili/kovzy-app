@@ -22,6 +22,7 @@
     "changePassword": "Փոխել գաղտնաբառը",
     "login": "Մուտք",
     "sound": "Ծանուցման ձայներ",
+    "okay": "Լավ",
     "logout": "Ելք",
     "orderID": "Պատվերի Իդ",
     "prevPage": "Նախորդ էջ",
@@ -493,5 +494,7 @@
     "newOrder_message": "Պատվերը հասել է,\nմասնաճյուղ: :title",
     "loading": "Բեռնվում է...",
     "settings": "կարգավորումները",
-    "st.postponeOrder": "Գծագրված պատվերներ"
+    "st.postponeOrder": "Գծագրված պատվերներ",
+    "pr.warrning": "Նախ ընտրեք մեկը այս նշման դաշտերից",
+    "info.warning": "Զգուշացում"
 }

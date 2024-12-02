@@ -36,8 +36,8 @@ export default function OrdersModalContent(props) {
 
         // Check for error in the response
         if (recheckResponse.data.data?.original?.status === -2 && recheckResponse.data.data?.original?.error) {
-          Alert.alert("ALERT", recheckResponse.data.data.original.error, [
-            { text: 'OK', onPress: () => props.hideModal() },
+          Alert.alert(dictionary["general.alerts"], recheckResponse.data.data.original.error, [
+            { text: dictionary["okay"], onPress: () => props.hideModal() },
           ]);
           setLoading(false);
           return;
@@ -47,8 +47,8 @@ export default function OrdersModalContent(props) {
       // Step 2: Send `url_acceptOrder` request (either directly or after successful recheck)
       await axiosInstance.post(props.options.url_acceptOrder, acceptData.data);
 
-      Alert.alert("ALERT", dictionary['dv.orderSuccess'], [
-        { text: 'OK', onPress: () => props.hideModal() },
+      Alert.alert(dictionary["general.alerts"], dictionary['dv.orderSuccess'], [
+        { text: dictionary["okay"], onPress: () => props.hideModal() },
       ]);
     } catch (error) {
       console.log("Error in acceptOrder:", error);

@@ -22,8 +22,8 @@ export default function OrdersModalContent(props) {
       axiosInstance.post(acceptOptions, statusData.data).then(resp => {
         if (resp.data.data.status == 0) {
           setLoading(false);
-          Alert.alert("ALERT", dictionary['orders.prepared'], [
-            {text: 'OK', onPress: () => props.hideModal()},
+          Alert.alert(dictionary["general.alerts"], dictionary['orders.prepared'], [
+            { text: dictionary["okay"], onPress: () => props.hideModal()},
           ]);
         }
       }).catch((error) => {
@@ -37,7 +37,7 @@ export default function OrdersModalContent(props) {
           if(item.id == props.itemId) {
             const deliveronId = JSON.parse(item.deliveron_data);
             if (deliveronId?.length == 0 || deliveronId['order_id_deliveron'] == null) {
-             setIsDisabled(false);
+              setIsDisabled(false);
               setStatusData({...statusData, data: {
                 Orderid: props.itemId,
               }})
