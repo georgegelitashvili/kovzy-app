@@ -14,6 +14,9 @@ import { Text, Button, Divider, Card } from "react-native-paper";
 import { FlatGrid } from "react-native-super-grid";
 import { MaterialCommunityIcons, SimpleLineIcons } from "@expo/vector-icons";
 import * as Updates from 'expo-updates';
+import * as BackgroundFetch from 'expo-background-fetch';
+import * as TaskManager from 'expo-task-manager';
+import * as Notifications from 'expo-notifications';
 
 import { AuthContext, AuthProvider } from "../../context/AuthProvider";
 import Loader from "../generate/loader";
@@ -26,12 +29,14 @@ import printRows from "../../PrintRows";
 import NotificationManager from '../../utils/NotificationManager';
 
 const width = Dimensions.get("window").width;
-
 const numColumns = printRows(width);
 const cardSize = width / numColumns;
 
 let ordersCount;
 let temp = 0;
+
+// Define a background task name
+const TASK_NAME = 'FETCH_NEW_ORDERS';
 
 // render entered orders function
 export const EnteredOrdersList = () => {
@@ -161,7 +166,6 @@ export const EnteredOrdersList = () => {
     console.log('call interval');
     const newIntervalId = setInterval(() => {
       if (optionsIsLoaded) {
-        // console.log('fetchEnteredOrders called');
         fetchEnteredOrders();
       } else {
         console.log('Options not loaded');
@@ -207,12 +211,131 @@ export const EnteredOrdersList = () => {
     }
   }, [optionsIsLoaded, languageId, appState]);
 
+// handle notifications
+  useEffect(() => {
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: false,
+        shouldSetBadge: false,
+      }),
+    });
+    // Define background task
+    const defineTask = async () => {
+      TaskManager.defineTask(TASK_NAME, async () => {
+        console.log('Background task started');
+        try {
+          const resp = await axiosInstance.post(options.url_unansweredOrders, {
+            type: 0,
+            page: 1,
+            branchid: branchid,
+            Languageid: languageId,
+            postponeOrder: false,
+          });
+
+          console.log('Response received:', resp.data);
+
+          const newOrders = Object.keys(resp.data.data).length;
+
+          if (newOrders > temp) {
+            console.log('New orders found, triggering notification...');
+            await Notifications.scheduleNotificationAsync({
+              content: {
+                title: "New Order",
+                body: "You have a new order!",
+                android: {
+                  icon: require("../../../assets/adaptive-icon.png"),
+                  color: '#ffffff',
+                },
+              },
+              trigger: null, // Immediate trigger
+            });
+          }
+          temp = newOrders;
+
+          return BackgroundFetch.BackgroundFetchResult.NewData; // Indicate new data available
+        } catch (error) {
+          console.error('Error in background task:', error);
+          return BackgroundFetch.BackgroundFetchResult.Failed; // Indicate failure
+        }
+      });
+    };
+
+    // Function to set up background fetch task
+    const setupBackgroundFetch = async () => {
+      try {
+        console.log('Attempting to register background fetch task...');
+        await BackgroundFetch.registerTaskAsync(TASK_NAME, {
+          minimumInterval: 30, // Check every 30 seconds
+          stopOnTerminate: false, // Keep running even when app is terminated
+          startOnBoot: true, // Start after reboot
+        });
+        console.log('Background fetch task registered successfully.');
+      } catch (error) {
+        console.error('Failed to register background fetch task:', error);
+      }
+    };
+
+    // Function to unregister background fetch task
+    const unregisterBackgroundFetch = async () => {
+      try {
+        console.log('Checking if background fetch task is registered...');
+        const status = await BackgroundFetch.getStatusAsync();
+        console.log('Background fetch status:', status);
+
+        if (status !== BackgroundFetch.Status.Available) {
+          console.log(`Task ${TASK_NAME} is not registered, skipping unregistration.`);
+          return;
+        }
+
+        console.log('Unregistering background fetch task...');
+        await BackgroundFetch.unregisterTaskAsync(TASK_NAME);
+        console.log('Background fetch task unregistered successfully.');
+      } catch (error) {
+        console.error('Failed to unregister background fetch task:', error);
+      }
+    };
+
+    // Define task once at component mount
+    defineTask();
+
+    // Register or unregister background fetch task based on appState
+    if (appState && appState.match(/inactive|background/)) {
+      setupBackgroundFetch();
+    } else {
+      unregisterBackgroundFetch();
+    }
+
+    // Cleanup function to ensure task is unregistered on component unmount
+    return () => {
+      unregisterBackgroundFetch();
+    };
+
+  }, [appState]);
+
+
+  useEffect(() => {
+    const requestPermissions = async () => {
+      const { status } = await Notifications.requestPermissionsAsync();
+
+      if (status !== 'granted') {
+        console.log('Permission not granted. Retrying in 10 minutes...');
+        // Retry after 10 minutes (10 * 60 * 1000 ms)
+        setTimeout(() => {
+          requestPermissions(); // Call the function again
+        }, 10 * 60 * 1000);
+      } else {
+        console.log('Notification permissions granted.');
+      }
+    };
+
+    requestPermissions();
+  }, []);
 
   // set deliveron data
   useEffect(() => {
     // Exit early if `itemTakeAway` is null or 1
     if (itemTakeAway === null || itemTakeAway === 1) return;
-
     // If `itemId` is null, reset options and exit
     if (!itemId) {
       setIsDeliveronOptions(false);
@@ -238,7 +361,7 @@ export const EnteredOrdersList = () => {
           const { status, content } = data.original ?? {};
           const alertHandler = (message, shouldClearData = false) => Alert.alert(dictionary["general.alerts"], message, [
             {
-              text: "okay",
+              text: dictionary["okay"],
               onPress: () => {
                 if (shouldClearData) {
                   setIsDeliveronOptions(false);
@@ -276,16 +399,23 @@ export const EnteredOrdersList = () => {
 
 
   useEffect(() => {
-    if (orders && appState) {
-      ordersCount = Object.keys(orders).length;
-      if (ordersCount > temp) {
-        if (notificationManagerRef.current) {
-          notificationManagerRef.current.orderReceived();
+    const checkForNewOrders = async () => {
+      if (orders && appState) {
+        const ordersCount = Object.keys(orders).length; // Get the count of new orders
+        if (ordersCount > temp) {
+          // New orders found, trigger notification
+          if (notificationManagerRef.current) {
+            notificationManagerRef.current.orderReceived();
+          }
         }
+        temp = ordersCount; // Update temp for the next comparison
       }
-      temp = ordersCount;
-    }
+    };
+
+    checkForNewOrders(); // Call the async function
+
   }, [orders, appState]);
+
 
   const parseTimeToMinutes = (time) => {
     const [hours, minutes, seconds] = time.split(':').map(Number);
@@ -370,7 +500,7 @@ export const EnteredOrdersList = () => {
               `Order delay till: ${formatDateToLocal(adjustedTime)}`,
               [
                 {
-                  text: "Okay",
+                  text: dictionary["okay"],
                   onPress: () => setPickerVisible(false),
                 },
               ]

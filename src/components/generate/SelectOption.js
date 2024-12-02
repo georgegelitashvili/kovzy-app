@@ -3,13 +3,14 @@ import { View, StyleSheet, Text, Keyboard, TouchableWithoutFeedback } from 'reac
 import RNPickerSelect from 'react-native-picker-select';
 import { theme } from '../../core/theme';
 
-export default function SelectOption({ errorText, description, items, ...props }) {
+export default function SelectOption({ errorText, description, placeholder="", items, ...props }) {
   return (
     <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
       <View style={styles.container}>
         {items && items.length > 0 && (
           <RNPickerSelect
             useNativeAndroidPickerStyle={false}
+            placeholder={{ label: placeholder }}
             style={pickerSelectStyles}
             items={items.map((item, index) => ({ label: item.label, value: item.value, key: index.toString() }))}
             {...props}

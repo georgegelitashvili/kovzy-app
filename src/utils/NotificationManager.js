@@ -77,7 +77,7 @@ const NotificationManager = forwardRef((props, ref) => {
             dictionary["orders.orderReceivedTitle"],
             [
                 {
-                    text: "OK",
+                    text: dictionary["okay"],
                     onPress: async () => {
                         await onStopPlaySound();
                     },

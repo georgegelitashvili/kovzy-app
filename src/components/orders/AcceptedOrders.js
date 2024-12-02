@@ -382,7 +382,7 @@ export const AcceptedOrdersList = () => {
               page === 0 && styles.paginationButtonDisabled,
             ]}
           >
-            Prev
+            {dictionary["prevPage"]}
           </Text>
         </TouchableOpacity>
         <Text style={styles.paginationText}>{page}</Text>
@@ -398,7 +398,7 @@ export const AcceptedOrdersList = () => {
               page === Math.ceil(increment) && styles.paginationButtonDisabled,
             ]}
           >
-            Next
+            {dictionary["nextPage"]}
           </Text>
         </TouchableOpacity>
       </View>

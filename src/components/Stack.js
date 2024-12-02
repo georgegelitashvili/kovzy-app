@@ -139,7 +139,7 @@ export const SettingsNavigator = () => {
       <Stack.Screen
         name="MusicList"
         options={({ route }) => ({
-          headerTitle: "Notifications",
+          headerTitle: dictionary['sound'],
           headerStyle: { marginTop: 0 },
           headerContentStyle: { fontSize: 10 },
           unmountOnBlur: true,

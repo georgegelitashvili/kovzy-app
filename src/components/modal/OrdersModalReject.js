@@ -19,8 +19,8 @@ export default function OrdersModalContent(props) {
       console.log(resp.data);
       if (resp.data.data?.status == 0 || resp.data.data?.status == -1) {
         setLoading(false);
-          Alert.alert("ALERT", dictionary['orders.declined'], [
-            {text: 'OK', onPress: () => props.hideModal()},
+        Alert.alert(dictionary["general.alerts"], dictionary['orders.declined'], [
+            { text: dictionary["okay"], onPress: () => props.hideModal()},
           ]);
         }
       });

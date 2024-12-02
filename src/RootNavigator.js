@@ -35,7 +35,7 @@ const RootNavigator = () => {
           <Drawer.Screen
             name="Settings"
             component={SettingsNavigator}
-            options={{ title: dictionary["Settings"], unmountOnBlur: true }}
+            options={{ title: dictionary["settings"], unmountOnBlur: true }}
           />
         </Drawer.Navigator>
       ) : (

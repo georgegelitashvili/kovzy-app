@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useContext, useCallback } from "react";
-import { StyleSheet, View, TouchableOpacity, Dimensions, RefreshControl, ActivityIndicator, Alert, } from "react-native";
+import React, { useState, useEffect, useContext, useCallback, useMemo } from "react";
+import { StyleSheet, View, TouchableOpacity, Dimensions, RefreshControl, Alert, } from "react-native";
 import NetInfo from "@react-native-community/netinfo";
-import { MaterialCommunityIcons, Fontisto } from "@expo/vector-icons";
-import { Text, Button, Divider, Card, Checkbox } from "react-native-paper";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { Text, Button, Card, Checkbox } from "react-native-paper";
 import { useIsFocused } from '@react-navigation/native';
 import { FlatGrid } from "react-native-super-grid";
 import SelectOption from "./components/generate/SelectOption";
@@ -130,10 +130,11 @@ export default function Products({ navigation }) {
     }
   }, [showFilter, showSearch]);
 
-  const onRefresh = () => {
+  const onRefresh = async () => {
+    console.log('refresh');
     // setPage(1);
     setRefreshing(true);
-    fetchData(); // Call fetchData when refreshing
+    await fetchData(); // Call fetchData when refreshing
     setCheckedItems([]);
   };
 
@@ -155,8 +156,8 @@ export default function Products({ navigation }) {
       });
     } else {
       // No checkbox is checked, show alert
-      Alert.alert("ALERT", "First check one of these checkboxes", [
-        { text: "OK", onPress: () => console.log("Alert dismissed") },
+      Alert.alert(dictionary["general.alerts"], dictionary["pr.warrning"], [
+        { text: dictionary["okay"], onPress: () => console.log("Alert dismissed") },
       ]);
     }
   };
@@ -199,11 +200,10 @@ export default function Products({ navigation }) {
     const isExcluded = excluded.some((excludedItem) => excludedItem.productid === item.id);
     const isDisabled = isExcluded; // Assuming exclusion implies disabled status
 
-    const buttonColor = isDisabled ? "#2fa360" : "#f14c4c";
     const buttonText = isDisabled ? dictionary["prod.enableProduct"] : dictionary["prod.disableProduct"];
 
     return (
-      <Card key={item.index}>
+      <Card key={item.id}>
         <Card.Content style={styles.cardContent}>
           <Text variant="titleMedium" style={styles.title}>
             {item.name}
@@ -217,23 +217,33 @@ export default function Products({ navigation }) {
         </Card.Content>
 
         <Card.Actions>
-          <Button
-            textColor="white"
-            buttonColor="#3490dc"
-            style={styles.button}
+          <TouchableOpacity
+            style={[
+              styles.button,
+              {
+                backgroundColor: "#3490dc", // Dynamic color
+              },
+            ]}
             onPress={() => navigation.navigate('ProductsDetail', { id: item.id })}
           >
-            {dictionary["prod.ingredients"]}
-          </Button>
+            <Text style={{ color: "white", fontSize: 16, fontWeight: "500" }}>
+              {dictionary["prod.ingredients"]}
+            </Text>
+          </TouchableOpacity>
 
-          <Button
-            textColor="white"
-            buttonColor={buttonColor}
-            style={styles.button}
+          <TouchableOpacity
+            style={[
+              styles.button,
+              {
+                backgroundColor: isDisabled ? "#2fa360" : "#f14c4c", // Dynamic color
+              },
+            ]}
             onPress={() => handleButtonPress(item)}
           >
-            {buttonText}
-          </Button>
+            <Text style={{ color: "white", fontSize: 16, fontWeight: "500" }}>
+              {buttonText}
+            </Text>
+          </TouchableOpacity>
         </Card.Actions>
       </Card>
     );
@@ -313,8 +323,10 @@ export default function Products({ navigation }) {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
+        extraData={excluded}
         initialNumToRender={10} // Adjust this number based on your performance needs
         windowSize={5} // Adjust this number based on your performance needs
+        updateCellsBatchingPeriod={50}
       />
 
       <View style={styles.paginationContainer}>
@@ -330,7 +342,7 @@ export default function Products({ navigation }) {
               page === 1 && styles.paginationButtonDisabled,
             ]}
           >
-            Prev
+            {dictionary["prevPage"]}
           </Text>
         </TouchableOpacity>
         <Text style={styles.paginationText}>{page}</Text>
@@ -346,7 +358,7 @@ export default function Products({ navigation }) {
               page === Math.ceil(totalPages) && styles.paginationButtonDisabled,
             ]}
           >
-            Next
+            {dictionary["nextPage"]}
           </Text>
         </TouchableOpacity>
       </View>
@@ -377,6 +389,16 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginTop: 25,
     padding: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 18, // Rounded corners like Paper's Button
+    shadowColor: "#000", // Add shadow for elevation
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3, // Elevation for Android
+    justifyContent: "center",
+    alignItems: "center",
   },
   cardContent: {
     flexDirection: "row",

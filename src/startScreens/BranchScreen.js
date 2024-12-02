@@ -12,6 +12,7 @@ import { LanguageContext } from "../components/Language";
 export const BranchScreen = ({ navigation }) => {
   const { setIsDataSet, domain, branchid, setBranchid, intervalId } = useContext(AuthContext);
   const [branches, setBranches] = useState([]);
+  const [branch, setBranch] = useState([]);
   const [selected, setSelected] = useState(branchid);
   const [isLoading, setIsLoading] = useState(true);
   const [errorText, setErrorText] = useState("");
@@ -36,14 +37,12 @@ export const BranchScreen = ({ navigation }) => {
     }
     try {
       setIsLoading(true);
-      const response = await axiosInstance.post(options.url_branches, {
-        lang: userLanguage,
-      });
-      console.log(response.data.branches);
+      const response = await axiosInstance.post(options.url_branches);
       const data = response.data.branches || [];
 
+      setBranch(data);
       setBranches(data.map((item) => ({
-        label: item.title,
+        label: item.titles[userLanguage],
         value: item.id,
         enabled: item.temp_close
       })));
@@ -52,10 +51,12 @@ export const BranchScreen = ({ navigation }) => {
       if (error.response && (error.response.status === 500 || error.response.status === 404)) {
         setIsDataSet(false);
         setBranches([]);
+        setBranch([]);
         setErrorText("Unable to fetch branch list.");
       } else {
         setIsDataSet(false);
         setBranches([]);
+        setBranch([]);
         setErrorText("An error occurred while fetching branch list. Please try again.");
       }
     } finally {
@@ -74,31 +75,32 @@ export const BranchScreen = ({ navigation }) => {
   useEffect(() => {
       apiOptions();
       setBranches([]);
+      setBranch([]);
       setSelected(null);
       setErrorText("");
       branchApi();
       clearInterval(intervalId);
-  }, [domain]);
+  }, [domain, userLanguage]);
 
   useEffect(() => {
     branchApi();
     clearInterval(intervalId);
-  }, [options]);
+  }, [options, userLanguage]);
 
   useEffect(() => {
     if (selected !== null) {
       const selectedBranch = branches.find((branch) => branch.value === selected);
       if (selectedBranch) {
-        storeData("branchName", selectedBranch.label);
+        const item = branch.find(item => item.id === selectedBranch.value);
+
+        storeData("branchNames", item);
       }
       storeData("branch", selected);
       setIsDataSet((data) => !data);
       setBranchid(selected);
       clearInterval(intervalId);
     }
-  }, [selected]);
-
-  console.log(branches);
+  }, [selected, userLanguage]);
 
   if (isLoading) {
     return <Loader error={errorText} />;
@@ -114,6 +116,7 @@ export const BranchScreen = ({ navigation }) => {
           setErrorText("");
         }}
         items={branches}
+        placeholder={dictionary["pt.chooseBranch"]}
         keyExtractor={(item) => (item && item.id ? item.id.toString() : '')}
         error={!!errorText}
         errorText={errorText}
