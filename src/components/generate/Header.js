@@ -4,7 +4,8 @@ import { Text } from 'react-native-paper';
 import { theme } from '../../core/theme';
 
 export default function Header({ style, ...props }) {
-  return <Text style={[styles.header, style]} {...props} />
+  const { key, ...otherProps } = props;
+  return <Text style={[styles.header, style]} {...otherProps} />
 }
 
 const styles = StyleSheet.create({

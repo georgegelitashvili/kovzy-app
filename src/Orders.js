@@ -8,11 +8,10 @@ import { LanguageContext } from "./components/Language";
 
 const Tab = createMaterialTopTabNavigator();
 
-export default function TabContent(props) {
-  const { dictionary } = useContext(LanguageContext);
+export default function TabContent() {
   const [postponeOrderShow, setPostponeOrderShow] = useState(false);
+  const { dictionary } = useContext(LanguageContext);
 
-  // Load the stored value on component mount
   useEffect(() => {
     const loadStoredValue = async () => {
       try {
@@ -43,11 +42,13 @@ export default function TabContent(props) {
         options={{ tabBarLabel: dictionary["nav.pendingOrders"], unmountOnBlur: true }}
       />
 
-      {postponeOrderShow ? (<Tab.Screen
-        name="PlannedOrders"
-        component={PostponeOrders}
-        options={{ tabBarLabel: dictionary["nav.plannedOrders"], unmountOnBlur: true }}
-        />): null}
+      {postponeOrderShow ? (
+        <Tab.Screen
+          name="PlannedOrders"
+          component={PostponeOrders}
+          options={{ tabBarLabel: dictionary["nav.plannedOrders"], unmountOnBlur: true }}
+        />
+      ) : null}
 
       <Tab.Screen
         name="AcceptedOrders"

@@ -1,5 +1,5 @@
-import React, { useState, useContext, useRef, useImperativeHandle, forwardRef } from 'react';
-import { Alert, View } from 'react-native';
+import React, { useEffect, useContext, useRef, useImperativeHandle, forwardRef } from 'react';
+import { Alert, View, AppState } from 'react-native';
 import { Audio } from 'expo-av';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { String, LanguageContext } from "../components/Language";
@@ -19,6 +19,24 @@ const NotificationManager = forwardRef((props, ref) => {
     const { dictionary } = useContext(LanguageContext);
     const soundRef = useRef(null);
     const repeatIntervalRef = useRef(null);
+    const appState = useRef(AppState.currentState);
+
+    useEffect(() => {
+        const subscription = AppState.addEventListener('change', nextAppState => {
+            if (
+                appState.current.match(/inactive|background/) &&
+                nextAppState === 'active'
+            ) {
+                // App has come to foreground
+                onStopPlaySound();
+            }
+            appState.current = nextAppState;
+        });
+
+        return () => {
+            subscription.remove();
+        };
+    }, [appState]);
 
     const onStopPlaySound = async () => {
         if (soundRef.current) {
@@ -44,6 +62,11 @@ const NotificationManager = forwardRef((props, ref) => {
         if (soundRef.current) {
             await onStopPlaySound();
         }
+
+        // Set audio mode to play in the background
+        await Audio.setAudioModeAsync({
+            staysActiveInBackground: true, // Allow the sound to play when app is in background
+        });
 
         // Create and play new sound
         const { sound: newSound } = await Audio.Sound.createAsync(music.source);
@@ -89,6 +112,7 @@ const NotificationManager = forwardRef((props, ref) => {
 
     useImperativeHandle(ref, () => ({
         orderReceived,
+        onStopPlaySound
     }));
 
     return <View />;

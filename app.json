@@ -8,7 +8,7 @@
     "userInterfaceStyle": "light",
     "splash": {
       "image": "./assets/splash.png",
-      "resizeMode": "contain",
+      "resizeMode": "cover",
       "backgroundColor": "#ffffff"
     },
     "updates": {
@@ -26,7 +26,7 @@
       },
       "splash": {
         "image": "./assets/splash.png",
-        "resizeMode": "contain",
+        "resizeMode": "cover",
         "backgroundColor": "#ffffff"
       }
     },
@@ -37,7 +37,7 @@
       },
       "splash": {
         "image": "./assets/splash.png",
-        "resizeMode": "contain",
+        "resizeMode": "cover",
         "backgroundColor": "#ffffff"
       },
       "permissions": [
@@ -46,8 +46,6 @@
       ],
       "jsEngine": "hermes",
       "package": "com.kovzy.app",
-      "softwareKeyboardLayoutMode": "pan",
-      "versionCode": 13,
       "googleServicesFile": "./google-services.json"
     },
     "web": {
@@ -69,10 +67,9 @@
           "icon": "./assets/icon.png",
           "color": "#ffffff",
           "defaultChannel": "default",
-          "enableBackgroundRemoteNotifications": false
+          "enableBackgroundRemoteNotifications": true
         }
       ]
-    ],
-    "newArchEnabled": true
+    ]
   }
 }
