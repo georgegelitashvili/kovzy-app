@@ -7,22 +7,13 @@ import {
   TouchableOpacity,
   Alert,
   AppState,
-  FlatList,
-  Platform
+  FlatList
 } from "react-native";
 
 import { Text, Button, Divider, Card } from "react-native-paper";
 import { FlatGrid } from "react-native-super-grid";
 import { MaterialCommunityIcons, SimpleLineIcons } from "@expo/vector-icons";
-
 import * as Updates from 'expo-updates';
-import * as BackgroundFetch from 'expo-background-fetch';
-import * as Application from 'expo-application';
-import * as Notifications from 'expo-notifications';
-import * as TaskManager from 'expo-task-manager';
-import * as Battery from 'expo-battery';
-import * as IntentLauncher from 'expo-intent-launcher';
-import Constants from 'expo-constants';
 
 import { AuthContext, AuthProvider } from "../../context/AuthProvider";
 import Loader from "../generate/loader";
@@ -32,27 +23,22 @@ import axiosInstance from "../../apiConfig/apiRequests";
 import OrdersDetail from "./OrdersDetail";
 import OrdersModal from "../modal/OrdersModal";
 import printRows from "../../PrintRows";
+
+import NotificationSound from '../../utils/NotificationSound';
 import NotificationManager from '../../utils/NotificationManager';
 
-
-const BACKGROUND_NOTIFICATION_TASK = 'BACKGROUND-NOTIFICATION-TASK';
-const BACKGROUND_FETCH_RESULT = {
-  NewData: 'new-data',
-  NoData: 'no-data',
-  Failed: 'failed'
-};
 
 const width = Dimensions.get("window").width;
 const numColumns = printRows(width);
 const cardSize = width / numColumns;
 
 let temp = 0;
+const type = 0;
 
 // render entered orders function
 export const EnteredOrdersList = () => {
-  const { domain, branchid, setUser, user, intervalId, setIntervalId, shouldRenderAuthScreen, setShouldRenderAuthScreen } = useContext(AuthContext);
-  const notificationManagerRef = useRef(null);
-  const lowPowerMode = Battery.useLowPowerMode();
+  const { domain, branchid, user, intervalId, setIntervalId } = useContext(AuthContext);
+  const NotificationSoundRef = useRef(null);
   const [orders, setOrders] = useState([]);
   const [fees, setFees] = useState([]);
   const [currency, setCurrency] = useState("");
@@ -82,10 +68,7 @@ export const EnteredOrdersList = () => {
   const [width, setWidth] = useState(Dimensions.get('window').width);
   const [numColumns, setNumColumns] = useState(printRows(width));
   const [cardSize, setCardSize] = useState(width / numColumns);
-  const [expoPushToken, setExpoPushToken] = useState('');
-  const [status, setStatus] = useState(null);
-  const notificationListener = useRef();
-  const responseListener = useRef();
+
   const { dictionary, languageId } = useContext(LanguageContext);
 
   const onChangeModalState = (newState) => {
@@ -214,226 +197,24 @@ export const EnteredOrdersList = () => {
     }
   }, [optionsIsLoaded, languageId, appState]);
 
-
-  useEffect(() => {
-    if (lowPowerMode) {
-      const showAlert = () => {
-        Alert.alert(
-          'Low Power Mode is On',
-          'To receive notifications, please turn off Low Power Mode.',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            {
-              text: 'Go to Settings',
-              onPress: () => {
-                IntentLauncher.startActivityAsync(
-                  IntentLauncher.ActivityAction.IGNORE_BATTERY_OPTIMIZATION_SETTINGS
-                );
-              },
-            },
-          ]
-        );
-      };
-
-      showAlert();
-
-      const intervalId = setInterval(() => {
-        if (lowPowerMode) {
-          showAlert();
-        }
-      }, 30000);
-
-      return () => clearInterval(intervalId);
-    }
-  }, [lowPowerMode]);
-
   // ****************************
   // Notifications
   // ****************************
-  // Define background notification task (global scope)
-  TaskManager.defineTask(BACKGROUND_NOTIFICATION_TASK, async () => {
-    const startTime = Date.now();
-    console.log(`Background fetch started at: ${new Date(startTime).toISOString()}`);
-
-    try {
-      const response = await axiosInstance.post(options.url_unansweredOrders, {
-        type: 0,
-        page: 1,
-        branchid: branchid,
-        Languageid: languageId,
-        postponeOrder: false
-      });
-
-      const endTime = Date.now();
-      const executionTime = endTime - startTime;
-  
-      const orderCount = Object.keys(response.data.data).length;
-      console.log(`Background fetch completed in ${executionTime}ms`);
-      console.log(response.data.data, orderCount);
-
-      if (orderCount > 0) {
-        await notificationManagerRef.current?.orderReceived();
-        console.log(`Found ${orderCount} new orders`);
-        return BACKGROUND_FETCH_RESULT.NewData;
-      }
-
-      console.log('No new orders found');
-      return BACKGROUND_FETCH_RESULT.NoData;
-    } catch (error) {
-      const errorTime = Date.now();
-      const executionTime = errorTime - startTime;
-      console.error(`Background fetch failed after ${executionTime}ms:`, error);
-      return BACKGROUND_FETCH_RESULT.Failed;
-    }
-  });
-
-  Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowAlert: true,
-      shouldPlaySound: true,
-      shouldSetBadge: true,
-    }),
-  });
-
   useEffect(() => {
-    const registerTask = async () => {
+    const initializeNotifications = async () => {
       try {
-        await BackgroundFetch.registerTaskAsync(BACKGROUND_NOTIFICATION_TASK, {
-          minimumInterval: 30,
-          stopOnTerminate: false,
-          startOnBoot: true
-        });
-        console.log('Background task registered');
-      } catch (err) {
-        console.error('Task registration failed:', err);
-      }
-    };
-
-    registerTask();
-
-    return () => {
-      try {
-        BackgroundFetch.unregisterTaskAsync(BACKGROUND_NOTIFICATION_TASK);
-      } catch (err) {
-        console.error('Task unregistration failed:', err);
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    const registerNotifications = async () => {
-      try {
-        const token = await registerForPushNotificationsAsync();
-        if (token && optionsIsLoaded) {
-          setExpoPushToken(token);
-          await savePushTokenToBackend(token);
+        if (!optionsIsLoaded) {
+          console.log('Options not loaded yet, skipping initialization.');
+          return;
         }
-
-        // Set up notification listeners
-        notificationListener.current = Notifications.addNotificationReceivedListener(
-          notification => console.log('Foreground Notification:', notification)
-        );
-
-        responseListener.current = Notifications.addNotificationResponseReceivedListener(
-          response => console.log('User Tapped Notification:', response)
-        );
-
+        await NotificationManager.initialize(options, type, branchid, languageId, NotificationSoundRef);
       } catch (error) {
-        console.error('Error registering notifications:', error);
+        console.error('Error initializing NotificationManager:', error);
       }
     };
 
-    registerNotifications();
-
-    // Cleanup
-    return () => {
-      if (notificationListener.current) {
-        Notifications.removeNotificationSubscription(notificationListener.current);
-      }
-      if (responseListener.current) {
-        Notifications.removeNotificationSubscription(responseListener.current);
-      }
-    };
-  }, [optionsIsLoaded, appState]);
-
-
-  // Save the push token to your backend
-  const savePushTokenToBackend = async (token) => {
-    const maxRetries = 15; // Maximum number of retries
-    let attempt = 0;
-    let success = false;
-
-    while (attempt < maxRetries && !success) {
-      try {
-        const response = await axiosInstance.post(options?.url_pushToken, {
-          token: token,
-          branch_id: branchid,
-          device_id: await Application.getAndroidId(),
-        });
-
-        if (response.data?.status) {
-          console.log('Push token stored successfully!');
-          success = true; // Stop retrying
-        } else {
-          throw new Error('Backend did not accept token.');
-        }
-      } catch (error) {
-        attempt++;
-        console.error(`Error saving token to backend (Attempt ${attempt}):`, error);
-        if (attempt === maxRetries) {
-          alert('Failed to save push token after multiple attempts.');
-        } else {
-          console.log('Retrying to save push token...');
-          await new Promise((resolve) => setTimeout(resolve, 2000)); // Wait 2 seconds before retrying
-        }
-      }
-    }
-  };
-
-
-  function handleRegistrationError(errorMessage) {
-    alert(errorMessage);
-    throw new Error(errorMessage);
-  }
-
-  // Register for push notifications
-  async function registerForPushNotificationsAsync() {
-    if (Platform.OS === 'android') {
-      await Notifications.setNotificationChannelAsync('myNotificationChannel', {
-        name: 'A channel is needed for the permissions prompt to appear',
-        importance: Notifications.AndroidImportance.MAX,
-        vibrationPattern: [0, 250, 250, 250],
-        lightColor: '#FF231F7C',
-      });
-    }
-
-    const { status: existingStatus } = await Notifications.getPermissionsAsync();
-    let finalStatus = existingStatus;
-
-    if (existingStatus !== 'granted') {
-      const { status } = await Notifications.requestPermissionsAsync();
-      finalStatus = status;
-    }
-
-    if (finalStatus !== 'granted') {
-      Alert.alert('Error', 'Failed to get push token for notifications!');
-      return null;
-    }
-
-    const projectId =
-      Constants?.expoConfig?.extra?.eas?.projectId ?? Constants?.easConfig?.projectId;
-    if (!projectId) {
-      handleRegistrationError('Project ID not found');
-    }
-
-    const pushTokenString = (
-      await Notifications.getExpoPushTokenAsync({
-        projectId,
-      })
-    ).data;
-    console.log('Expo Push Token:', pushTokenString);
-    return pushTokenString;
-  }
+    initializeNotifications();
+  }, [optionsIsLoaded]);
 
 
   useEffect(() => {
@@ -496,11 +277,11 @@ export const EnteredOrdersList = () => {
 
   useEffect(() => {
     const checkForNewOrders = async () => {
-      if (orders && appState) {
+      if (orders && appState === "active") {
         const newOrderCount = Object.keys(orders).length;
         if (newOrderCount > temp) {
-          if (notificationManagerRef.current) {
-            notificationManagerRef.current.orderReceived();
+          if (NotificationSoundRef.current) {
+            NotificationSoundRef.current.orderReceived();
           }
         }
         temp = newOrderCount;
@@ -757,7 +538,7 @@ export const EnteredOrdersList = () => {
   return (
     <View style={{ flex: 1, width: width }}>
       {loadingOptions ? <Loader /> : null}
-      <NotificationManager ref={notificationManagerRef} />
+      <NotificationSound ref={NotificationSoundRef} />
 
       <FlatList
         data={[{}]} // Dummy data for the FlatList since we're using ListHeaderComponent for main content
