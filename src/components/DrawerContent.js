@@ -151,6 +151,19 @@ export default function DrawerContent(props) {
           />
           <DrawerItem
             icon={({ color, size }) => (
+              <MaterialCommunityIcons
+                name="qrcode-scan"
+                color={color}
+                size={size}
+              />
+            )}
+            label={dictionary["nav.QROrders"]}
+            onPress={() => {
+              props.navigation.navigate("QrOrders");
+            }}
+          />
+          <DrawerItem
+            icon={({ color, size }) => (
               <SimpleLineIcons name="settings"
                 color={color}
                 size={size} />
