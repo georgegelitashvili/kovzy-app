@@ -10,7 +10,6 @@ const Drawer = createDrawerNavigator();
 
 const RootNavigator = () => {
   const { user, isLoading } = useContext(AuthContext);
-
   const { dictionary } = useContext(LanguageContext);
 
   console.log("user:", user);
@@ -19,7 +18,10 @@ const RootNavigator = () => {
     <>
       {user?.token ? (
         <Drawer.Navigator
-          drawerContent={(props) => <DrawerContent {...props} />}
+          drawerContent={(props) => {
+            const { key, ...otherProps } = props; // Destructure key from props
+            return <DrawerContent {...otherProps} />; // Spread otherProps without key
+          }}
           initialRouteName="Order"
         >
           <Drawer.Screen

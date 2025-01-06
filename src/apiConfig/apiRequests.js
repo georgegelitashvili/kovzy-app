@@ -33,6 +33,7 @@ axiosInstance.interceptors.request.use(
   },
 );
 
+// Response interceptor to handle responses and errors
 axiosInstance.interceptors.response.use(
   (response) => {
     // Clear cache for this specific request
@@ -43,16 +44,13 @@ axiosInstance.interceptors.response.use(
     return response;
   },
   (error) => {
-    console.error("Error axiosInstance:", error);
-    if (error?.response && error?.response.status === 404) {
-      // Handle not found error
-      removeData("domain");
-      removeData("branch");
-      removeData("branchName");
-      removeData("user");
+    // Handle response errors
+    if (error.response) {
+      console.error('Response error:', error.response);
+    } else if (error.request) {
+      console.error('Request error:', error.request);
     } else {
-      // Handle other types of errors (e.g., network errors)
-      console.error("An error occurred (axios):", error.message);
+      console.error('Error:', error.message);
     }
     return Promise.reject(error);
   },
