@@ -171,6 +171,7 @@
     "disc.deletingDiscountsWarning": "ნამდვილად გსურთ წაშლა?",
     "disc.editingDiscount": "ფასდაკლების შესწორება",
     "orders.order" : "კოვზის შეკვეთის #",
+    "orders.Neworder" : "კოვზის შეკვეთა",
     "orders.downloadExcel": "ექსელის ფაილის ჩამოტვირთვა",
     "orders.status": "შეკვეთის სტატუსი",
     "orders.dateRange": "პერიოდი",

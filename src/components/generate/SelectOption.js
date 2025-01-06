@@ -3,7 +3,10 @@ import { View, StyleSheet, Text, Keyboard, TouchableWithoutFeedback } from 'reac
 import RNPickerSelect from 'react-native-picker-select';
 import { theme } from '../../core/theme';
 
-export default function SelectOption({ errorText, description, placeholder="", items, ...props }) {
+export default function SelectOption({ errorText, description, placeholder = "", items, ...props }) {
+  // Destructure key from props to ensure it is not spread into JSX
+  const { key, ...otherProps } = props;
+
   return (
     <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
       <View style={styles.container}>
@@ -13,7 +16,7 @@ export default function SelectOption({ errorText, description, placeholder="", i
             placeholder={{ label: placeholder }}
             style={pickerSelectStyles}
             items={items.map((item, index) => ({ label: item.label, value: item.value, key: index.toString() }))}
-            {...props}
+            {...otherProps} // Spread otherProps without key
           />
         )}
         {description && !errorText && (

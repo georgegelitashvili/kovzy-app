@@ -30,6 +30,7 @@ export default function OrdersModalContent(props) {
     setLoading(true);
 
     try {
+      console.log("orderData:", orderData.data);
       // Step 1: Send `url_deliveronRecheck` request if deliveron is enabled
       if (props.deliveron?.status !== -2 && props.takeAway !== 1) {
         const recheckResponse = await axiosInstance.post(props.options.url_deliveronRecheck, orderData.data);
@@ -79,7 +80,7 @@ export default function OrdersModalContent(props) {
               companyId: item.companyId,
               companyName: item.name ?? item.companyName,
               type: item.type == "glovo" || item.type == "wolt" ? item.type : item.type,
-              orderDelyTime: props.forDelivery,
+              orderDelyTime: props.forDelivery !== 0 ? props.forDelivery : null,
             },
           });
 
@@ -87,7 +88,7 @@ export default function OrdersModalContent(props) {
             ...acceptData,
             data: {
               Orderid: props.itemId,
-              orderDelyTime: props.forDelivery,
+              orderDelyTime: props.forDelivery !== 0 ? props.forDelivery : null,
             },
           });
         }
@@ -97,14 +98,14 @@ export default function OrdersModalContent(props) {
         ...orderData,
         data: {
           Orderid: props.itemId,
-          orderDelyTime: props.forDelivery,
+          orderDelyTime: props.forDelivery !== 0 ? props.forDelivery : null,
         },
       });
       setAcceptData({
         ...acceptData,
         data: {
           Orderid: props.itemId,
-          orderDelyTime: props.forDelivery,
+          orderDelyTime: props.forDelivery !== 0 ? props.forDelivery : null,
         },
       });
     }

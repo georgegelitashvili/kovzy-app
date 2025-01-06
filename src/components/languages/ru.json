@@ -173,6 +173,7 @@
     "disc.editingDiscount": "Редактирование скидки",
     "orders.downloadExcel": "Скачать как Excel файл ",
     "orders.order" : "Номер заказа \"Ковзи\"",
+    "orders.Neworder" : "Заказ ковзи",
     "orders.status": "Статус заказа",
     "orders.dateRange": "Диапазон дат",
     "orders.fName": "Имя",

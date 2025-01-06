@@ -10,6 +10,7 @@ import { String, LanguageContext } from "./Language";
 
 export default function DrawerContent(props) {
 
+  const { key, ...otherProps } = props;
   const { domain, branchid, branchName, branchEnabled, setBranchEnabled, setDeliveronEnabled, deliveronEnabled, logout, intervalId, setIsLoading } = useContext(AuthContext);
   const { dictionary, userLanguage } = useContext(LanguageContext);
 
@@ -49,12 +50,6 @@ export default function DrawerContent(props) {
       .then((resp) => setBranchEnabled(resp.data.data));
   };
 
-  const toggleDeliveron = async () => {
-    await axiosInstance
-      .post(options.url_deliveronActivity, deliveronChangeOptions.data)
-      .then((resp) => setDeliveronEnabled(resp.data.data));
-  };
-
   useEffect(() => {
     if (domain) {
       apiOptions();
@@ -78,7 +73,7 @@ export default function DrawerContent(props) {
   }, [deliveronEnabled]);
 
   return (
-    <DrawerContentScrollView {...props}>
+    <DrawerContentScrollView {...otherProps}>
       <View style={styles.drawerContent}>
         <View
           style={{
@@ -103,15 +98,6 @@ export default function DrawerContent(props) {
         </View>
 
         <Drawer.Section style={styles.drawerSection}>
-          {/* <TouchableRipple onPress={toggleDeliveron}>
-            <View style={styles.preference}>
-              <Text>{dictionary["dv.deliveron"]}</Text>
-              <View pointerEvents="none">
-                <Switch value={deliveronEnabled} />
-              </View>
-            </View>
-          </TouchableRipple> */}
-
           <TouchableRipple style={styles.ripple} onPress={toggleBranch}>
             <View style={styles.preference}>
               <Text style={{ color: '#090909', fontWeight: "bold" }}>{dictionary["orders.branch"]}</Text>

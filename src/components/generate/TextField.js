@@ -4,6 +4,7 @@ import { TextInput } from 'react-native-paper';
 import { theme } from '../../core/theme';
 
 export default function TextField({ errorText, description, ...props }) {
+  const { key, ...otherProps } = props;
   return (
     <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
     <View style={styles.container}>
@@ -11,7 +12,7 @@ export default function TextField({ errorText, description, ...props }) {
         style={styles.input}
         underlineColor="transparent"
         mode="outlined"
-        {...props}
+          {...otherProps}
       />
       {description && !errorText ? (
         <Text style={styles.description}>{description}</Text>

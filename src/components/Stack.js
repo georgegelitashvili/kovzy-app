@@ -45,7 +45,10 @@ export const AuthNavigator = () => {
     <Stack.Navigator
       screenOptions={({ navigation, route }) => ({
         headerMode: 'screen',
-        header: (props) => <Header {...props} />,
+        header: (props) => {
+          const { key, ...otherProps } = props; // Destructure key from props
+          return <Header {...otherProps} />; // Spread otherProps without key
+        },
         ...route.params?.options, // Pass route params as options
       })}
     >
@@ -83,7 +86,10 @@ export const OrdersNavigator = () => {
       screenOptions={({ navigation, route }) => ({
         headerMode: "screen",
         headerBackTitleVisible: false,
-        header: (props) => <Header {...props} />,
+        header: (props) => {
+          const { key, ...otherProps } = props; // Destructure key from props
+          return <Header {...otherProps} />; // Spread otherProps without key
+        },
         ...route.params?.options, // Pass route params as options
       })}
     >
@@ -114,7 +120,10 @@ export const ProductsNavigator = () => {
       screenOptions={({ navigation, route }) => ({
         headerMode: "screen",
         headerBackTitleVisible: false,
-        header: (props) => <Header {...props} />,
+        header: (props) => {
+          const { key, ...otherProps } = props; // Destructure key from props
+          return <Header {...otherProps} />; // Spread otherProps without key
+        },
         ...route.params?.options, // Pass route params as options
       })}
     >
@@ -139,12 +148,18 @@ export const SettingsNavigator = () => {
 
   return (
     <Stack.Navigator
-      screenOptions={({ navigation, route }) => ({
-        headerMode: "screen",
-        headerBackTitleVisible: false,
-        header: (props) => <Header {...props} />,
-        ...route.params?.options, // Pass route params as options
-      })}
+      screenOptions={({ navigation, route }) => {
+        const { key, ...options } = route.params?.options || {}; // Exclude key prop
+        return {
+          headerMode: "screen",
+          headerBackTitleVisible: false,
+          header: (props) => {
+            const { key, ...otherProps } = props; // Destructure key from props
+            return <Header {...otherProps} />; // Spread otherProps without key
+          },
+          ...options, // Pass route params as options without key
+        };
+      }}
     >
       <Stack.Screen
         name="Setting"
@@ -153,14 +168,18 @@ export const SettingsNavigator = () => {
       />
       <Stack.Screen
         name="MusicList"
-        options={({ route }) => ({
-          headerTitle: dictionary['sound'],
-          headerStyle: { marginTop: 0 },
-          headerContentStyle: { fontSize: 10 },
-          unmountOnBlur: true,
-          ...route.params?.options, // Pass route params as options
-        })}
-        component={NotificationScreen} />
+        options={({ route }) => {
+          const { key, ...options } = route.params?.options || {}; // Exclude key prop
+          return {
+            headerTitle: dictionary['sound'],
+            headerStyle: { marginTop: 0 },
+            headerContentStyle: { fontSize: 10 },
+            unmountOnBlur: true,
+            ...options, // Pass route params as options without key
+          };
+        }}
+        component={NotificationScreen}
+      />
     </Stack.Navigator>
   );
 };

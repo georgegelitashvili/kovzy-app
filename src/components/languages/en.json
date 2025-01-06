@@ -173,6 +173,7 @@
     "disc.editingDiscount": "Editing Discount",
     "orders.downloadExcel": "Download as Excel File",
     "orders.order" : "Kovzy Order #",
+    "orders.Neworder" : "Kovzy Order",
     "orders.status": "Order Status",
     "orders.dateRange": "Date Range",
     "orders.fName": "First Name",

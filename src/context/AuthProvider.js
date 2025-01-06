@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useRef, useEffect, useCallback } from "react";
-import { AppState } from 'react-native';
-import { View, Text, TouchableOpacity, Alert } from 'react-native';
+import { AppState, TouchableOpacity, Alert } from 'react-native';
 import axiosInstance from "../apiConfig/apiRequests";
 import * as SecureStore from 'expo-secure-store';
 import { storeData, getSecureData, removeData, getMultipleData } from "../helpers/storage";
