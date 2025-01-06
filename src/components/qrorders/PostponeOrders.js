@@ -22,7 +22,7 @@ import axiosInstance from "../../apiConfig/apiRequests";
 import OrdersDetail from "./OrdersDetail";
 import OrdersModal from "../modal/OrdersModal";
 import printRows from "../../PrintRows";
-import NotificationManager from '../../utils/NotificationManager';
+import NotificationSound from '../../utils/NotificationSound';
 
 const width = Dimensions.get("window").width;
 
@@ -35,7 +35,7 @@ let temp = 0;
 // render entered orders function
 export const PostponeOrders = () => {
     const { domain, branchid, setUser, user, intervalId, setIntervalId, shouldRenderAuthScreen, setShouldRenderAuthScreen } = useContext(AuthContext);
-    const notificationManagerRef = useRef(null);
+    const NotificationSoundRef = useRef(null);
     const [orders, setOrders] = useState([]);
     const [fees, setFees] = useState([]);
     const [currency, setCurrency] = useState("");
@@ -368,7 +368,7 @@ export const PostponeOrders = () => {
     return (
         <View style={{ flex: 1, width: width }}>
             {loadingOptions ? <Loader /> : null}
-            <NotificationManager ref={notificationManagerRef} />
+            <NotificationSound ref={NotificationSoundRef} />
 
             <FlatList
                 data={[{}]} // Dummy data for the FlatList since we're using ListHeaderComponent for main content

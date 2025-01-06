@@ -14,9 +14,6 @@ import { Text, Button, Divider, Card } from "react-native-paper";
 import { FlatGrid } from "react-native-super-grid";
 import { MaterialCommunityIcons, SimpleLineIcons } from "@expo/vector-icons";
 import * as Updates from 'expo-updates';
-import * as BackgroundFetch from 'expo-background-fetch';
-import * as TaskManager from 'expo-task-manager';
-import * as Notifications from 'expo-notifications';
 
 import { AuthContext, AuthProvider } from "../../context/AuthProvider";
 import Loader from "../generate/loader";
@@ -26,53 +23,48 @@ import axiosInstance from "../../apiConfig/apiRequests";
 import OrdersDetail from "./OrdersDetail";
 import OrdersModal from "../modal/OrdersModal";
 import printRows from "../../PrintRows";
+
+import NotificationSound from '../../utils/NotificationSound';
 import NotificationManager from '../../utils/NotificationManager';
+
 
 const width = Dimensions.get("window").width;
 const numColumns = printRows(width);
 const cardSize = width / numColumns;
 
-let ordersCount;
 let temp = 0;
-
-// Define a background task name
-const TASK_NAME = 'FETCH_NEW_ORDERS';
+const type = 1;
 
 // render entered orders function
 export const EnteredOrdersList = () => {
-  const { domain, branchid, setUser, user, intervalId, setIntervalId, shouldRenderAuthScreen, setShouldRenderAuthScreen } = useContext(AuthContext);
-  const notificationManagerRef = useRef(null);
+  const { domain, branchid, user, intervalId, setIntervalId } = useContext(AuthContext);
+  const NotificationSoundRef = useRef(null);
   const [orders, setOrders] = useState([]);
   const [fees, setFees] = useState([]);
   const [currency, setCurrency] = useState("");
   const [scheduled, setScheduled] = useState([]);
   const [deliveryScheduled, setDeliveryScheduled] = useState(null);
   const [postponeOrder, setPostponeOrder] = useState(false);
-
   const [appState, setAppState] = useState(AppState.currentState);
-
   const [options, setOptions] = useState({
     url_unansweredOrders: "",
     url_deliveronRecheck: "",
     url_acceptOrder: "",
-    url_rejectOrder: ""
-  }); // api options
-  const [optionsIsLoaded, setOptionsIsLoaded] = useState(false); // api options
+    url_rejectOrder: "",
+    url_pushToken: ""
+  });
+  const [optionsIsLoaded, setOptionsIsLoaded] = useState(false);
   const [deliveronOptions, setDeliveronOptions] = useState(null);
   const [isDeliveronOptions, setIsDeliveronOptions] = useState(false);
-
   const [deliveron, setDeliveron] = useState([]);
-  const [visible, setVisible] = useState(false); // modal state
-  const [itemId, setItemId] = useState(null); //item id for modal
+  const [visible, setVisible] = useState(false);
+  const [itemId, setItemId] = useState(null);
   const [itemTakeAway, setItemTakeAway] = useState(null);
-  const [isOpen, setOpenState] = useState([]); // my accordion state
+  const [isOpen, setOpenState] = useState([]);
   const [modalType, setModalType] = useState("");
-
   const [loading, setLoading] = useState(true);
   const [loadingOptions, setLoadingOptions] = useState(false);
-
   const [isPickerVisible, setPickerVisible] = useState(false);
-
   const [width, setWidth] = useState(Dimensions.get('window').width);
   const [numColumns, setNumColumns] = useState(printRows(width));
   const [cardSize, setCardSize] = useState(width / numColumns);
@@ -93,7 +85,6 @@ export const EnteredOrdersList = () => {
 
   const toggleContent = (value) => {
     setOpenState([...isOpen, value]);
-
     let index = isOpen.indexOf(value);
     if (index > -1) setOpenState([...isOpen.filter((i) => i !== value)]);
   };
@@ -109,17 +100,16 @@ export const EnteredOrdersList = () => {
       url_deliveronRecheck: `https://${domain}/api/v1/admin/deliveronRecheck`,
       url_acceptOrder: `https://${domain}/api/v1/admin/acceptOrder`,
       url_rejectOrder: `https://${domain}/api/v1/admin/rejectOrder`,
+      url_pushToken: `https://${domain}/api/v1/admin/storePushToken`,
     });
     setOptionsIsLoaded(true);
   }, [domain]);
 
-  // modal show
   const showModal = (type) => {
     setModalType(type);
     setVisible(true);
   };
 
-  // Update layout on dimension change
   useEffect(() => {
     const updateLayout = () => {
       const newWidth = Dimensions.get('window').width;
@@ -172,7 +162,7 @@ export const EnteredOrdersList = () => {
       }
     }, 5000);
 
-    setIntervalId(newIntervalId); // Update the intervalId state immediately
+    setIntervalId(newIntervalId);
   };
 
   const handleAppStateChange = (nextAppState) => {
@@ -197,154 +187,43 @@ export const EnteredOrdersList = () => {
     if (optionsIsLoaded) {
       const subscribe = AppState.addEventListener('change', handleAppStateChange);
       console.log('Starting interval...');
-
-      // Clear any existing interval
       clearInterval(intervalId);
-      // Start the interval
       startInterval();
-
       console.log('Interval started.');
       return () => {
-        clearInterval(intervalId); // Clear the interval in the cleanup function
+        clearInterval(intervalId);
         subscribe.remove();
       };
     }
   }, [optionsIsLoaded, languageId, appState]);
 
-// handle notifications
+  // ****************************
+  // Notifications
+  // ****************************
   useEffect(() => {
-    Notifications.setNotificationHandler({
-      handleNotification: async () => ({
-        shouldShowAlert: true,
-        shouldPlaySound: false,
-        shouldSetBadge: false,
-      }),
-    });
-    // Define background task
-    const defineTask = async () => {
-      TaskManager.defineTask(TASK_NAME, async () => {
-        console.log('Background task started');
-        try {
-          const resp = await axiosInstance.post(options.url_unansweredOrders, {
-            type: 1,
-            page: 1,
-            branchid: branchid,
-            Languageid: languageId,
-            postponeOrder: false,
-          });
-
-          
-
-          console.log('Response received:', resp.data);
-
-          const newOrders = Object.keys(resp.data.data).length;
-
-          if (newOrders > temp) {
-            console.log('New orders found, triggering notification...');
-            await Notifications.scheduleNotificationAsync({
-              content: {
-                title: "New Order",
-                body: "You have a new order!",
-                android: {
-                  icon: require("../../../assets/adaptive-icon.png"),
-                  color: '#ffffff',
-                },
-              },
-              trigger: null, // Immediate trigger
-            });
-          }
-          temp = newOrders;
-
-          return BackgroundFetch.BackgroundFetchResult.NewData; // Indicate new data available
-        } catch (error) {
-          console.error('Error in background task:', error);
-          return BackgroundFetch.BackgroundFetchResult.Failed; // Indicate failure
-        }
-      });
-    };
-
-    // Function to set up background fetch task
-    const setupBackgroundFetch = async () => {
+    const initializeNotifications = async () => {
       try {
-        console.log('Attempting to register background fetch task...');
-        await BackgroundFetch.registerTaskAsync(TASK_NAME, {
-          minimumInterval: 30, // Check every 30 seconds
-          stopOnTerminate: false, // Keep running even when app is terminated
-          startOnBoot: true, // Start after reboot
-        });
-        console.log('Background fetch task registered successfully.');
-      } catch (error) {
-        console.error('Failed to register background fetch task:', error);
-      }
-    };
-
-    // Function to unregister background fetch task
-    const unregisterBackgroundFetch = async () => {
-      try {
-        console.log('Checking if background fetch task is registered...');
-        const status = await BackgroundFetch.getStatusAsync();
-        console.log('Background fetch status:', status);
-
-        if (status !== BackgroundFetch.Status.Available) {
-          console.log(`Task ${TASK_NAME} is not registered, skipping unregistration.`);
+        if (!optionsIsLoaded) {
+          console.log('Options not loaded yet, skipping initialization.');
           return;
         }
-
-        console.log('Unregistering background fetch task...');
-        await BackgroundFetch.unregisterTaskAsync(TASK_NAME);
-        console.log('Background fetch task unregistered successfully.');
+        await NotificationManager.initialize(options, type, branchid, languageId, NotificationSoundRef);
       } catch (error) {
-        console.error('Failed to unregister background fetch task:', error);
+        console.error('Error initializing NotificationManager:', error);
       }
     };
 
-    // Define task once at component mount
-    defineTask();
-
-    // Register or unregister background fetch task based on appState
-    if (appState && appState.match(/inactive|background/)) {
-      setupBackgroundFetch();
-    } else {
-      unregisterBackgroundFetch();
-    }
-
-    // Cleanup function to ensure task is unregistered on component unmount
-    return () => {
-      unregisterBackgroundFetch();
-    };
-
-  }, [appState]);
+    initializeNotifications();
+  }, [optionsIsLoaded]);
 
 
   useEffect(() => {
-    const requestPermissions = async () => {
-      const { status } = await Notifications.requestPermissionsAsync();
-
-      if (status !== 'granted') {
-        console.log('Permission not granted. Retrying in 10 minutes...');
-        // Retry after 10 minutes (10 * 60 * 1000 ms)
-        setTimeout(() => {
-          requestPermissions(); // Call the function again
-        }, 10 * 60 * 1000);
-      } else {
-        console.log('Notification permissions granted.');
-      }
-    };
-
-    requestPermissions();
-  }, []);
-
-  // set deliveron data
-  useEffect(() => {
-    // Exit early if `itemTakeAway` is null or 1
     if (itemTakeAway === null || itemTakeAway === 1) return;
-    // If `itemId` is null, reset options and exit
     if (!itemId) {
       setIsDeliveronOptions(false);
       return;
     }
 
-    // Update `deliveronOptions` and set flags if necessary
     setDeliveronOptions((prev) => ({
       ...prev,
       data: { orderId: itemId },
@@ -369,20 +248,17 @@ export const EnteredOrdersList = () => {
                   setIsDeliveronOptions(false);
                   setLoadingOptions(false);
                   setDeliveronOptions(null);
-                  // setDeliveron([]);
                 } else {
                   setVisible(false);
                   setLoadingOptions(false);
                   setIsDeliveronOptions(false);
                   setDeliveronOptions(null);
                   setItemId(null);
-                  // setDeliveron([]);
                 }
               },
             },
           ]);
 
-          // Handle status -1 or -2 and module off case
           if (status === -2 && content === "Module is off") {
             alertHandler(dictionary["dv.deliveronModuleOff"], true);
             setDeliveron(data);
@@ -399,25 +275,22 @@ export const EnteredOrdersList = () => {
     }
   }, [isDeliveronOptions, deliveronOptions]);
 
-
   useEffect(() => {
     const checkForNewOrders = async () => {
-      if (orders && appState) {
-        const ordersCount = Object.keys(orders).length; // Get the count of new orders
-        if (ordersCount > temp) {
-          // New orders found, trigger notification
-          if (notificationManagerRef.current) {
-            notificationManagerRef.current.orderReceived();
+      if (orders && appState === "active") {
+        const newOrderCount = Object.keys(orders).length;
+        if (newOrderCount > temp) {
+          if (NotificationSoundRef.current) {
+            NotificationSoundRef.current.orderReceived();
           }
         }
-        temp = ordersCount; // Update temp for the next comparison
+        temp = newOrderCount;
       }
     };
 
-    checkForNewOrders(); // Call the async function
+    checkForNewOrders();
 
   }, [orders, appState]);
-
 
   const parseTimeToMinutes = (time) => {
     const [hours, minutes, seconds] = time.split(':').map(Number);
@@ -452,11 +325,8 @@ export const EnteredOrdersList = () => {
       return false;
     }
 
-    // Check if the provided delay is less than the default delay time
     const delayMinutes = parseTimeToMinutes(delay);
     const defaultDelayMinutes = parseTimeToMinutes(scheduled.delay_time);
-
-    // Use default delay time if provided delay is less than the default delay
     const effectiveDelay = delayMinutes < defaultDelayMinutes ? scheduled.delay_time : delay;
     console.log("Effective Delay:", effectiveDelay);
 
@@ -472,13 +342,11 @@ export const EnteredOrdersList = () => {
     const deliveryScheduledStamp = deliveryScheduledTime.getTime();
     const currentTimeStamp = new Date().getTime();
 
-    // Check if adjusted time is earlier than the current time
     if (adjustedTimeStamp < currentTimeStamp) {
       alert("The adjusted delivery time is in the past. Please select a valid time.");
       return false;
     }
 
-    // Check if the adjusted time is after or equal to the scheduled delivery time
     if (adjustedTimeStamp >= deliveryScheduledStamp) {
       alert("The adjusted delivery time is later than the scheduled time. The order cannot be delayed.");
       return false;
@@ -670,7 +538,7 @@ export const EnteredOrdersList = () => {
   return (
     <View style={{ flex: 1, width: width }}>
       {loadingOptions ? <Loader /> : null}
-      <NotificationManager ref={notificationManagerRef} />
+      <NotificationSound ref={NotificationSoundRef} />
 
       <FlatList
         data={[{}]} // Dummy data for the FlatList since we're using ListHeaderComponent for main content
