@@ -216,6 +216,7 @@
     "orders.discountedPrice": "ფასდაკლებით",
     "orders.couponCode": "კუპონის კოდი",
     "orders.branch": "ფილიალი",
+    "orders.table":"მაგიდა",
     "orders.branchEnabled": "ფილიალი გამორთულია",
     "orders.type": "შეკვეთის ტიპი",
     "orders.qrOrder": "QR შეკვეთა",

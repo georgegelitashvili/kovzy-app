@@ -219,6 +219,7 @@
     "orders.deliveryCost": "Delivery Cost",
     "orders.discountedPrice": "Discounted Price",
     "orders.branch": "Branch",
+    "orders.table":"table",
     "orders.branchEnabled": "Branch is disabled",
     "orders.type": "Order Type",
     "orders.qrOrder": "QR Order",
