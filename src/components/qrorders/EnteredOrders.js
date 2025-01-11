@@ -43,20 +43,14 @@ export const EnteredOrdersList = () => {
   const [fees, setFees] = useState([]);
   const [currency, setCurrency] = useState("");
   const [scheduled, setScheduled] = useState([]);
-  const [deliveryScheduled, setDeliveryScheduled] = useState(null);
-  const [postponeOrder, setPostponeOrder] = useState(false);
   const [appState, setAppState] = useState(AppState.currentState);
   const [options, setOptions] = useState({
     url_unansweredOrders: "",
-    url_deliveronRecheck: "",
     url_acceptOrder: "",
     url_rejectOrder: "",
     url_pushToken: ""
   });
   const [optionsIsLoaded, setOptionsIsLoaded] = useState(false);
-  const [deliveronOptions, setDeliveronOptions] = useState(null);
-  const [isDeliveronOptions, setIsDeliveronOptions] = useState(false);
-  const [deliveron, setDeliveron] = useState([]);
   const [visible, setVisible] = useState(false);
   const [itemId, setItemId] = useState(null);
   const [itemTakeAway, setItemTakeAway] = useState(null);
@@ -96,8 +90,6 @@ export const EnteredOrdersList = () => {
   const apiOptions = useCallback(() => {
     setOptions({
       url_unansweredOrders: `https://${domain}/api/v1/admin/getUnansweredOrders`,
-      url_delayOrders: `https://${domain}/api/v1/admin/postponeOrder`,
-      url_deliveronRecheck: `https://${domain}/api/v1/admin/deliveronRecheck`,
       url_acceptOrder: `https://${domain}/api/v1/admin/acceptOrder`,
       url_rejectOrder: `https://${domain}/api/v1/admin/rejectOrder`,
       url_pushToken: `https://${domain}/api/v1/admin/storePushToken`,
@@ -216,65 +208,6 @@ export const EnteredOrdersList = () => {
     initializeNotifications();
   }, [optionsIsLoaded]);
 
-
-  useEffect(() => {
-    if (itemTakeAway === null || itemTakeAway === 1) return;
-    if (!itemId) {
-      setIsDeliveronOptions(false);
-      return;
-    }
-
-    setDeliveronOptions((prev) => ({
-      ...prev,
-      data: { orderId: itemId },
-    }));
-    setIsDeliveronOptions((prev) => prev || true);
-
-  }, [itemId, itemTakeAway]);
-
-  useEffect(() => {
-    if (isDeliveronOptions && deliveronOptions.data.orderId) {
-      setLoadingOptions(true);
-      axiosInstance
-        .post(options.url_deliveronRecheck, deliveronOptions.data)
-        .then((resp) => resp.data.data)
-        .then((data) => {
-          const { status, content } = data.original ?? {};
-          const alertHandler = (message, shouldClearData = false) => Alert.alert(dictionary["general.alerts"], message, [
-            {
-              text: dictionary["okay"],
-              onPress: () => {
-                if (shouldClearData) {
-                  setIsDeliveronOptions(false);
-                  setLoadingOptions(false);
-                  setDeliveronOptions(null);
-                } else {
-                  setVisible(false);
-                  setLoadingOptions(false);
-                  setIsDeliveronOptions(false);
-                  setDeliveronOptions(null);
-                  setItemId(null);
-                }
-              },
-            },
-          ]);
-
-          if (status === -2 && content === "Module is off") {
-            alertHandler(dictionary["dv.deliveronModuleOff"], true);
-            setDeliveron(data);
-          } else if (status === -1) {
-            alertHandler("Order ID not passed or invalid.");
-          } else if (Array.isArray(content) && content.length === 0) {
-            alertHandler(dictionary["dv.empty"]);
-          } else {
-            setDeliveron(data);
-            setLoadingOptions(false);
-          }
-        })
-        .catch((error) => alertHandler("Error fetching deliveron options."));
-    }
-  }, [isDeliveronOptions, deliveronOptions]);
-
   useEffect(() => {
     const checkForNewOrders = async () => {
       if (orders && appState === "active") {
@@ -292,102 +225,7 @@ export const EnteredOrdersList = () => {
 
   }, [orders, appState]);
 
-  const parseTimeToMinutes = (time) => {
-    const [hours, minutes, seconds] = time.split(':').map(Number);
-    return hours * 60 + minutes + seconds / 60;
-  };
-
-  const formatDateToLocal = (date) => {
-    if (!(date instanceof Date) || isNaN(date)) return "Invalid Date";
-    const pad = (num) => num.toString().padStart(2, '0');
-    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
-  };
-
-  const subtractTime = (baseTime, hours = 0, minutes = 0, seconds = 0) => {
-    const time = new Date(baseTime);
-    if (isNaN(time)) return "Invalid base time";
-    time.setHours(time.getHours() - hours);
-    time.setMinutes(time.getMinutes() - minutes);
-    time.setSeconds(time.getSeconds() - seconds);
-    return time;
-  };
-
-  const handleDelaySet = (delay) => {
-    setLoadingOptions(false);
-    if (!deliveryScheduled) {
-      alert("Delivery scheduled time is not set. Please provide a valid time.");
-      return false;
-    }
-
-    const deliveryScheduledTime = new Date(deliveryScheduled.replace(' ', 'T'));
-    if (isNaN(deliveryScheduledTime)) {
-      alert("Invalid delivery scheduled time format.");
-      return false;
-    }
-
-    const delayMinutes = parseTimeToMinutes(delay);
-    const defaultDelayMinutes = parseTimeToMinutes(scheduled.delay_time);
-    const effectiveDelay = delayMinutes < defaultDelayMinutes ? scheduled.delay_time : delay;
-    console.log("Effective Delay:", effectiveDelay);
-
-    const [delayHours, delayMinutesUsed, delaySeconds] = effectiveDelay.split(':').map(Number);
-    const adjustedTime = subtractTime(deliveryScheduledTime, delayHours, delayMinutesUsed, delaySeconds);
-
-    if (isNaN(adjustedTime)) {
-      console.error("Invalid adjusted time:", adjustedTime);
-      return false;
-    }
-
-    const adjustedTimeStamp = adjustedTime.getTime();
-    const deliveryScheduledStamp = deliveryScheduledTime.getTime();
-    const currentTimeStamp = new Date().getTime();
-
-    if (adjustedTimeStamp < currentTimeStamp) {
-      alert("The adjusted delivery time is in the past. Please select a valid time.");
-      return false;
-    }
-
-    if (adjustedTimeStamp >= deliveryScheduledStamp) {
-      alert("The adjusted delivery time is later than the scheduled time. The order cannot be delayed.");
-      return false;
-    }
-
-    try {
-      setPostponeOrder(true);
-      axiosInstance
-        .post(options.url_delayOrders, {
-          Orderid: itemId,
-          orderDelayTime: formatDateToLocal(adjustedTime)
-        })
-        .then((resp) => {
-          return resp.data.data
-        })
-        .then((data) => {
-          setPostponeOrder(false);
-          if (data.status === 0) {
-            Alert.alert(
-              dictionary["general.alerts"],
-              `Order delay till: ${formatDateToLocal(adjustedTime)}`,
-              [
-                {
-                  text: dictionary["okay"],
-                  onPress: () => setPickerVisible(false),
-                },
-              ]
-            );
-
-          }
-          setLoading(false);
-        });
-    } catch (error) {
-      console.error("Error delaying order:", error);
-      Alert.alert("Error", "There was a problem delaying the order. Please try again.");
-    }
-  };
-
-
   const renderEnteredOrdersList = ({ item }) => {
-    const deliveryPrice = parseFloat(item.delivery_price);
     const additionalFees = parseFloat(item.service_fee) / 100;
     const feeData = JSON.parse(item.fees_details || '{}');
     const feesDetails = fees?.reduce((acc, fee) => {
@@ -397,8 +235,6 @@ export const EnteredOrdersList = () => {
       }
       return acc;
     }, []);
-
-    const isScheduled = item.take_away ? scheduled.scheduled_takeaway : scheduled.scheduled_delivery;
 
     return (
       <Card key={item.id} style={styles.card}>
@@ -434,15 +270,6 @@ export const EnteredOrdersList = () => {
               {dictionary["orders.phone"]}: {item.phone_number}
             </Text>
 
-            <Text variant="titleSmall" style={styles.title} ellipsizeMode="tail">
-              {dictionary["orders.address"]}: {item.address}
-            </Text>
-
-            {item.delivery_scheduled ? (
-              <Text variant="titleSmall" style={styles.title} numberOfLines={2} ellipsizeMode="tail">
-                {dictionary["orders.scheduledDeliveryTime"]}: {item.delivery_scheduled}
-              </Text>
-            ) : null}
 
             {item.comment ? (
               <Text variant="titleSmall" style={styles.title} numberOfLines={2} ellipsizeMode="tail">
@@ -462,7 +289,7 @@ export const EnteredOrdersList = () => {
 
             <Text variant="titleMedium" style={styles.title}> {dictionary["orders.discountedPrice"]}: {item.price} {currency}</Text>
 
-            <Text variant="titleMedium" style={styles.title}> {dictionary["orders.deliveryPrice"]}: {deliveryPrice} {currency}</Text>
+            <Text variant="titleMedium" style={styles.title}> {dictionary["orders.table"]}: {item.table_number}</Text>
 
             {feesDetails?.length > 0 && (
               <View>
@@ -494,19 +321,6 @@ export const EnteredOrdersList = () => {
                 <MaterialCommunityIcons name="check-decagram-outline" size={30} color="white" />
               </TouchableOpacity>
 
-              {item.delivery_scheduled !== null && isScheduled && (
-                <TouchableOpacity
-                  style={styles.buttonDelay}
-                  onPress={() => {
-                    setItemId(item.id);
-                    setDeliveryScheduled(item.delivery_scheduled);
-                    setPickerVisible(true);
-                    setLoadingOptions(false);
-                  }}
-                >
-                  <MaterialCommunityIcons name="bell-ring-outline" size={30} color="white" />
-                </TouchableOpacity>
-              )}
 
               <TouchableOpacity
                 style={styles.buttonReject}
@@ -553,8 +367,6 @@ export const EnteredOrdersList = () => {
                 onChangeState={onChangeModalState}
                 orders={orders}
                 hasItemId={itemId}
-                deliveron={deliveron ?? null}
-                deliveronOptions={deliveronOptions}
                 type={modalType}
                 options={options}
                 takeAway={itemTakeAway}
@@ -562,21 +374,7 @@ export const EnteredOrdersList = () => {
               />
             )}
 
-            <Modal
-              transparent={true}
-              visible={isPickerVisible}
-              animationType="fade"
-              onRequestClose={() => { setPickerVisible(false); setLoadingOptions(false); }}
-            >
-              <View style={styles.modalContainer}>
-                <TimePicker
-                  scheduled={scheduled}
-                  showButton={true}
-                  onDelaySet={handleDelaySet}
-                  onClose={() => { setPickerVisible(false); setLoadingOptions(false); }} // Close when done
-                />
-              </View>
-            </Modal>
+        
 
             <FlatGrid
               adjustGridToStyles={true}

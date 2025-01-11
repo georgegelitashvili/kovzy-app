@@ -41,15 +41,11 @@ export const AcceptedOrdersList = () => {
   const [page, setPage] = useState(0);
   const [options, setOptions] = useState({
     url_getAcceptedOrders: "",
-    url_deliveronStatus: "",
     url_checkOrderStatus: "",
     url_orderPrepared: "",
     url_rejectOrder: "",
   }); // api options
   const [optionsIsLoaded, setOptionsIsLoaded] = useState(false);
-  const [deliveronOptions, setDeliveronOptions] = useState({});
-  const [isDeliveronOptions, setIsDeliveronOptions] = useState(false);
-  const [deliveron, setDeliveron] = useState([]);
   const [visible, setVisible] = useState(false);
   const [itemId, setItemId] = useState(null);
   const [isOpen, setOpenState] = useState([]);
@@ -77,7 +73,6 @@ export const AcceptedOrdersList = () => {
   const apiOptions = useCallback(() => {
     setOptions({
       url_getAcceptedOrders: `https://${domain}/api/v1/admin/getAcceptedOrders`,
-      url_deliveronStatus: `https://${domain}/api/v1/admin/deliveronStatus`,
       url_checkOrderStatus: `https://${domain}/api/v1/admin/checkOrderStatus`,
       url_orderPrepared: `https://${domain}/api/v1/admin/orderPrepared`,
       url_rejectOrder: `https://${domain}/api/v1/admin/rejectOrder`,
@@ -168,19 +163,6 @@ export const AcceptedOrdersList = () => {
     }
   }, [itemId]);
 
-  useEffect(() => {
-    if (deliveron) {
-      setLoadingOptions(false);
-    }
-  }, [deliveron]);
-
-  useEffect(() => {
-    if (isDeliveronOptions) {
-      axiosInstance.post(options.url_deliveronStatus).then((resp) => {
-        setDeliveron(resp.data.data);
-      });
-    }
-  }, [isDeliveronOptions]);
 
   const openURLInBrowser = async (url) => {
     const supported = await Linking.canOpenURL(url);
@@ -196,8 +178,6 @@ export const AcceptedOrdersList = () => {
     const trackLink = [JSON.parse(item.deliveron_data)]?.map(link => {
       return link.trackLink ?? null;
     });
-
-    const deliveryPrice = parseFloat(item.delivery_price);
     const additionalFees = parseFloat(item.service_fee) / 100;
     const feeData = JSON.parse(item.fees_details || '{}');
     const feesDetails = fees?.reduce((acc, fee) => {
@@ -278,7 +258,7 @@ export const AcceptedOrdersList = () => {
 
             <Text variant="titleMedium" style={styles.title}> {dictionary["orders.discountedPrice"]}: {item.price} {currency}</Text>
 
-            <Text variant="titleMedium" style={styles.title}> {dictionary["orders.deliveryPrice"]}: {deliveryPrice} {currency}</Text>
+            <Text variant="titleMedium" style={styles.title}> {dictionary["orders.table"]}: {item.table}</Text>
 
             {feesDetails?.length > 0 && (
               <View>
@@ -347,8 +327,6 @@ export const AcceptedOrdersList = () => {
                 onChangeState={onChangeModalState}
                 orders={orders}
                 hasItemId={itemId}
-                deliveron={deliveron}
-                deliveronOptions={deliveronOptions}
                 type={modalType}
                 options={options}
                 PendingOrders={false}
