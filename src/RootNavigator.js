@@ -1,7 +1,7 @@
 import React, { useContext } from "react";
 import { createDrawerNavigator } from "@react-navigation/drawer";
 import { AuthContext } from "./context/AuthProvider";
-import { OrdersNavigator, ProductsNavigator, AuthNavigator, SettingsNavigator } from "./components/Stack";
+import { OrdersNavigator,QrOrdersNavigator, ProductsNavigator, AuthNavigator, SettingsNavigator } from "./components/Stack";
 import DrawerContent from "./components/DrawerContent";
 import { LanguageContext } from "./components/Language";
 
@@ -28,6 +28,11 @@ const RootNavigator = () => {
             name="Orders"
             component={OrdersNavigator}
             options={{ title: dictionary["nav.onlineOrders"], unmountOnBlur: true }}
+          />
+          <Drawer.Screen
+            name="QrOrders"
+            component={QrOrdersNavigator}
+            options={{ title: dictionary["nav.QROrders"], unmountOnBlur: true }}
           />
           <Drawer.Screen
             name="Products"
