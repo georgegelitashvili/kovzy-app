@@ -21,7 +21,7 @@ import TimePicker from "../generate/TimePicker";
 import { String, LanguageContext } from "../Language";
 import axiosInstance from "../../apiConfig/apiRequests";
 import OrdersDetail from "./OrdersDetail";
-import OrdersModal from "../modal/OrdersModal";
+import OrdersModal from "../modal/OrdersModalQr";
 import printRows from "../../PrintRows";
 
 import NotificationSound from '../../utils/NotificationSound';
@@ -69,11 +69,9 @@ export const EnteredOrdersList = () => {
     console.log("modal close: ", newState);
     setTimeout(() => {
       setVisible(false);
-      setIsDeliveronOptions(false);
       setLoadingOptions(false);
       setLoading(false);
       setItemId(null);
-      setDeliveron([]);
     }, 0);
   };
 
@@ -119,13 +117,13 @@ export const EnteredOrdersList = () => {
     if (!user || !options.url_unansweredOrders) {
       return null;
     }
+
     try {
       const resp = await axiosInstance.post(options.url_unansweredOrders, {
         type: 1,
         page: 1,
         branchid: branchid,
         Languageid: languageId,
-        postponeOrder: false
       });
       const data = resp.data.data;
       const feesData = resp.data.fees;

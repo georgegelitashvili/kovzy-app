@@ -24,7 +24,7 @@ import Loader from "../generate/loader";
 import { LanguageContext } from "../Language";
 import axiosInstance from "../../apiConfig/apiRequests";
 import OrdersDetail from "./OrdersDetail";
-import OrdersModal from "../modal/OrdersModal";
+import OrdersModal from "../modal/OrdersModalQr";
 import printRows from "../../PrintRows";
 
 const width = Dimensions.get("window").width;
@@ -132,12 +132,14 @@ export const AcceptedOrdersList = () => {
 
   const onChangeModalState = useCallback((newState) => {
     setVisible(newState);
-    setIsDeliveronOptions(newState);
+    if (!newState) {  // If the modal is closed
+        setLoading(false);  // Ensure the loading state is reset when modal is closed
+        setLoadingOptions(false);  // Reset the options loading state as well
+    }
     setItemId(null);
-    setDeliveron([]);
     setOrders([]);
     fetchAcceptedOrders();
-  }, [orders]);
+}, [orders]);
 
   useEffect(() => {
     if (domain && branchid) {
@@ -158,7 +160,6 @@ export const AcceptedOrdersList = () => {
 
   useEffect(() => {
     if (itemId) {
-      setIsDeliveronOptions(true);
       setLoadingOptions(true);
     }
   }, [itemId]);
@@ -222,10 +223,6 @@ export const AcceptedOrdersList = () => {
               {dictionary["orders.phone"]}: {item.phone_number}
             </Text>
 
-            <Text variant="titleSmall" style={styles.title} numberOfLines={2} ellipsizeMode="tail">
-              {dictionary["orders.address"]}: {item.address}
-            </Text>
-
             {trackLink[0] ? (
               <TouchableOpacity onPress={() => openURLInBrowser(trackLink[0].toString())}>
                 <Text variant="titleSmall" style={styles.title}>
@@ -258,7 +255,7 @@ export const AcceptedOrdersList = () => {
 
             <Text variant="titleMedium" style={styles.title}> {dictionary["orders.discountedPrice"]}: {item.price} {currency}</Text>
 
-            <Text variant="titleMedium" style={styles.title}> {dictionary["orders.table"]}: {item.table}</Text>
+            <Text variant="titleMedium" style={styles.title}> {dictionary["orders.table"]}: {item.table_number}</Text>
 
             {feesDetails?.length > 0 && (
               <View>
