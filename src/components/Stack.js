@@ -7,6 +7,7 @@ import { DomainScreen } from "../startScreens/DomainScreen";
 import { BranchScreen } from "../startScreens/BranchScreen";
 import { LoginScreen } from "../startScreens/LoginScreen";
 import Orders from "../Orders";
+import QrOrders from "../QrOrders";
 import Products from "../Products";
 import ProductsDetail from "./products/ProductsDetail";
 import SettingsScreen from '../SettingsScreen';
@@ -93,6 +94,20 @@ export const OrdersNavigator = () => {
       })}
     >
       <Stack.Screen name="Order" options={{ headerShown: false, unmountOnBlur: true }} component={Orders} />
+    </Stack.Navigator>
+  );
+};
+export const QrOrdersNavigator = () => {
+  return (
+    <Stack.Navigator
+      screenOptions={({ navigation, route }) => ({
+        headerMode: "screen",
+        headerBackTitleVisible: false,
+        header: (props) => <Header {...props} />,
+        ...route.params?.options, // Pass route params as options
+      })}
+    >
+      <Stack.Screen name="QrOrder" options={{ headerShown: false, unmountOnBlur: true }} component={QrOrders} />
     </Stack.Navigator>
   );
 };
