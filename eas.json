@@ -12,9 +12,6 @@
       "android": {
         "buildType": "apk"
       },
-      "hooks": {
-        "pre-build": "cd android && ./gradlew clean && cd .."
-      },
       "channel": "preview"
     },
     "production": {
