@@ -42,7 +42,11 @@
       },
       "permissions": [
         "NOTIFICATIONS",
-        "BACKGROUND_FETCH"
+        "BACKGROUND_FETCH",
+        "VIBRATE",
+        "MODIFY_AUDIO_SETTINGS",
+        "WAKE_LOCK",
+        "RECEIVE_BOOT_COMPLETED"
       ],
       "jsEngine": "hermes",
       "package": "com.kovzy.app",

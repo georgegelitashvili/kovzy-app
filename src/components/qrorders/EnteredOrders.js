@@ -32,7 +32,6 @@ const width = Dimensions.get("window").width;
 const numColumns = printRows(width);
 const cardSize = width / numColumns;
 
-let temp = 0;
 const type = 1;
 
 // render entered orders function
@@ -62,6 +61,11 @@ export const EnteredOrdersList = () => {
   const [width, setWidth] = useState(Dimensions.get('window').width);
   const [numColumns, setNumColumns] = useState(printRows(width));
   const [cardSize, setCardSize] = useState(width / numColumns);
+  const [previousOrderCount, setPreviousOrderCount] = useState(0);
+
+  const [retryCount, setRetryCount] = useState(0);
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY = 5000;
 
   const { dictionary, languageId } = useContext(LanguageContext);
 
@@ -132,17 +136,34 @@ export const EnteredOrdersList = () => {
       setCurrency(resp.data.currency);
       setScheduled(resp.data.scheduled);
     } catch (error) {
-      console.log('Error fetching entered orders full:', error);
+      console.log('Error fetching qr entered orders full:', error);
       const statusCode = error?.status || 'Unknown';
-      console.log('Status code entered orders:', statusCode);
-      clearInterval(intervalId);
-      handleReload();
+      console.log('Status code qr entered orders:', statusCode);
+      if (retryCount < MAX_RETRIES) {
+        setRetryCount(prev => prev + 1);
+        console.log(`Retry attempt ${retryCount + 1} of ${MAX_RETRIES}`);
+
+        // Clear current interval
+        clearInterval(intervalId);
+
+        // Attempt retry after delay
+        setTimeout(() => {
+          startInterval();
+        }, RETRY_DELAY);
+      } else {
+        console.log('Max retries reached, stopping interval');
+        clearInterval(intervalId);
+        handleReload();
+      }
     } finally {
       setLoading(false);
     }
   };
 
   const startInterval = () => {
+    if (intervalId) {
+      clearInterval(intervalId);
+    }
     console.log('call interval');
     const newIntervalId = setInterval(() => {
       if (optionsIsLoaded) {
@@ -208,15 +229,15 @@ export const EnteredOrdersList = () => {
 
   useEffect(() => {
     const checkForNewOrders = async () => {
-      if (orders && appState === "active") {
-        const newOrderCount = Object.keys(orders).length;
-        if (newOrderCount > temp) {
-          if (NotificationSoundRef.current) {
-            NotificationSoundRef.current.orderReceived();
-          }
+      if (!orders || appState !== "active") return;
+
+      const newOrderCount = Object.keys(orders).length;
+      if (newOrderCount > previousOrderCount) {
+        if (NotificationSoundRef.current) {
+          NotificationSoundRef.current.orderReceived();
         }
-        temp = newOrderCount;
       }
+      setPreviousOrderCount(newOrderCount);
     };
 
     checkForNewOrders();
