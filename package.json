@@ -33,7 +33,7 @@
     "expo": "~52.0.26",
     "expo-application": "~6.0.2",
     "expo-av": "~15.0.2",
-    "expo-background-fetch": "~13.0.5",
+    "expo-background-fetch": "^13.0.5",
     "expo-battery": "~9.0.2",
     "expo-constants": "~17.0.5",
     "expo-intent-launcher": "~12.0.2",

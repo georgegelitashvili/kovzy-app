@@ -3563,7 +3563,7 @@ expo-av@~15.0.2:
   resolved "https://registry.yarnpkg.com/expo-av/-/expo-av-15.0.2.tgz#65bb08658a7fe3a67aa47da614abbfae9adb684e"
   integrity sha512-AHIHXdqLgK1dfHZF0JzX3YSVySGMrWn9QtPzaVjw54FAzvXfMt4sIoq4qRL/9XWCP9+ICcCs/u3EcvmxQjrfcA==
 
-expo-background-fetch@~13.0.5:
+expo-background-fetch@^13.0.5:
   version "13.0.5"
   resolved "https://registry.yarnpkg.com/expo-background-fetch/-/expo-background-fetch-13.0.5.tgz#d781a5251ca37971da5fa8c960e34527cacbc4dd"
   integrity sha512-rLRM+rYDRT0fA0Oaet5ibJK3nKVRkfdjXjISHxjUvIE4ktD9pE+UjAPPdjTXZ5CkNb3JyNNhQGJEGpdJC2HLKw==
