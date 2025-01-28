@@ -44,9 +44,7 @@
         "NOTIFICATIONS",
         "BACKGROUND_FETCH",
         "VIBRATE",
-        "MODIFY_AUDIO_SETTINGS",
-        "WAKE_LOCK",
-        "RECEIVE_BOOT_COMPLETED"
+        "MODIFY_AUDIO_SETTINGS"
       ],
       "jsEngine": "hermes",
       "package": "com.kovzy.app",
