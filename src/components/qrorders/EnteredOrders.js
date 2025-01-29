@@ -37,6 +37,7 @@ const type = 1;
 // render entered orders function
 export const EnteredOrdersList = () => {
   const { domain, branchid, user, intervalId, setIntervalId } = useContext(AuthContext);
+  const [isNotificationReady, setIsNotificationReady] = useState(false);
   const NotificationSoundRef = useRef(null);
   const [orders, setOrders] = useState([]);
   const [fees, setFees] = useState([]);
@@ -103,6 +104,12 @@ export const EnteredOrdersList = () => {
     setModalType(type);
     setVisible(true);
   };
+
+  useEffect(() => {
+    if (NotificationSoundRef.current) {
+      setIsNotificationReady(true);
+    }
+  });
 
   useEffect(() => {
     const updateLayout = () => {
@@ -202,6 +209,7 @@ export const EnteredOrdersList = () => {
       startInterval();
       console.log('Interval started.');
       return () => {
+        setPreviousOrderCount(0);
         clearInterval(intervalId);
         subscribe.remove();
       };
@@ -228,21 +236,15 @@ export const EnteredOrdersList = () => {
   }, [optionsIsLoaded]);
 
   useEffect(() => {
-    const checkForNewOrders = async () => {
-      if (!orders || appState !== "active") return;
+    if (!orders || appState !== "active" || !isNotificationReady) return;
 
-      const newOrderCount = Object.keys(orders).length;
-      if (newOrderCount > previousOrderCount) {
-        if (NotificationSoundRef.current) {
-          NotificationSoundRef.current.orderReceived();
-        }
-      }
-      setPreviousOrderCount(newOrderCount);
-    };
+    newOrderCount = Object.keys(orders).length;
+    if (newOrderCount > previousOrderCount) {
+      NotificationSoundRef.current.orderReceived();
+    }
+    setPreviousOrderCount(newOrderCount);
 
-    checkForNewOrders();
-
-  }, [orders, appState]);
+  }, [orders, appState, isNotificationReady]);
 
   const renderEnteredOrdersList = ({ item }) => {
     const additionalFees = parseFloat(item.service_fee) / 100;

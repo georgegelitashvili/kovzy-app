@@ -66,8 +66,6 @@ const NotificationSound = forwardRef((props, ref) => {
         // Set audio mode to play in the background
         await Audio.setAudioModeAsync({
             staysActiveInBackground: true, // Allow the sound to play when app is in background
-            playThroughEarpieceAndroid: false,
-            shouldDuckAndroid: true,
         });
 
         // Create and play new sound
@@ -108,13 +106,12 @@ const NotificationSound = forwardRef((props, ref) => {
                     },
                 },
             ],
-            { cancelable: false } // Prevent dismissing the alert without pressing OK
+            { cancelable: false }
         );
     };
 
     useImperativeHandle(ref, () => ({
         orderReceived,
-        onStopPlaySound
     }));
 
     return <View />;

@@ -44,7 +44,10 @@
         "NOTIFICATIONS",
         "BACKGROUND_FETCH",
         "VIBRATE",
-        "MODIFY_AUDIO_SETTINGS"
+        "WAKE_LOCK",
+        "FOREGROUND_SERVICE",
+        "MODIFY_AUDIO_SETTINGS",
+        "ACCESS_NOTIFICATION_POLICY"
       ],
       "jsEngine": "hermes",
       "package": "com.kovzy.app",
@@ -63,6 +66,12 @@
     },
     "plugins": [
       "expo-secure-store",
+      [
+        "expo-av",
+        {
+          "microphonePermission": false
+        }
+      ],
       [
         "expo-notifications",
         {

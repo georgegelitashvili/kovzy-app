@@ -32,11 +32,13 @@ const width = Dimensions.get("window").width;
 const numColumns = printRows(width);
 const cardSize = width / numColumns;
 
+let newOrderCount;
 const type = 0;
 
 // render entered orders function
 export const EnteredOrdersList = () => {
   const { domain, branchid, user, intervalId, setIntervalId } = useContext(AuthContext);
+  const [isNotificationReady, setIsNotificationReady] = useState(false);
   const NotificationSoundRef = useRef(null);
   const [orders, setOrders] = useState([]);
   const [fees, setFees] = useState([]);
@@ -113,6 +115,12 @@ export const EnteredOrdersList = () => {
     setModalType(type);
     setVisible(true);
   };
+
+  useEffect(() => {
+    if (NotificationSoundRef.current) {
+      setIsNotificationReady(true);
+    }
+  });
 
   useEffect(() => {
     const updateLayout = () => {
@@ -214,6 +222,7 @@ export const EnteredOrdersList = () => {
       console.log('Interval started.');
       return () => {
         clearInterval(intervalId);
+        setPreviousOrderCount(0);
         subscribe.remove();
       };
     }
@@ -298,22 +307,15 @@ export const EnteredOrdersList = () => {
   }, [isDeliveronOptions, deliveronOptions]);
 
   useEffect(() => {
-    const checkForNewOrders = async () => {
-      if (!orders || appState !== "active") return;
+    if (!orders || appState !== "active" || !isNotificationReady) return;
 
-      const newOrderCount = Object.keys(orders).length;
-      if (newOrderCount > previousOrderCount) {
-        if (NotificationSoundRef.current) {
-          console.log("****Playing sound for new order.****");
-          NotificationSoundRef.current.orderReceived();
-        }
-      }
-      setPreviousOrderCount(newOrderCount);
-    };
+    newOrderCount = Object.keys(orders).length;
+    if (newOrderCount > previousOrderCount) {
+      NotificationSoundRef.current.orderReceived();
+    }
+    setPreviousOrderCount(newOrderCount);
 
-    checkForNewOrders();
-
-  }, [orders, appState]);
+  }, [orders, appState, isNotificationReady]);
 
   const parseTimeToMinutes = (time) => {
     const [hours, minutes, seconds] = time.split(':').map(Number);
