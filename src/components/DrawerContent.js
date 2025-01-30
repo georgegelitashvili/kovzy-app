@@ -13,6 +13,8 @@ export default function DrawerContent(props) {
   const { key, ...otherProps } = props;
   const { domain, branchid, branchName, branchEnabled, setBranchEnabled, setDeliveronEnabled, deliveronEnabled, logout, intervalId, setIsLoading } = useContext(AuthContext);
   const { dictionary, userLanguage } = useContext(LanguageContext);
+  const [qrOrdersBadge, setQrOrdersBadge] = useState(0);
+  const [onlineOrdersBadge, setOnlineOrdersBadge] = useState(0);
 
   const [options, setOptions] = useState({
     url_branchActivity: "",
@@ -36,6 +38,31 @@ export default function DrawerContent(props) {
     });
     setOptionsIsLoaded(true);
   };
+  const fetchUnansweredOrders = async () => {
+    try {
+      const [responseQr, responseOnline] = await Promise.all([
+        axiosInstance.post(`https://${domain}/api/v1/admin/getUnansweredOrders`, { type: 1, branchid }),
+        axiosInstance.post(`https://${domain}/api/v1/admin/getUnansweredOrders`, { type: 0, branchid,postponeOrder: false })
+      ]);
+
+      const ordersQr = responseQr.data.data; 
+      const ordersOnline = responseOnline.data.data;
+
+      setQrOrdersBadge(ordersQr.length);
+      setOnlineOrdersBadge(ordersOnline.length);
+
+    } catch (error) {
+      console.error("Error fetching unanswered orders:", error);
+    }
+  };
+
+
+  useEffect(() => {
+    fetchUnansweredOrders();
+    const intervalId = setInterval(fetchUnansweredOrders, 10000);
+  
+    return () => clearInterval(intervalId);
+  }, [branchid, domain]);
 
   const onLogoutPressed = () => {
     setIsLoading(true);
@@ -124,29 +151,35 @@ export default function DrawerContent(props) {
           />
           <DrawerItem
             icon={({ color, size }) => (
-              <MaterialCommunityIcons
-                name="format-list-bulleted"
-                color={color}
-                size={size}
-              />
+              <MaterialCommunityIcons name="format-list-bulleted" color={color} size={size} />
             )}
-            label={dictionary["nav.onlineOrders"]}
-            onPress={() => {
-              props.navigation.navigate("Orders");
-            }}
+            label={() => (
+              <View style={styles.labelContainer}>
+                <Text style={styles.labelText}>{dictionary["nav.onlineOrders"]}</Text>
+                {onlineOrdersBadge > 0 && (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>{onlineOrdersBadge}</Text>
+                  </View>
+                )}
+              </View>
+            )}
+            onPress={() => props.navigation.navigate("Orders")}
           />
           <DrawerItem
             icon={({ color, size }) => (
-              <MaterialCommunityIcons
-                name="qrcode-scan"
-                color={color}
-                size={size}
-              />
+              <MaterialCommunityIcons name="qrcode-scan" color={color} size={size} />
             )}
-            label={dictionary["nav.QROrders"]}
-            onPress={() => {
-              props.navigation.navigate("QrOrders");
-            }}
+            label={() => (
+              <View style={styles.labelContainer}>
+                <Text style={styles.labelText}>{dictionary["nav.QROrders"]}</Text>
+                {qrOrdersBadge > 0 && (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>{qrOrdersBadge}</Text>
+                  </View>
+                )}
+              </View>
+            )}
+            onPress={() => props.navigation.navigate("QrOrders")}
           />
           <DrawerItem
             icon={({ color, size }) => (
@@ -173,6 +206,29 @@ export default function DrawerContent(props) {
 }
 
 const styles = StyleSheet.create({
+  labelContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    width: "100%",
+  },
+  labelText: {
+    fontSize: 16,
+  },
+  badge: {
+    backgroundColor: "red",
+    borderRadius: 12,
+    minWidth: 24,
+    height: 24,
+    justifyContent: "center",
+    alignItems: "center",
+    marginLeft: 8,
+  },
+  badgeText: {
+    color: "white",
+    fontSize: 14,
+    fontWeight: "bold",
+  },
   drawerContent: {
     flex: 1,
   },
