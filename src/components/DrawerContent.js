@@ -1,5 +1,5 @@
 import React, { useState, useContext, useEffect } from "react";
-import { View, StyleSheet } from "react-native";
+import { View, StyleSheet, ActivityIndicator } from "react-native";
 import { DrawerItem, DrawerContentScrollView } from "@react-navigation/drawer";
 import { Drawer, Text, TouchableRipple, Switch } from "react-native-paper";
 import { MaterialCommunityIcons, Fontisto, SimpleLineIcons } from "@expo/vector-icons";
@@ -28,6 +28,7 @@ export default function DrawerContent(props) {
 
   const [isBranchEnabled, setIsBranchEnabled] = useState(false);
   const [isDeliveronEnabled, setIsDeliveronEnabled] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const apiOptions = () => {
     setOptions({
@@ -72,9 +73,21 @@ export default function DrawerContent(props) {
   };
 
   const toggleBranch = async () => {
-    await axiosInstance
-      .post(options.url_branchActivity, branchChangeOptions.data)
-      .then((resp) => setBranchEnabled(resp.data.data));
+    if (loading) return;
+    setLoading(true);
+    try {
+      const resp = await axiosInstance.post(
+        options.url_branchActivity,
+        branchChangeOptions.data
+      );
+      setBranchEnabled(resp.data.data);
+    } catch (error) {
+      console.error('Branch toggle failed:', error);
+    } finally {
+      setTimeout(() => {
+        setLoading(false);
+      }, 1500);
+    }
   };
 
   useEffect(() => {
@@ -128,8 +141,19 @@ export default function DrawerContent(props) {
           <TouchableRipple style={styles.ripple} onPress={toggleBranch}>
             <View style={styles.preference}>
               <Text style={{ color: '#090909', fontWeight: "bold" }}>{dictionary["orders.branch"]}</Text>
-              <View pointerEvents="none">
-                <Switch value={branchEnabled} />
+              <View pointerEvents="none" style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Switch
+                  value={branchEnabled}
+                  onValueChange={toggleBranch}
+                  disabled={loading}
+                />
+                {loading && (
+                  <ActivityIndicator
+                    size="small"
+                    color="#0000ff"
+                    style={{ marginLeft: 10 }}
+                  />
+                )}
               </View>
             </View>
           </TouchableRipple>
