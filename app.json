@@ -45,9 +45,12 @@
         "BACKGROUND_FETCH",
         "VIBRATE",
         "WAKE_LOCK",
+        "REQUEST_IGNORE_BATTERY_OPTIMIZATIONS",
+        "RECEIVE_BOOT_COMPLETED",
         "FOREGROUND_SERVICE",
         "MODIFY_AUDIO_SETTINGS",
-        "ACCESS_NOTIFICATION_POLICY"
+        "ACCESS_NOTIFICATION_POLICY",
+        "SCHEDULE_EXACT_ALARM"
       ],
       "jsEngine": "hermes",
       "package": "com.kovzy.app",
