@@ -8,6 +8,13 @@ import { Alert, Platform } from 'react-native';
 import axiosInstance from '../apiConfig/apiRequests'; // Adjust this import based on your project structure
 
 const BACKGROUND_NOTIFICATION_TASK = 'background-notification-task';
+Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: false,
+        shouldSetBadge: false,
+    }),
+});
 
 const NotificationManager = {
     async initialize(options, type, branchid, languageId, NotificationSoundRef) {
@@ -95,14 +102,7 @@ const NotificationManager = {
 
     async registerBackgroundTask({ fetchUrl, type, branchid, languageId, NotificationSoundRef }) {
         TaskManager.defineTask(BACKGROUND_NOTIFICATION_TASK, async () => {
-            const startTime = Date.now();
-            const appState = AppState.currentState; // Check app state
-
-            if (appState === 'active') {
-                console.log('App is in the foreground. Skipping background fetch.');
-                return BackgroundFetch.BackgroundFetchResult.NoData;
-            }
-            console.log(`Background fetch started at: ${new Date(startTime).toISOString()}`);
+            console.log(`Background fetch started`);
 
             try {
                 const response = await axiosInstance.post(fetchUrl, {
@@ -113,11 +113,8 @@ const NotificationManager = {
                     postponeOrder: false,
                 });
 
-                const endTime = Date.now();
-                const executionTime = endTime - startTime;
-
                 const orderCount = Object.keys(response.data.data).length;
-                console.log(`Background fetch completed in ${executionTime}ms`);
+                console.log(`Background fetch completed`);
 
                 if (orderCount > 0) {
                     await NotificationSoundRef?.current?.orderReceived();
@@ -135,7 +132,7 @@ const NotificationManager = {
 
         try {
             await BackgroundFetch.registerTaskAsync(BACKGROUND_NOTIFICATION_TASK, {
-                minimumInterval: 30, // interval in seconds
+                minimumInterval: 5,
                 stopOnTerminate: false,
                 startOnBoot: true,
             });
