@@ -11,7 +11,7 @@ import { String, LanguageContext } from "./Language";
 export default function DrawerContent(props) {
 
   const { key, ...otherProps } = props;
-  const { domain, branchid, branchName, branchEnabled, setBranchEnabled, setDeliveronEnabled, deliveronEnabled, logout, intervalId, setIsLoading } = useContext(AuthContext);
+  const { domain, branchid, branchName, branchEnabled, setBranchEnabled, setDeliveronEnabled, deliveronEnabled, logout, intervalId, setIntervalId, setIsLoading } = useContext(AuthContext);
   const { dictionary, userLanguage } = useContext(LanguageContext);
   const [qrOrdersBadge, setQrOrdersBadge] = useState(0);
   const [onlineOrdersBadge, setOnlineOrdersBadge] = useState(0);
@@ -39,30 +39,51 @@ export default function DrawerContent(props) {
     });
     setOptionsIsLoaded(true);
   };
+
   const fetchUnansweredOrders = async () => {
     try {
       const [responseQr, responseOnline] = await Promise.all([
-        axiosInstance.post(`https://${domain}/api/v1/admin/getUnansweredOrders`, { type: 1, branchid }),
-        axiosInstance.post(`https://${domain}/api/v1/admin/getUnansweredOrders`, { type: 0, branchid,postponeOrder: false })
+        axiosInstance.post(`https://${domain}/api/v1/admin/getUnansweredOrders`,
+          { type: 1, branchid },
+          { timeout: 5000 } // Add timeout
+        ),
+        axiosInstance.post(`https://${domain}/api/v1/admin/getUnansweredOrders`,
+          { type: 0, branchid, postponeOrder: false },
+          { timeout: 5000 }
+        )
       ]);
 
-      const ordersQr = responseQr.data.data; 
-      const ordersOnline = responseOnline.data.data;
-
-      setQrOrdersBadge(ordersQr.length);
-      setOnlineOrdersBadge(ordersOnline.length);
+      if (responseQr.data && responseOnline.data) {
+        setQrOrdersBadge(responseQr.data.data.length);
+        setOnlineOrdersBadge(responseOnline.data.data.length);
+      }
 
     } catch (error) {
-      console.error("Error fetching unanswered orders:", error);
+      console.error("Error fetching orders:", error);
+      // Clear interval on repeated failures
+      if (error.message?.includes('timeout')) {
+        clearInterval(intervalId);
+        setIntervalId(null);
+      }
     }
   };
 
 
   useEffect(() => {
+    clearInterval(intervalId);
     fetchUnansweredOrders();
-    const intervalId = setInterval(fetchUnansweredOrders, 10000);
-  
-    return () => clearInterval(intervalId);
+    const newIntervalId = setInterval(() => {
+      fetchUnansweredOrders();
+    }, 10000);
+
+    setIntervalId(newIntervalId);
+
+    // Cleanup on unmount
+    return () => {
+      if (newIntervalId) {
+        clearInterval(newIntervalId);
+      }
+    };
   }, [branchid, domain]);
 
   const onLogoutPressed = () => {
