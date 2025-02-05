@@ -1,24 +1,27 @@
-import { AppState } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Alert, AppState, Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import * as TaskManager from 'expo-task-manager';
 import * as BackgroundFetch from 'expo-background-fetch';
 import Constants from 'expo-constants';
 import * as Application from 'expo-application';
-import { Alert, Platform } from 'react-native';
 import axiosInstance from '../apiConfig/apiRequests'; // Adjust this import based on your project structure
 
 const BACKGROUND_NOTIFICATION_TASK = 'background-notification-task';
 Notifications.setNotificationHandler({
     handleNotification: async () => ({
         shouldShowAlert: true,
-        shouldPlaySound: false,
-        shouldSetBadge: false,
+        shouldPlaySound: true,
+        shouldSetBadge: true,
+        priority: Notifications.AndroidNotificationPriority.HIGH
     }),
 });
 
 const NotificationManager = {
-    async initialize(options, type, branchid, languageId, NotificationSoundRef) {
+    soundRef: null,
+    async initialize(options, type, branchid, languageId, soundRef) {
         try {
+            this.soundRef = soundRef;
             // Register notifications
             const token = await this.registerForPushNotificationsAsync();
             if (token) {
@@ -32,7 +35,7 @@ const NotificationManager = {
                 type,
                 branchid,
                 languageId,
-                NotificationSoundRef,
+                notificationSoundRef: this.soundRef
             });
         } catch (error) {
             console.error('Error initializing NotificationManager:', error);
@@ -100,7 +103,7 @@ const NotificationManager = {
         }
     },
 
-    async registerBackgroundTask({ fetchUrl, type, branchid, languageId, NotificationSoundRef }) {
+    async registerBackgroundTask({ fetchUrl, type, branchid, languageId }) {
         TaskManager.defineTask(BACKGROUND_NOTIFICATION_TASK, async () => {
             console.log(`Background fetch started`);
 
@@ -115,10 +118,13 @@ const NotificationManager = {
 
                 const orderCount = Object.keys(response.data.data).length;
                 console.log(`Background fetch completed`);
-
                 if (orderCount > 0) {
-                    await NotificationSoundRef?.current?.orderReceived();
                     console.log(`Found ${orderCount} new orders`);
+                    if (this.soundRef?.current) {
+                        await this.soundRef.current.orderReceived();
+                    } else {
+                        console.warn('soundRef is not set');
+                    }
                     return BackgroundFetch.BackgroundFetchResult.NewData;
                 }
 
@@ -130,18 +136,13 @@ const NotificationManager = {
             }
         });
 
-        try {
-            await BackgroundFetch.registerTaskAsync(BACKGROUND_NOTIFICATION_TASK, {
-                minimumInterval: 5,
-                stopOnTerminate: false,
-                startOnBoot: true,
-            });
+        await BackgroundFetch.registerTaskAsync(BACKGROUND_NOTIFICATION_TASK, {
+            minimumInterval: 0,
+            stopOnTerminate: false,
+            startOnBoot: true,
+        });
 
-            console.log('Background task registered successfully.');
-        } catch (error) {
-            console.error('Failed to register background task:', error);
-            throw error;
-        }
+        console.log('Background task registered successfully.');
     },
 
     async unregisterBackgroundTask() {

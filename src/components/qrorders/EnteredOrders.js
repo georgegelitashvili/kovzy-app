@@ -38,7 +38,7 @@ const type = 1;
 export const EnteredOrdersList = () => {
   const { domain, branchid, user, intervalId, setIntervalId } = useContext(AuthContext);
   const [isNotificationReady, setIsNotificationReady] = useState(false);
-  const NotificationSoundRef = useRef(null);
+  const NotificationSoundRef = useRef(NotificationSound);
   const [orders, setOrders] = useState([]);
   const [fees, setFees] = useState([]);
   const [currency, setCurrency] = useState("");
@@ -106,10 +106,17 @@ export const EnteredOrdersList = () => {
   };
 
   useEffect(() => {
-    if (NotificationSoundRef.current) {
-      setIsNotificationReady(true);
+    if (!NotificationSoundRef?.current) {
+      console.warn('NotificationSoundRef not ready');
+      return;
     }
-  });
+
+    setIsNotificationReady(true);
+
+    return () => {
+      setIsNotificationReady(false);
+    };
+  }, [NotificationSoundRef]);
 
   useEffect(() => {
     const updateLayout = () => {
@@ -268,7 +275,7 @@ export const EnteredOrdersList = () => {
               />
               {item.id}
             </Text>
-            <Text style={styles.takeAway}>{item.take_away === 1 ? "("+dictionary["orders.takeAway"] + ")" : ""}</Text>
+            <Text style={styles.takeAway}>{item.take_away === 1 ? "(" + dictionary["orders.takeAway"] + ")" : ""}</Text>
             <Text variant="headlineMedium" style={styles.header}>
               <SimpleLineIcons
                 name={!isOpen.includes(item.id) ? "arrow-up" : "arrow-down"}
@@ -303,7 +310,7 @@ export const EnteredOrdersList = () => {
             </Text>
 
             <Divider />
-              <OrdersDetail orderId={item.id} />
+            <OrdersDetail orderId={item.id} />
             <Divider />
 
             <Text variant="titleMedium" style={styles.title}> {dictionary["orders.initialPrice"]}: {item.real_price} {currency}</Text>
@@ -361,56 +368,54 @@ export const EnteredOrdersList = () => {
     )
   };
 
-
-  if (loading) {
-    return <Loader show={loading} />;
-  }
-
-  if (!orders || orders.length === 0) {
-    return null;
-  }
-
   return (
     <View style={{ flex: 1, width: width }}>
       {loadingOptions ? <Loader /> : null}
+
+      {/* Always render NotificationSound */}
       <NotificationSound ref={NotificationSoundRef} />
 
-      <FlatList
-        data={[{}]} // Dummy data for the FlatList since we're using ListHeaderComponent for main content
-        renderItem={null} // No items in the FlatList itself
-        keyExtractor={() => 'dummy'} // Static key for the dummy item
-        showsVerticalScrollIndicator={false}
-        ListHeaderComponent={
-          <View style={{ flexDirection: 'row', flexWrap: 'nowrap', flex: 1 }}>
-            {visible && (
-              <OrdersModal
-                isVisible={visible}
-                onChangeState={onChangeModalState}
-                orders={orders}
-                hasItemId={itemId}
-                type={modalType}
-                options={options}
-                takeAway={itemTakeAway}
-                PendingOrders={true}
+      {loading && <Loader show={loading} />}
+
+      {/* Display a fallback message when there are no orders */}
+      {(!orders || orders.length === 0) ? (
+        null
+      ) : (
+        <FlatList
+          data={[{}]} // Dummy data for the FlatList since we're using ListHeaderComponent for main content
+          renderItem={null} // No items in the FlatList itself
+          keyExtractor={() => 'dummy'} // Static key for the dummy item
+          showsVerticalScrollIndicator={false}
+          ListHeaderComponent={
+            <View style={{ flexDirection: 'row', flexWrap: 'nowrap', flex: 1 }}>
+              {visible && (
+                <OrdersModal
+                  isVisible={visible}
+                  onChangeState={onChangeModalState}
+                  orders={orders}
+                  hasItemId={itemId}
+                  type={modalType}
+                  options={options}
+                  takeAway={itemTakeAway}
+                  PendingOrders={true}
+                />
+              )}
+
+              <FlatGrid
+                adjustGridToStyles={true}
+                itemDimension={cardSize}
+                spacing={10}
+                data={orders}
+                renderItem={renderEnteredOrdersList}
+                keyExtractor={(item) => (item && item.id ? item.id.toString() : '')}
+                itemContainerStyle={{ justifyContent: 'space-between' }}
+                style={{ flex: 1 }}
+                onEndReachedThreshold={0.5}
               />
-            )}
-
-        
-
-            <FlatGrid
-              adjustGridToStyles={true}
-              itemDimension={cardSize}
-              spacing={10}
-              data={orders}
-              renderItem={renderEnteredOrdersList}
-              keyExtractor={(item) => (item && item.id ? item.id.toString() : '')}
-              itemContainerStyle={{ justifyContent: 'space-between' }}
-              style={{ flex: 1 }}
-              onEndReachedThreshold={0.5}
-            />
-          </View>
-        }
-      />
+            </View>
+          }
+        />
+      )}
     </View>
   );
 };
