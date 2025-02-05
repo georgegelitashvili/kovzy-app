@@ -137,12 +137,10 @@ const NotificationManager = {
         });
 
         await BackgroundFetch.registerTaskAsync(BACKGROUND_NOTIFICATION_TASK, {
-            minimumInterval: 0,
+            minimumInterval: 3,
             stopOnTerminate: false,
             startOnBoot: true,
         });
-
-        console.log('Background task registered successfully.');
     },
 
     async unregisterBackgroundTask() {
