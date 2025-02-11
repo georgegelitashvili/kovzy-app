@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useContext } from "react";
+import {
+  Alert
+} from "react-native";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createMaterialTopTabNavigator } from "@react-navigation/material-top-tabs";
 import * as Battery from 'expo-battery';
