@@ -9,6 +9,7 @@ import { LoginScreen } from "../startScreens/LoginScreen";
 import Orders from "../Orders";
 import QrOrders from "../QrOrders";
 import Products from "../Products";
+import Reports from "../Reports";
 import ProductsDetail from "./products/ProductsDetail";
 import SettingsScreen from '../SettingsScreen';
 import NotificationScreen from './settings/NotificationScreen';
@@ -111,6 +112,21 @@ export const QrOrdersNavigator = () => {
     </Stack.Navigator>
   );
 };
+
+export const ReportsNavigator = () => {
+  return (
+    <Stack.Navigator
+      screenOptions={({ navigation, route }) => ({
+        headerMode: "screen",
+        headerBackTitleVisible: false,
+        header: (props) => <Header {...props} />,
+        ...route.params?.options, // Pass route params as options
+      })}
+    >
+      <Stack.Screen name="Reports" options={{ headerShown: false, unmountOnBlur: true }} component={Reports} />
+    </Stack.Navigator>
+  );
+}
 
 export const ProductsNavigator = () => {
   const { dictionary } = useContext(LanguageContext);

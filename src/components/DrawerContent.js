@@ -228,6 +228,16 @@ export default function DrawerContent(props) {
           />
           <DrawerItem
             icon={({ color, size }) => (
+              <MaterialCommunityIcons name="chart-line" color={color} size={size} />
+            )}
+            label={dictionary["nav.Reports"]}
+            onPress={() => {
+              props.navigation.navigate("Reports");
+            }}
+          />
+
+          <DrawerItem
+            icon={({ color, size }) => (
               <SimpleLineIcons name="settings"
                 color={color}
                 size={size} />
