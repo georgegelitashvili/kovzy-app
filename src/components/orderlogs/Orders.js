@@ -30,7 +30,8 @@ export const OrdersList = () => {
   const [filters, setFilters] = useState({
     orderType: "all",
     orderStatus: "all",
-    dateRange: "",
+    dateRangeEnd: "",
+    dateRangeStart: "",
     firstName: "",
     lastName: "",
   });
@@ -100,8 +101,8 @@ export const OrdersList = () => {
       if (appliedFilters.lastName) {
         requestFilters.lastname = { like: appliedFilters.lastName };
       }
-      if (appliedFilters.dateRange) {
-        requestFilters.dateRange = appliedFilters.dateRange;
+      if (appliedFilters.startDate && appliedFilters.endDate) {
+        requestFilters.created_at = { min: appliedFilters.startDate, max: appliedFilters.endDate };
       }
 
       console.log("Request Filters:", requestFilters);
@@ -255,9 +256,10 @@ export const OrdersList = () => {
   }
 
   return (
-    <View style={{ flex: 1, width: width }}>
+    <View style={{ flex: 1, width: "100%" }}>
       {loadingOptions ? <Loader /> : null}
-
+  
+      {/* Toggle Filters Button */}
       <TouchableOpacity
         style={styles.toggleFiltersButton}
         onPress={() => setShowFilters(!showFilters)}
@@ -266,42 +268,40 @@ export const OrdersList = () => {
           {showFilters ? dictionary["nav.hideFilters"] : dictionary["nav.showFilters"]}
         </Text>
       </TouchableOpacity>
-
-      {showFilters && <OrdersFilters onApplyFilters={handleApplyFilters}  filters={filters}/>}
-
-      <FlatList
-        data={[{}]}
-        renderItem={null}
-        keyExtractor={() => 'dummy'}
-        showsVerticalScrollIndicator={false}
-        ListHeaderComponent={
-          <View style={{ flexDirection: 'row', flexWrap: 'nowrap', flex: 1 }}>
-            {visible ? (
-              <OrdersModal
-                isVisible={visible}
-                onChangeState={() => setVisible(false)}
-                orders={orders}
-                hasItemId={itemId}
-                type={modalType}
-                options={options}
-                PendingOrders={false}
-              />
-            ) : null}
-            <FlatGrid
-              adjustGridToStyles={true}
-              itemDimension={cardSize}
-              spacing={10}
-              data={orders}
-              renderItem={renderEnteredOrdersList}
-              keyExtractor={(item) => (item && item.id ? item.id.toString() : '')}
-              itemContainerStyle={{ justifyContent: 'space-between' }}
-              style={{ flex: 1 }}
-              onEndReachedThreshold={0.5}
-            />
-          </View>
-        }
-      />
-
+  
+      {showFilters && (
+        <View style={{ flex: 1, width: "100%" }}>
+          <OrdersFilters onApplyFilters={handleApplyFilters} filters={filters} />
+        </View>
+      )}
+  
+      <View style={{ flex: 1, width: "100%" }}>
+        {visible ? (
+          <OrdersModal
+            isVisible={visible}
+            onChangeState={() => setVisible(false)}
+            orders={orders}
+            hasItemId={itemId}
+            type={modalType}
+            options={options}
+            PendingOrders={false}
+          />
+        ) : null}
+  
+        <FlatGrid
+          adjustGridToStyles={true}
+          itemDimension={cardSize}
+          spacing={10}
+          data={orders}
+          renderItem={renderEnteredOrdersList}
+          keyExtractor={(item) => (item && item.id ? item.id.toString() : '')}
+          itemContainerStyle={{ justifyContent: 'space-between' }}
+          style={{ flex: 1, width: "100%" }}
+          onEndReachedThreshold={0.5}
+        />
+      </View>
+  
+      {/* Pagination */}
       <View style={styles.paginationContainer}>
         <TouchableOpacity
           onPress={() => {
