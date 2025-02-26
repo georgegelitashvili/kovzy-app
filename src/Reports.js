@@ -16,12 +16,19 @@ export default function TabContent(props) {
         },
       }}
     >
-      <Tab.Screen
-        name="OrdersList"
-        component={OrdersList}
-        options={{ tabBarLabel: "", unmountOnBlur: true }}
-      />
+    <Tab.Screen
+      name="OnlineOrdersLogs"
+      component={OrdersList}
+      options={{ tabBarLabel: dictionary["filter.onlineOrder"], unmountOnBlur: true }}
+      initialParams={{ orderType: "0" }} 
+    />
 
+    <Tab.Screen
+      name="QrOrdersLogs"
+      component={OrdersList}
+      options={{ tabBarLabel: dictionary["filter.qrOrder"], unmountOnBlur: true }}
+      initialParams={{ orderType: "1" }} 
+    />
     </Tab.Navigator>
   );
 };
