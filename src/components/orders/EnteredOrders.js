@@ -20,7 +20,7 @@ import Loader from "../generate/loader";
 import TimePicker from "../generate/TimePicker";
 import { String, LanguageContext } from "../Language";
 import axiosInstance from "../../apiConfig/apiRequests";
-import OrdersDetail from "./OrdersDetail";
+import OrdersDetail from "../OrdersDetail";
 import OrdersModal from "../modal/OrdersModal";
 import printRows from "../../PrintRows";
 
@@ -72,7 +72,7 @@ export const EnteredOrdersList = () => {
   const [previousOrderCount, setPreviousOrderCount] = useState(0);
 
   const [retryCount, setRetryCount] = useState(0);
-  const MAX_RETRIES = 3;
+  const MAX_RETRIES = 15;
   const RETRY_DELAY = 5000;
 
   const { dictionary, languageId } = useContext(LanguageContext);
@@ -419,7 +419,7 @@ export const EnteredOrdersList = () => {
   };
 
 
-  const renderEnteredOrdersList = ({ item }) => {
+  const RenderEnteredOrdersList = React.memo(({ item }) => {
     const deliveryPrice = parseFloat(item.delivery_price);
     const additionalFees = parseFloat(item.service_fee) / 100;
     const feeData = JSON.parse(item.fees_details || '{}');
@@ -557,7 +557,7 @@ export const EnteredOrdersList = () => {
         ) : null}
       </Card>
     )
-  };
+  });
 
 
   return (
@@ -576,7 +576,7 @@ export const EnteredOrdersList = () => {
         <FlatList
           data={orders}
           renderItem={null}  // No items in the FlatList itself
-          keyExtractor={() => 'dummy'}  // Static key for the dummy item
+          keyExtractor={() => Math.random().toString()}
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={(
             <View style={{ flexDirection: 'row', flexWrap: 'nowrap', flex: 1 }}>
@@ -616,11 +616,12 @@ export const EnteredOrdersList = () => {
                 itemDimension={cardSize}
                 spacing={10}
                 data={orders}
-                renderItem={renderEnteredOrdersList}
+                renderItem={({ item }) => <RenderEnteredOrdersList item={item} />}
                 keyExtractor={(item) => (item && item.id ? item.id.toString() : '')}
                 itemContainerStyle={{ justifyContent: 'space-between' }}
                 style={{ flex: 1 }}
                 onEndReachedThreshold={0.5}
+                removeClippedSubviews={true}
               />
             </View>
           )}

@@ -45,7 +45,7 @@ const Toast = ({ type, title, subtitle, animate, addStyles }) => {
     <Animated.View
       style={{ transform: [{ translateY: slideAnim }], marginBottom: 25 }}
     >
-      <View style={[styles.toastBox, addStyles, { width: screenWidth - 25 }]}>
+      <View style={[styles.toastBox, addStyles]}>
         <View style={[styles.uiLine, { backgroundColor: COLOR[type] }]} />
         <Icon
           name={ICON}
@@ -55,8 +55,8 @@ const Toast = ({ type, title, subtitle, animate, addStyles }) => {
         />
 
         <View>
-          <Text style={styles.toatTitle}>{title}</Text>
-          <Text style={styles.toatMsg}>{subtitle}</Text>
+          <Text style={styles.toastTitle}>{title}</Text>
+          <Text style={styles.toastMsg}>{subtitle}</Text>
         </View>
       </View>
     </Animated.View>
@@ -68,7 +68,7 @@ export default Toast;
 const styles = StyleSheet.create({
   toastBox: {
     position: "absolute",
-    top: -125,
+    top: -130,
     zIndex: 1024,
     height: 70,
     flexDirection: "row",
@@ -85,6 +85,8 @@ const styles = StyleSheet.create({
     shadowRadius: 9.11,
     elevation: 14,
     marginHorizontal: 10,
+    alignSelf: 'center', // Center the toast
+    width: '90%', // Set the width to 90% of the screen width
   },
 
   uiLine: {
@@ -93,13 +95,13 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
 
-  toatTitle: {
+  toastTitle: {
     fontSize: 14,
     fontWeight: "600",
     color: "#000",
   },
 
-  toatMsg: {
+  toastMsg: {
     fontSize: 13,
     fontWeight: "400",
     color: "#010101",

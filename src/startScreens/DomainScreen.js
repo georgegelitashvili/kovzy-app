@@ -23,13 +23,13 @@ export const DomainScreen = ({ navigation }) => {
   };
 
   const onCheckPressed = async () => {
-    // const domainError = domainValidator(inputDomain.value);
-    // if (domainError) {
-    //   setInputDomain({ ...inputDomain, error: domainError });
-    //   return;
-    // }
-    setDomain(inputDomain.value);
-    storeData("domain", inputDomain.value);
+    const domainError = domainValidator(inputDomain.value.trim());
+    if (domainError) {
+      setInputDomain({ ...inputDomain, error: domainError });
+      return;
+    }
+    setDomain(inputDomain.value.trim());
+    storeData("domain", inputDomain.value.trim());
 
     navigation.navigate("Branch");
   };
@@ -52,7 +52,7 @@ export const DomainScreen = ({ navigation }) => {
         editable={true}
         clearButtonMode='always'
         value={inputDomain.value}
-        onChangeText={(text) => { setInputDomain({ value: text, error: '' }); }}
+        onChangeText={(text) => { setInputDomain({ value: text.trim(), error: '' }); }}
         error={!!inputDomain.error}
         errorText={inputDomain.error}
         autoCapitalize="none"

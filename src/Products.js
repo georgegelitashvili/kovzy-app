@@ -196,7 +196,7 @@ export default function Products({ navigation }) {
     });
   };
 
-  const renderProductList = ({ item }) => {
+  const RenderProductList = ({ item }) => {
     const isExcluded = excluded.some((excludedItem) => excludedItem.productid === item.id);
     const isDisabled = isExcluded; // Assuming exclusion implies disabled status
 
@@ -316,7 +316,7 @@ export default function Products({ navigation }) {
         itemDimension={width}
         data={products}
         maxItemsPerRow={4}
-        renderItem={renderProductList}
+        renderItem={({ item }) => <RenderProductList item={item} />}
         adjustGridToStyles={true}
         contentContainerStyle={{ justifyContent: "flex-start" }}
         keyExtractor={(item) => item.id.toString()}
@@ -327,6 +327,7 @@ export default function Products({ navigation }) {
         initialNumToRender={10} // Adjust this number based on your performance needs
         windowSize={5} // Adjust this number based on your performance needs
         updateCellsBatchingPeriod={50}
+        removeClippedSubviews={true}
       />
 
       <View style={styles.paginationContainer}>

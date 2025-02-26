@@ -125,7 +125,7 @@ export default function ProductsDetail({ navigation, route }) {
     setEnabled(packEnabled ? 0 : 1);
   };
 
-  const renderCustomizableList = ({ item }) => {
+  const RenderCustomizableList = ({ item }) => {
     return (
       <Card key={item.id}>
         <TouchableOpacity onPress={() => toggleContent(item.id)}>
@@ -185,10 +185,11 @@ export default function ProductsDetail({ navigation, route }) {
         itemDimension={width}
         data={customizable || []}
         maxItemsPerRow={4}
-        renderItem={renderCustomizableList}
+        renderItem={({ item }) => <RenderCustomizableList item={item} />}
         adjustGridToStyles={true}
         contentContainerStyle={{ justifyContent: "flex-start" }}
         keyExtractor={(item) => item.id.toString()}
+        removeClippedSubviews={true}
       />
     </>
   );

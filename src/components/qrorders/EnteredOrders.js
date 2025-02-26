@@ -17,10 +17,9 @@ import * as Updates from 'expo-updates';
 
 import { AuthContext, AuthProvider } from "../../context/AuthProvider";
 import Loader from "../generate/loader";
-import TimePicker from "../generate/TimePicker";
 import { String, LanguageContext } from "../Language";
 import axiosInstance from "../../apiConfig/apiRequests";
-import OrdersDetail from "./OrdersDetail";
+import OrdersDetail from "../OrdersDetail";
 import OrdersModal from "../modal/OrdersModalQr";
 import printRows from "../../PrintRows";
 
@@ -253,7 +252,7 @@ export const EnteredOrdersList = () => {
 
   }, [orders, appState, isNotificationReady]);
 
-  const renderEnteredOrdersList = ({ item }) => {
+  const RenderEnteredOrdersList = ({ item }) => {
     const additionalFees = parseFloat(item.service_fee) / 100;
     const feeData = JSON.parse(item.fees_details || '{}');
     const feesDetails = fees?.reduce((acc, fee) => {
@@ -384,7 +383,7 @@ export const EnteredOrdersList = () => {
         <FlatList
           data={[{}]} // Dummy data for the FlatList since we're using ListHeaderComponent for main content
           renderItem={null} // No items in the FlatList itself
-          keyExtractor={() => 'dummy'} // Static key for the dummy item
+            keyExtractor={() => Math.random().toString()} // Static key for the dummy item
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={
             <View style={{ flexDirection: 'row', flexWrap: 'nowrap', flex: 1 }}>
@@ -406,11 +405,12 @@ export const EnteredOrdersList = () => {
                 itemDimension={cardSize}
                 spacing={10}
                 data={orders}
-                renderItem={renderEnteredOrdersList}
+                renderItem={({ item }) => <RenderEnteredOrdersList item={item} />}
                 keyExtractor={(item) => (item && item.id ? item.id.toString() : '')}
                 itemContainerStyle={{ justifyContent: 'space-between' }}
                 style={{ flex: 1 }}
                 onEndReachedThreshold={0.5}
+                removeClippedSubviews={true}
               />
             </View>
           }

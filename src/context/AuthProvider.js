@@ -330,7 +330,7 @@ export const AuthProvider = ({ isConnected, children }) => {
       )}
 
 
-      {!isVisible && (
+      {!isVisible && user && (
         <TouchableOpacity onPress={handleClick}>
           <Toast
             type="failed"

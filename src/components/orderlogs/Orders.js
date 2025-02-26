@@ -17,7 +17,7 @@ import { AuthContext } from "../../context/AuthProvider";
 import Loader from "../generate/loader";
 import { LanguageContext } from "../Language";
 import axiosInstance from "../../apiConfig/apiRequests";
-import OrdersDetail from "./OrdersDetail";
+import OrdersDetail from "../OrdersDetail";
 import OrdersModal from "../modal/OrdersModalQr";
 import printRows from "../../PrintRows";
 import OrdersFilters from "./OrdersFilters";
@@ -148,7 +148,7 @@ export const OrdersList = () => {
     }
   }, [domain, branchid, apiOptions]);
 
-  const renderEnteredOrdersList = ({ item }) => {
+  const RenderEnteredOrdersList = ({ item }) => {
     const trackLink = [JSON.parse(item.deliveron_data)]?.map(link => {
       return link.trackLink ?? null;
     });
@@ -293,11 +293,12 @@ export const OrdersList = () => {
           itemDimension={cardSize}
           spacing={10}
           data={orders}
-          renderItem={renderEnteredOrdersList}
+          renderItem={({ item }) => <RenderEnteredOrdersList item={item} />}
           keyExtractor={(item) => (item && item.id ? item.id.toString() : '')}
           itemContainerStyle={{ justifyContent: 'space-between' }}
           style={{ flex: 1, width: "100%" }}
           onEndReachedThreshold={0.5}
+          removeClippedSubviews={true}
         />
       </View>
   

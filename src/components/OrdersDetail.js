@@ -3,9 +3,9 @@ import { StyleSheet, View } from "react-native";
 import { List, Text } from "react-native-paper";
 import { Entypo } from "@expo/vector-icons";
 
-import { AuthContext } from "../../context/AuthProvider";
-import { LanguageContext } from "../Language";
-import axiosInstance from "../../apiConfig/apiRequests";
+import { AuthContext } from "../context/AuthProvider";
+import { LanguageContext } from "./Language";
+import axiosInstance from "../apiConfig/apiRequests";
 
 export default function OrdersDetail({ orderId }) {
   const [expanded, setExpanded] = useState(true);

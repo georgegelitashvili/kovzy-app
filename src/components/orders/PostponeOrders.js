@@ -19,7 +19,7 @@ import Loader from "../generate/loader";
 import TimePicker from "../generate/TimePicker";
 import { String, LanguageContext } from "../Language";
 import axiosInstance from "../../apiConfig/apiRequests";
-import OrdersDetail from "./OrdersDetail";
+import OrdersDetail from "../OrdersDetail";
 import OrdersModal from "../modal/OrdersModal";
 import printRows from "../../PrintRows";
 import NotificationSound from '../../utils/NotificationSound';
@@ -28,9 +28,6 @@ const width = Dimensions.get("window").width;
 
 const numColumns = printRows(width);
 const cardSize = width / numColumns;
-
-let ordersCount;
-let temp = 0;
 
 // render entered orders function
 export const PostponeOrders = () => {
@@ -232,7 +229,7 @@ export const PostponeOrders = () => {
         }
     }, [isDeliveronOptions, deliveronOptions]);
 
-    const renderPostponeOrdersList = ({ item }) => {
+    const RenderPostponeOrdersList = ({ item }) => {
         const deliveryPrice = parseFloat(item.delivery_price);
         const additionalFees = parseFloat(item.service_fee) / 100;
         const feeData = JSON.parse(item.fees_details || '{}');
@@ -397,11 +394,12 @@ export const PostponeOrders = () => {
                             itemDimension={cardSize}
                             spacing={10}
                             data={orders}
-                            renderItem={renderPostponeOrdersList}
+                            renderItem={({ item }) => <RenderPostponeOrdersList item={item} />}
                             keyExtractor={(item) => (item && item.id ? item.id.toString() : '')}
                             itemContainerStyle={{ justifyContent: 'space-between' }}
                             style={{ flex: 1 }}
                             onEndReachedThreshold={0.5}
+                            removeClippedSubviews={true}
                         />
                     </View>
                 }
