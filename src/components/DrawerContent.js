@@ -11,7 +11,7 @@ import { String, LanguageContext } from "./Language";
 export default function DrawerContent(props) {
 
   const { key, ...otherProps } = props;
-  const { domain, branchid, branchName, branchEnabled, setBranchEnabled, setDeliveronEnabled, deliveronEnabled, logout, intervalId, setIntervalId, setIsLoading } = useContext(AuthContext);
+  const { domain, branchid, branchName, branchEnabled, setBranchEnabled, deliveronEnabled, logout, intervalId, setIntervalId, setIsLoading } = useContext(AuthContext);
   const { dictionary, userLanguage } = useContext(LanguageContext);
   const [qrOrdersBadge, setQrOrdersBadge] = useState(0);
   const [onlineOrdersBadge, setOnlineOrdersBadge] = useState(0);
@@ -24,10 +24,8 @@ export default function DrawerContent(props) {
   }); // api options
   const [optionsIsLoaded, setOptionsIsLoaded] = useState(false); // check api options is loaded
   const [branchChangeOptions, setBranchChangeOptions] = useState({});
-  const [deliveronChangeOptions, setDeliveronChangeOptions] = useState({});
 
   const [isBranchEnabled, setIsBranchEnabled] = useState(false);
-  const [isDeliveronEnabled, setIsDeliveronEnabled] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const apiOptions = () => {
@@ -45,7 +43,7 @@ export default function DrawerContent(props) {
       const [responseQr, responseOnline] = await Promise.all([
         axiosInstance.post(`https://${domain}/api/v1/admin/getUnansweredOrders`,
           { type: 1, branchid },
-          { timeout: 5000 } // Add timeout
+          { timeout: 5000 }
         ),
         axiosInstance.post(`https://${domain}/api/v1/admin/getUnansweredOrders`,
           { type: 0, branchid, postponeOrder: false },
@@ -101,6 +99,7 @@ export default function DrawerContent(props) {
         options.url_branchActivity,
         branchChangeOptions.data
       );
+      console.log("Branch toggle response:", resp.data);
       setBranchEnabled(resp.data.data);
     } catch (error) {
       console.error('Branch toggle failed:', error);
@@ -125,13 +124,7 @@ export default function DrawerContent(props) {
     setIsBranchEnabled(true);
   }, [branchEnabled, branchid]);
 
-  useEffect(() => {
-    setDeliveronChangeOptions((prev) => ({
-      ...prev,
-      data: { enabled: deliveronEnabled ? 0 : 1 },
-    }));
-    setIsDeliveronEnabled(true);
-  }, [deliveronEnabled]);
+console.log("branchEnabled", branchEnabled);
 
   return (
     <DrawerContentScrollView {...otherProps}>

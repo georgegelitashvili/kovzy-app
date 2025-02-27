@@ -45,6 +45,7 @@ export const AuthProvider = ({ isConnected, children }) => {
   const handleClick = () => {
     setIsVisible(true);
   };
+  console.log(branchEnabled);
 
   const readData = async () => {
     try {
@@ -97,8 +98,8 @@ export const AuthProvider = ({ isConnected, children }) => {
 
     try {
       const [deliveronResponse, branchResponse] = await Promise.all([
-        axiosInstance.post(options.url_deliveronStatus),
-        axiosInstance.post(options.url_branchStatus, { branchid }),
+        axiosInstance.post(options.url_deliveronStatus, { timeout: 5000 }),
+        axiosInstance.post(options.url_branchStatus, { branchid }, { timeout: 5000 }),
       ]);
 
       setDeliveronEnabled(deliveronResponse.data.data.status === 0);
@@ -140,7 +141,7 @@ export const AuthProvider = ({ isConnected, children }) => {
   };
 
   const startInterval = () => {
-    const newIntervalId = setInterval(fetchData, 5000);
+    const newIntervalId = setInterval(fetchData, 3000);
     setIntervalId(newIntervalId);
   };
 
@@ -198,7 +199,7 @@ export const AuthProvider = ({ isConnected, children }) => {
       stopInterval();
       subscribe.remove();
     };
-  }, [appState, domain, branchid, options, isConnected, user]);
+  }, [appState, domain, branchid, options, isConnected, user, branchEnabled, deliveronEnabled]);
 
 
   useEffect(() => {
