@@ -4,9 +4,6 @@ import {
   Dimensions,
   View,
   TouchableOpacity,
-  Linking,
-  Alert,
-  FlatList,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { Text, Divider, Card } from "react-native-paper";

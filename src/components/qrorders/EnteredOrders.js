@@ -252,7 +252,7 @@ export const EnteredOrdersList = () => {
 
   }, [orders, appState, isNotificationReady]);
 
-  const RenderEnteredOrdersList = ({ item }) => {
+  const renderEnteredOrdersList = ({ item }) => {
     const additionalFees = parseFloat(item.service_fee) / 100;
     const feeData = JSON.parse(item.fees_details || '{}');
     const feesDetails = fees?.reduce((acc, fee) => {
@@ -405,7 +405,7 @@ export const EnteredOrdersList = () => {
                 itemDimension={cardSize}
                 spacing={10}
                 data={orders}
-                renderItem={({ item }) => <RenderEnteredOrdersList item={item} />}
+                renderItem={renderEnteredOrdersList}
                 keyExtractor={(item) => (item && item.id ? item.id.toString() : '')}
                 itemContainerStyle={{ justifyContent: 'space-between' }}
                 style={{ flex: 1 }}

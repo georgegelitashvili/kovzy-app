@@ -419,7 +419,7 @@ export const EnteredOrdersList = () => {
   };
 
 
-  const RenderEnteredOrdersList = React.memo(({ item }) => {
+  const renderEnteredOrdersList = ({ item }) => {
     const deliveryPrice = parseFloat(item.delivery_price);
     const additionalFees = parseFloat(item.service_fee) / 100;
     const feeData = JSON.parse(item.fees_details || '{}');
@@ -557,7 +557,7 @@ export const EnteredOrdersList = () => {
         ) : null}
       </Card>
     )
-  });
+  };
 
 
   return (
@@ -616,7 +616,7 @@ export const EnteredOrdersList = () => {
                 itemDimension={cardSize}
                 spacing={10}
                 data={orders}
-                renderItem={({ item }) => <RenderEnteredOrdersList item={item} />}
+                renderItem={renderEnteredOrdersList}
                 keyExtractor={(item) => (item && item.id ? item.id.toString() : '')}
                 itemContainerStyle={{ justifyContent: 'space-between' }}
                 style={{ flex: 1 }}
