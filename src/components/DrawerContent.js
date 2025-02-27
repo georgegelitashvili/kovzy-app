@@ -124,8 +124,6 @@ export default function DrawerContent(props) {
     setIsBranchEnabled(true);
   }, [branchEnabled, branchid]);
 
-console.log("branchEnabled", branchEnabled);
-
   return (
     <DrawerContentScrollView {...otherProps}>
       <View style={styles.drawerContent}>

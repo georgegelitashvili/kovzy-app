@@ -45,7 +45,6 @@ export const AuthProvider = ({ isConnected, children }) => {
   const handleClick = () => {
     setIsVisible(true);
   };
-  console.log(branchEnabled);
 
   const readData = async () => {
     try {
