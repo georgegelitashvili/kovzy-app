@@ -5,6 +5,7 @@ import {
   Dimensions,
   View,
   TouchableOpacity,
+  ActivityIndicator
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { Text, Divider, Card } from "react-native-paper";
@@ -306,16 +307,12 @@ export const OrdersList = () => {
           keyExtractor={(item) => (item && item.id ? item.id.toString() : '')}
           itemContainerStyle={{ justifyContent: 'space-between' }}
           style={{ flex: 1, width: "100%" }}
-<<<<<<< HEAD
-          onEndReachedThreshold={0.5}
-          removeClippedSubviews={true}
-=======
           onEndReached={() => fetchAcceptedOrders()} 
           onEndReachedThreshold={0.5} 
           ListFooterComponent={
             loadingMore ? <ActivityIndicator size="large" color="#0000ff" /> : null
           }
->>>>>>> 273b2b2 (Refactor Reports.js to add new tab screens for online and QR orders also change pagination with scroll load)
+          removeClippedSubviews={true}
         />
       </View>
     </View>
