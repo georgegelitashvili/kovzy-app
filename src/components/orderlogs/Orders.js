@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useContext } from "react";
+import { useRoute } from "@react-navigation/native";
 import {
   StyleSheet,
   Dimensions,
@@ -24,6 +25,8 @@ const numColumns = printRows(width);
 const cardSize = width / numColumns;
 
 export const OrdersList = () => {
+  const route = useRoute();
+  const orderType = route.params?.orderType ?? "all";
   const [filters, setFilters] = useState({
     orderType: "all",
     orderStatus: "all",
@@ -36,7 +39,6 @@ export const OrdersList = () => {
   const [orders, setOrders] = useState([]);
   const [fees, setFees] = useState([]);
   const [currency, setCurrency] = useState("");
-  const [page, setPage] = useState(0);
   const [options, setOptions] = useState({
     url_getOrdersLogs: "",
     url_checkOrderStatus: "",
@@ -48,12 +50,11 @@ export const OrdersList = () => {
   const [modalType, setModalType] = useState("");
   const [loading, setLoading] = useState(true);
   const [loadingOptions, setLoadingOptions] = useState(false);
-  const [showFilters, setShowFilters] = useState(false); // State to toggle filters visibility
+  const [showFilters, setShowFilters] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false); // For infinite scroll
+  const [hasMore, setHasMore] = useState(true); // To check if more data is available
 
   const { dictionary, languageId } = useContext(LanguageContext);
-
-  const increment = () => { setPage(page + 1); setLoading(true) };
-  const decrement = () => { setPage(page - 1); setLoading(true) };
 
   const toggleContent = useCallback((value) => {
     if (isOpen.includes(value)) {
@@ -74,49 +75,60 @@ export const OrdersList = () => {
   const handleApplyFilters = (newFilters) => {
     console.log("New Filters applied: ", newFilters);
     setFilters(newFilters);
-    setPage(0);
-    fetchAcceptedOrders(newFilters);
+    setOrders([]);
+    setHasMore(true); 
+    fetchAcceptedOrders(newFilters, true);
   };
 
-  const fetchAcceptedOrders = async (appliedFilters = filters) => {
-    setLoading(true);
+  const fetchAcceptedOrders = async (appliedFilters = filters, reset = false) => {
+    if (loadingMore || !hasMore) return; // Prevent duplicate calls
+  
+    setLoadingMore(true);
     try {
       if (!user || !options.url_getOrdersLogs) {
         return null;
       }
-
+  
       const requestFilters = {};
       if (appliedFilters.orderStatus !== "all") {
         requestFilters.status = { exact: appliedFilters.orderStatus };
       }
-      if (appliedFilters.orderType !== "all") {
-        requestFilters.type = { exact: appliedFilters.orderType };
-      }
-      if (appliedFilters.firstName) {
-        requestFilters.firstname = { like: appliedFilters.firstName };
-      }
-      if (appliedFilters.lastName) {
-        requestFilters.lastname = { like: appliedFilters.lastName };
+      if (orderType !== "all") {
+        requestFilters.type = { exact: orderType };
       }
       if (appliedFilters.startDate && appliedFilters.endDate) {
-        requestFilters.created_at = { min: appliedFilters.startDate, max: appliedFilters.endDate };
+        requestFilters.created_at = { 
+          min: appliedFilters.startDate + " 00:00:00", 
+          max: appliedFilters.endDate + " 23:59:59" 
+      };
       }
-
-      console.log("Request Filters:", requestFilters);
-
+      if(branchid) {
+        requestFilters.branchid = { exact: branchid };
+      }
+      console.log(requestFilters);
       const resp = await axiosInstance.post(options.url_getOrdersLogs, JSON.stringify({
         Pagination: {
           limit: 12,
-          page: page,
+          page: reset ? 0 : Math.floor(orders.length / 12), 
         },
         Filters: requestFilters,
         Languageid: languageId,
         branchid: branchid,
       }));
-
-      const data = resp.data.data;
+  
+      const newData = resp.data.data;
       const feesData = resp.data.fees;
-      setOrders(data);
+  
+      const uniqueData = newData.filter(
+        (newItem) => !orders.some((existingItem) => existingItem.id === newItem.id)
+      );
+  
+      if (uniqueData.length === 0) {
+        setHasMore(false);
+      } else {
+        setOrders((prevOrders) => reset ? uniqueData : [...prevOrders, ...uniqueData]); // Append new data
+      }
+  
       setFees(feesData);
       setCurrency(resp.data.currency);
     } catch (error) {
@@ -126,14 +138,15 @@ export const OrdersList = () => {
       clearInterval(intervalId);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   };
 
   useFocusEffect(
     React.useCallback(() => {
-      fetchAcceptedOrders(filters);
+      fetchAcceptedOrders(filters, true); 
       return () => { };
-    }, [options, page, branchid, languageId, filters])
+    }, [options, branchid, languageId, filters])
   );
 
   useEffect(() => {
@@ -185,7 +198,7 @@ export const OrdersList = () => {
         {!isOpen.includes(item.id) ? (
           <Card.Content>
             <Text variant="titleSmall" style={styles.title}>
-              {dictionary["orders.status"]}: {dictionary["orders.pending"]}
+              {dictionary["orders.status"]}: {item.status === 2 ? dictionary["filter.prepared"] : dictionary["filter.cancelled"]}
             </Text>
             <Text variant="titleSmall" style={styles.title} numberOfLines={2} ellipsizeMode="tail">
               {dictionary["orders.fName"]}: {item.firstname} {item.lastname}
@@ -255,8 +268,7 @@ export const OrdersList = () => {
   return (
     <View style={{ flex: 1, width: "100%" }}>
       {loadingOptions ? <Loader /> : null}
-  
-      {/* Toggle Filters Button */}
+
       <TouchableOpacity
         style={styles.toggleFiltersButton}
         onPress={() => setShowFilters(!showFilters)}
@@ -294,44 +306,17 @@ export const OrdersList = () => {
           keyExtractor={(item) => (item && item.id ? item.id.toString() : '')}
           itemContainerStyle={{ justifyContent: 'space-between' }}
           style={{ flex: 1, width: "100%" }}
+<<<<<<< HEAD
           onEndReachedThreshold={0.5}
           removeClippedSubviews={true}
+=======
+          onEndReached={() => fetchAcceptedOrders()} 
+          onEndReachedThreshold={0.5} 
+          ListFooterComponent={
+            loadingMore ? <ActivityIndicator size="large" color="#0000ff" /> : null
+          }
+>>>>>>> 273b2b2 (Refactor Reports.js to add new tab screens for online and QR orders also change pagination with scroll load)
         />
-      </View>
-  
-      {/* Pagination */}
-      <View style={styles.paginationContainer}>
-        <TouchableOpacity
-          onPress={() => {
-            decrement();
-          }}
-          disabled={page === 0}
-        >
-          <Text
-            style={[
-              styles.paginationButton,
-              page === 0 && styles.paginationButtonDisabled,
-            ]}
-          >
-            {dictionary["prevPage"]}
-          </Text>
-        </TouchableOpacity>
-        <Text style={styles.paginationText}>{page}</Text>
-        <TouchableOpacity
-          onPress={() => {
-            increment();
-          }}
-          disabled={page === Math.ceil(increment)}
-        >
-          <Text
-            style={[
-              styles.paginationButton,
-              page === Math.ceil(increment) && styles.paginationButtonDisabled,
-            ]}
-          >
-            {dictionary["nextPage"]}
-          </Text>
-        </TouchableOpacity>
       </View>
     </View>
   );
@@ -379,27 +364,6 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     fontSize: 14,
     flexWrap: 'wrap',
-  },
-  paginationContainer: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: 15,
-    marginBottom: 15,
-  },
-  paginationButton: {
-    backgroundColor: "#ccc",
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    marginHorizontal: 5,
-    borderRadius: 5,
-  },
-  paginationButtonDisabled: {
-    opacity: 0.5,
-  },
-  paginationText: {
-    fontSize: 17,
-    fontWeight: "bold",
   },
   feeDetailsContainer: {
     paddingLeft: 10,
