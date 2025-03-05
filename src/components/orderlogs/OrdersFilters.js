@@ -1,27 +1,22 @@
-import React, { useState, useContext, useCallback } from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-} from "react-native";
-import RNPickerSelect from "react-native-picker-select";
+import React, { useState, useContext, useCallback, useEffect } from "react";
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Modal } from "react-native";
+import { Calendar } from "react-native-calendars";
 import { LanguageContext } from "../Language";
-import DateTimePickerModal from "react-native-modal-datetime-picker";
 
 const OrdersFilters = ({ onApplyFilters, filters }) => {
   const { dictionary } = useContext(LanguageContext);
-  const [orderStatus, setOrderStatus] = useState(filters.orderStatus || "2");
-  const [startDate, setStartDate] = useState(filters.startDate ? new Date(filters.startDate) : null);
-  const [endDate, setEndDate] = useState(filters.endDate ? new Date(filters.endDate) : null);
-  const [isStartDateVisible, setIsStartDateVisible] = useState(false);
-  const [isEndDateVisible, setIsEndDateVisible] = useState(false);
+  const [isPreparedSelected, setIsPreparedSelected] = useState(true); // Default to "Prepared" (status 2)
+  const [isCancelledSelected, setIsCancelledSelected] = useState(false);
 
-  const formatDate = useCallback((date) => {
-    if (!date) return "";
-    return `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`;
-  }, []);
+  const [dateRange, setDateRange] = useState({
+    startDate: filters.startDate ? new Date(filters.startDate) : null,
+    endDate: filters.endDate ? new Date(filters.endDate) : null,
+  });
+  const [isCalendarVisible, setIsCalendarVisible] = useState(false);
+
+  useEffect(() => {
+    applyFilters();
+  }, [isPreparedSelected, isCancelledSelected, dateRange]);
 
   const applyFilters = useCallback(() => {
     if (!onApplyFilters) {
@@ -29,192 +24,245 @@ const OrdersFilters = ({ onApplyFilters, filters }) => {
       return;
     }
 
-    if (startDate && endDate && startDate > endDate) {
+    if (dateRange.startDate && dateRange.endDate && dateRange.startDate > dateRange.endDate) {
       alert(dictionary["filter.dateRangeError"]);
       return;
     }
+    let orderStatuses = [];
+    if (isPreparedSelected) orderStatuses.push("2"); // Prepared
+    if (isCancelledSelected) orderStatuses.push("-1"); // Cancelled
+
+    // If both are selected, send all statuses
+    const orderStatus = orderStatuses.length === 2 ? "all" : orderStatuses.join(",");
 
     const newFilters = {
       orderStatus,
-      startDate: startDate ? startDate.toISOString().split("T")[0] : null,
-      endDate: endDate ? endDate.toISOString().split("T")[0] : null,
+      startDate: dateRange.startDate ? dateRange.startDate.toISOString().split("T")[0] : null,
+      endDate: dateRange.endDate ? dateRange.endDate.toISOString().split("T")[0] : null,
     };
     onApplyFilters(newFilters);
-  }, [onApplyFilters, startDate, endDate, orderStatus, dictionary]);
+  }, [onApplyFilters, dateRange, isPreparedSelected, isCancelledSelected, dictionary]);
 
-  const showStartDatePicker = () => setIsStartDateVisible(true);
-  const hideStartDatePicker = () => setIsStartDateVisible(false);
-  const handleStartDateConfirm = (date) => {
-    setStartDate(date);
-    hideStartDatePicker();
+  const handleDayPress = (day) => {
+    const { startDate, endDate } = dateRange;
+    const selectedDate = new Date(day.dateString);
+
+    if (!startDate || (startDate && endDate)) {
+      // If no start date is selected or both start and end dates are selected, reset the range
+      setDateRange({ startDate: selectedDate, endDate: null });
+    } else if (selectedDate.toISOString() === startDate.toISOString()) {
+      // If the selected date is the same as the start date, clear the start date
+      setDateRange({ startDate: null, endDate: null });
+    } else if (selectedDate < startDate) {
+      // If the selected date is before the start date, set it as the new start date
+      setDateRange({ startDate: selectedDate, endDate: null });
+    } else {
+      // If the selected date is after the start date, set it as the end date
+      setDateRange({ ...dateRange, endDate: selectedDate });
+    }
   };
 
-  const showEndDatePicker = () => setIsEndDateVisible(true);
-  const hideEndDatePicker = () => setIsEndDateVisible(false);
-  const handleEndDateConfirm = (date) => {
-    setEndDate(date);
-    hideEndDatePicker();
+  const clearDateRange = () => {
+    setDateRange({ startDate: null, endDate: null });
   };
+
+  // Format marked dates for the calendar
+  const markedDates = {};
+  if (dateRange.startDate) {
+    const startDateStr = dateRange.startDate.toISOString().split("T")[0];
+    markedDates[startDateStr] = { startingDay: true, color: "green", textColor: "white" };
+  }
+  if (dateRange.endDate) {
+    const endDateStr = dateRange.endDate.toISOString().split("T")[0];
+    markedDates[endDateStr] = { endingDay: true, color: "green", textColor: "white" };
+  }
+  if (dateRange.startDate && dateRange.endDate) {
+    // Highlight the range between start and end dates
+    let currentDate = new Date(dateRange.startDate);
+    while (currentDate <= dateRange.endDate) {
+      const currentDateStr = currentDate.toISOString().split("T")[0];
+      if (!markedDates[currentDateStr]) {
+        markedDates[currentDateStr] = { color: "lightgreen", textColor: "black" };
+      }
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+  }
+
+  // Format the selected date range for display
+  const selectedRangeText =
+    dateRange.startDate && dateRange.endDate
+      ? `${dateRange.startDate.toLocaleDateString()} - ${dateRange.endDate.toLocaleDateString()}`
+      : dictionary["filter.selectDateRange"];
 
   return (
-    <View style={styles.container}>
-      <ScrollView
-        contentContainerStyle={styles.scrollViewContent}
-        keyboardShouldPersistTaps="handled"
-      >
-        <View style = {styles.statusRow}>
-        <Text style={styles.label}>{dictionary["filter.orderStatus"]}</Text>
-        <RNPickerSelect
-          onValueChange={setOrderStatus}
-          items={[
-            { label: dictionary["filter.prepared"], value: "2" },
-            { label: dictionary["filter.cancelled"], value: "-1" },
-          ]}
-          value={orderStatus}
-          placeholder={{ label: dictionary["filter.selectOrderStatus"], value: null }}
-          style={pickerSelectStyles}
-        />
-        </View>
-
-        <View style={styles.dateRow}>
-          <View style={styles.dateColumn}>
-            <Text style={styles.label}>{dictionary["filter.startDate"]}</Text>
-            <View style={styles.dateContainer}>
-              <TouchableOpacity onPress={showStartDatePicker} style={styles.dateButton}>
-                <Text style={styles.dateButtonText}>
-                  {startDate ? formatDate(startDate) : dictionary["filter.selectDate"]}
-                </Text>
-              </TouchableOpacity>
-              {startDate && (
-                <TouchableOpacity onPress={() => setStartDate(null)} style={styles.clearButton}>
-                  <Text style={styles.clearButtonText}>X</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-            <DateTimePickerModal
-              isVisible={isStartDateVisible}
-              mode="date"
-              date={startDate || new Date()}
-              onConfirm={handleStartDateConfirm}
-              onCancel={hideStartDatePicker}
-            />
+    <View contentContainerStyle={styles.scrollViewContent} keyboardShouldPersistTaps="handled">
+      <Text style={styles.label}>{dictionary["filter.orderStatus"]}</Text>
+      <View style={styles.statusRow}>
+        <TouchableOpacity
+          style={styles.checkboxContainer}
+          onPress={() => setIsPreparedSelected(!isPreparedSelected)}
+        >
+          <View style={[styles.checkbox, isPreparedSelected && styles.checkboxSelected]}>
+            {isPreparedSelected && <Text style={styles.checkboxIcon}>✓</Text>}
           </View>
-
-          <View style={styles.dateColumn}>
-            <Text style={styles.label}>{dictionary["filter.endDate"]}</Text>
-            <View style={styles.dateContainer}>
-              <TouchableOpacity onPress={showEndDatePicker} style={styles.dateButton}>
-                <Text style={styles.dateButtonText}>
-                  {endDate ? formatDate(endDate) : dictionary["filter.selectDate"]}
-                </Text>
-              </TouchableOpacity>
-              {endDate && (
-                <TouchableOpacity onPress={() => setEndDate(null)} style={styles.clearButton}>
-                  <Text style={styles.clearButtonText}>X</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-            <DateTimePickerModal
-              isVisible={isEndDateVisible}
-              mode="date"
-              date={endDate || new Date()}
-              onConfirm={handleEndDateConfirm}
-              onCancel={hideEndDatePicker}
-            />
-          </View>
-        </View>
-
-        <View style={styles.filterButtonContainer}>
-        <TouchableOpacity style={styles.filterButton} onPress={applyFilters}>
-          <Text style={styles.filterButtonText}>{dictionary["filter.applyFilters"]}</Text>
+          <Text style={styles.checkboxLabel}>{dictionary["filter.prepared"]}</Text>
         </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.checkboxContainer}
+          onPress={() => setIsCancelledSelected(!isCancelledSelected)}
+        >
+          <View style={[styles.checkbox, isCancelledSelected && styles.checkboxSelected]}>
+            {isCancelledSelected && <Text style={styles.checkboxIcon}>✓</Text>}
+          </View>
+          <Text style={styles.checkboxLabel}>{dictionary["filter.cancelled"]}</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.dateRangeContainer}>
+        <View style={styles.dateRangeButtonContainer}>
+          <TouchableOpacity
+            style={styles.dateRangeButton}
+            onPress={() => setIsCalendarVisible(true)}
+          >
+            <Text style={styles.dateRangeText}>{selectedRangeText}</Text>
+          </TouchableOpacity>
+          {dateRange.startDate && (
+            <TouchableOpacity style={styles.clearButton} onPress={clearDateRange}>
+              <Text style={styles.clearButtonText}>X</Text>
+            </TouchableOpacity>
+          )}
         </View>
-      </ScrollView>
+      </View>
+
+      <Modal visible={isCalendarVisible} transparent={true} animationType="slide">
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Calendar
+              onDayPress={handleDayPress}
+              markedDates={markedDates}
+              markingType="period"
+            />
+            <TouchableOpacity
+              style={styles.modalCloseButton}
+              onPress={() => setIsCalendarVisible(false)}
+            >
+              <Text style={styles.modalCloseButtonText}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
 
-// Styles
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     width: "100%",
+    padding: 10,
     backgroundColor: "white",
   },
   scrollViewContent: {
     flexGrow: 1,
-    padding: 8,
+    padding: 7,
   },
   label: {
     fontSize: 14,
     marginBottom: 1,
   },
-  dateContainer: {
+  statusRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
-    marginBottom: 20,
-    width: "100%",
+    padding: 5,
   },
-  dateButton: {
+  checkboxContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginVertical: 5,
+    marginRight: 10,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderWidth: 1,
+    borderColor: "gray",
+    borderRadius: 4,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 10,
+  },
+  checkboxSelected: {
+    backgroundColor: "#006400",
+    borderColor: "#006400",
+  },
+  checkboxIcon: {
+    color: "white",
+    fontSize: 14,
+  },
+  checkboxLabel: {
+    fontSize: 14,
+  },
+  dateRangeContainer: {
+    marginVertical: 5,
+  },
+  dateRangeButtonContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  dateRangeButton: {
     flex: 1,
     borderWidth: 1,
     borderColor: "gray",
     borderRadius: 5,
-    padding: 8,
+    padding: 5,
     alignItems: "center",
   },
-  dateButtonText: {
+  dateRangeText: {
     fontSize: 14,
   },
   clearButton: {
-    backgroundColor: "red",
-    padding: 8,
+    marginLeft: 10,
+    padding: 7,
+    backgroundColor: "#FF0000",
     borderRadius: 5,
   },
   clearButtonText: {
     color: "white",
-    fontWeight: "bold",
+    fontSize: 13,
   },
-  filterButtonContainer:{
+  modalContainer: {
+    flex: 1,
+    justifyContent: "center",
     alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
   },
-
-  statusRow:{
-    padding: 5,
+  modalContent: {
+    width: "90%",
+    backgroundColor: "white",
+    borderRadius: 10,
+    padding: 20,
   },
-
-  filterButton: {
-    backgroundColor: "#006400",
+  modalCloseButton: {
+    marginTop: 10,
     padding: 10,
+    backgroundColor: "#006400",
     borderRadius: 5,
     alignItems: "center",
-    marginTop: 7,
-    width: "70%",
   },
-  filterButtonText: {
+  modalCloseButtonText: {
     color: "white",
     fontSize: 16,
   },
-  dateRow: {
+  headerContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
+    alignItems: "center",
+    padding: 10,
   },
-  dateColumn: {
-    flex: 1,
-    marginHorizontal: 5,
-  },
-});
-
-const pickerSelectStyles = StyleSheet.create({
-  inputAndroid: {
-    borderWidth: 1,
-    borderColor: "gray",
-    borderRadius: 5,
-    padding: 8,
-    marginBottom: 10,
-    fontSize: 14,
-    width: "100%",
+  headerText: {
+    fontSize: 18,
+    fontWeight: "bold",
   },
 });
 

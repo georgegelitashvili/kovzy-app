@@ -1,11 +1,10 @@
-import React, { useState, useEffect, useCallback, useContext } from "react";
-import { useRoute } from "@react-navigation/native";
+import React, { useState, useEffect, useCallback, useContext, memo } from "react";
 import {
   StyleSheet,
   Dimensions,
   View,
   TouchableOpacity,
-  ActivityIndicator
+  ActivityIndicator,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { Text, Divider, Card } from "react-native-paper";
@@ -25,16 +24,12 @@ const width = Dimensions.get("window").width;
 const numColumns = printRows(width);
 const cardSize = width / numColumns;
 
-export const OrdersList = () => {
-  const route = useRoute();
-  const orderType = route.params?.orderType ?? "all";
+export const OrdersListBase = ({ orderType }) => {
   const [filters, setFilters] = useState({
     orderType: "all",
-    orderStatus: "all",
+    orderStatus: "2",
     dateRangeEnd: "",
     dateRangeStart: "",
-    firstName: "",
-    lastName: "",
   });
   const { domain, branchid, user, intervalId } = useContext(AuthContext);
   const [orders, setOrders] = useState([]);
@@ -51,7 +46,7 @@ export const OrdersList = () => {
   const [modalType, setModalType] = useState("");
   const [loading, setLoading] = useState(true);
   const [loadingOptions, setLoadingOptions] = useState(false);
-  const [showFilters, setShowFilters] = useState(false);
+
   const [loadingMore, setLoadingMore] = useState(false); // For infinite scroll
   const [hasMore, setHasMore] = useState(true); // To check if more data is available
 
@@ -73,63 +68,79 @@ export const OrdersList = () => {
     setOptionsIsLoaded(true);
   }, [domain]);
 
-  const handleApplyFilters = (newFilters) => {
+  const handleApplyFilters = useCallback((newFilters) => {
     console.log("New Filters applied: ", newFilters);
     setFilters(newFilters);
     setOrders([]);
-    setHasMore(true); 
+    setHasMore(true);
     fetchAcceptedOrders(newFilters, true);
-  };
+  }, []);
 
   const fetchAcceptedOrders = async (appliedFilters = filters, reset = false) => {
     if (loadingMore || !hasMore) return; // Prevent duplicate calls
-  
+
     setLoadingMore(true);
     try {
       if (!user || !options.url_getOrdersLogs) {
         return null;
       }
-  
+
       const requestFilters = {};
+      if (!appliedFilters.orderStatus) {
+        requestFilters.status = { exact: "2" };
+      }
       if (appliedFilters.orderStatus !== "all") {
         requestFilters.status = { exact: appliedFilters.orderStatus };
+      }
+      if (appliedFilters.orderStatus === "all") {
+        requestFilters.status = { exact: "all" };
       }
       if (orderType !== "all") {
         requestFilters.type = { exact: orderType };
       }
-      if (appliedFilters.startDate && appliedFilters.endDate) {
-        requestFilters.created_at = { 
-          min: appliedFilters.startDate + " 00:00:00", 
-          max: appliedFilters.endDate + " 23:59:59" 
-      };
+      if (appliedFilters.orderStatus === "") {
+        requestFilters.status = { exact: "all" };
       }
-      if(branchid) {
+      if (appliedFilters.startDate && appliedFilters.endDate) {
+        requestFilters.created_at = {
+          min: appliedFilters.startDate + " 00:00:00",
+          max: appliedFilters.endDate + " 23:59:59",
+        };
+      }
+      if (branchid) {
         requestFilters.branchid = { exact: branchid };
       }
-      console.log(requestFilters);
+
       const resp = await axiosInstance.post(options.url_getOrdersLogs, JSON.stringify({
         Pagination: {
           limit: 12,
-          page: reset ? 0 : Math.floor(orders.length / 12), 
+          page: reset ? 0 : Math.floor(orders.length / 12),
         },
         Filters: requestFilters,
         Languageid: languageId,
         branchid: branchid,
       }));
-  
+
       const newData = resp.data.data;
       const feesData = resp.data.fees;
-  
-      const uniqueData = newData.filter(
-        (newItem) => !orders.some((existingItem) => existingItem.id === newItem.id)
-      );
-  
+
+      // Filter out duplicates
+      const uniqueData = [];
+      const seenIds = new Set();
+      for (const item of newData) {
+        const uniqueKey = `${item.id}-${item.created_at}`;
+        if (!seenIds.has(uniqueKey)) {
+          seenIds.add(uniqueKey);
+          uniqueData.push(item);
+        }
+      }
+
       if (uniqueData.length === 0) {
         setHasMore(false);
       } else {
-        setOrders((prevOrders) => reset ? uniqueData : [...prevOrders, ...uniqueData]); // Append new data
+        setOrders((prevOrders) => reset ? uniqueData : [...prevOrders, ...uniqueData]);
       }
-  
+
       setFees(feesData);
       setCurrency(resp.data.currency);
     } catch (error) {
@@ -145,7 +156,7 @@ export const OrdersList = () => {
 
   useFocusEffect(
     React.useCallback(() => {
-      fetchAcceptedOrders(filters, true); 
+      fetchAcceptedOrders(filters, true);
       return () => { };
     }, [options, branchid, languageId, filters])
   );
@@ -159,7 +170,7 @@ export const OrdersList = () => {
     }
   }, [domain, branchid, apiOptions]);
 
-  const RenderEnteredOrdersList = ({ item }) => {
+  const RenderEnteredOrdersList = memo(({ item, toggleContent, isOpen, dictionary, currency, fees }) => {
     const trackLink = [JSON.parse(item.deliveron_data)]?.map(link => {
       return link.trackLink ?? null;
     });
@@ -174,7 +185,7 @@ export const OrdersList = () => {
     }, []);
 
     return (
-      <Card key={item.id} style={styles.card}>
+      <Card style={styles.card}>
         <TouchableOpacity onPress={() => toggleContent(item.id)}>
           <Card.Content style={styles.head}>
             <Text variant="headlineMedium" style={styles.header}>
@@ -260,7 +271,20 @@ export const OrdersList = () => {
         ) : null}
       </Card>
     );
-  };
+  });
+
+  const renderItem = useCallback(({ item }) => {
+    return (
+      <RenderEnteredOrdersList
+        item={item}
+        toggleContent={toggleContent}
+        isOpen={isOpen}
+        dictionary={dictionary}
+        currency={currency}
+        fees={fees}
+      />
+    );
+  }, [toggleContent, isOpen, dictionary, currency, fees]);
 
   if (loading) {
     return <Loader show={loading} />;
@@ -270,21 +294,10 @@ export const OrdersList = () => {
     <View style={{ flex: 1, width: "100%" }}>
       {loadingOptions ? <Loader /> : null}
 
-      <TouchableOpacity
-        style={styles.toggleFiltersButton}
-        onPress={() => setShowFilters(!showFilters)}
-      >
-        <Text style={styles.toggleFiltersButtonText}>
-          {showFilters ? dictionary["nav.hideFilters"] : dictionary["nav.showFilters"]}
-        </Text>
-      </TouchableOpacity>
-  
-      {showFilters && (
-        <View style={{ flex: 1, width: "100%" }}>
-          <OrdersFilters onApplyFilters={handleApplyFilters} filters={filters} />
-        </View>
-      )}
-  
+      <View style={{ padding: 10 }}>
+        <OrdersFilters onApplyFilters={handleApplyFilters} filters={filters} />
+      </View>
+
       <View style={{ flex: 1, width: "100%" }}>
         {visible ? (
           <OrdersModal
@@ -297,22 +310,24 @@ export const OrdersList = () => {
             PendingOrders={false}
           />
         ) : null}
-  
+
         <FlatGrid
           adjustGridToStyles={true}
           itemDimension={cardSize}
           spacing={10}
           data={orders}
-          renderItem={({ item }) => <RenderEnteredOrdersList item={item} />}
-          keyExtractor={(item) => (item && item.id ? item.id.toString() : '')}
+          keyExtractor={(item) => `${item.id}-${item.created_at}`} 
+          renderItem={renderItem}
           itemContainerStyle={{ justifyContent: 'space-between' }}
           style={{ flex: 1, width: "100%" }}
-          onEndReached={() => fetchAcceptedOrders()} 
-          onEndReachedThreshold={0.5} 
+          onEndReached={() => fetchAcceptedOrders()}
+          onEndReachedThreshold={0.5}
           ListFooterComponent={
             loadingMore ? <ActivityIndicator size="large" color="#0000ff" /> : null
           }
           removeClippedSubviews={true}
+          initialNumToRender={10}
+          windowSize={21} 
         />
       </View>
     </View>
@@ -324,8 +339,10 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "flex-start",
   },
+  filtersContainer: {
+    padding: 1,
+  },
   card: {
-    flexWrap: 'nowrap',
     margin: 10,
     borderRadius: 10,
     shadowColor: "#000",
@@ -381,3 +398,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
 });
+
+export const OrdersListQr = () => <OrdersListBase orderType={1} />;
+export const OrdersListOnline = () => <OrdersListBase orderType={0} />;

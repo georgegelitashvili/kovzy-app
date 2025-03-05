@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, { useContext } from "react";
 import { createMaterialTopTabNavigator } from "@react-navigation/material-top-tabs";
-import { OrdersList } from "./components/orderlogs/Orders";
 import { LanguageContext } from "./components/Language";
+import { OrdersListOnline, OrdersListQr } from "./components/orderlogs/OrdersListBase"; // Import the shared components
 
 const Tab = createMaterialTopTabNavigator();
 
@@ -16,19 +16,16 @@ export default function TabContent(props) {
         },
       }}
     >
-    <Tab.Screen
-      name="OnlineOrdersLogs"
-      component={OrdersList}
-      options={{ tabBarLabel: dictionary["filter.onlineOrder"], unmountOnBlur: true }}
-      initialParams={{ orderType: "0" }} 
-    />
-
-    <Tab.Screen
-      name="QrOrdersLogs"
-      component={OrdersList}
-      options={{ tabBarLabel: dictionary["filter.qrOrder"], unmountOnBlur: true }}
-      initialParams={{ orderType: "1" }} 
-    />
+      <Tab.Screen
+        name="OnlineOrdersLogs"
+        component={OrdersListOnline}
+        options={{ tabBarLabel: dictionary["filter.onlineOrder"], unmountOnBlur: true }}
+      />
+      <Tab.Screen
+        name="QrOrdersLogs"
+        component={OrdersListQr}
+        options={{ tabBarLabel: dictionary["filter.qrOrder"], unmountOnBlur: true }}
+      />
     </Tab.Navigator>
   );
-};
+}
