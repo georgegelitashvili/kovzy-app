@@ -85,6 +85,7 @@
     "nav.showFilters": "Показать фильтры",
     "filter.startDate": "Дата начала",
     "filter.endDate": "Дата окончания",
+    "filter.selectDateRange": "Выберите диапазон дат",
     "filter.clear": "Очистить",
     "filter.orderType": "Тип заказа",
     "filter.onlineOrder": "Онлайн заказ",

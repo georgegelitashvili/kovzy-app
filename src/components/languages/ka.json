@@ -87,6 +87,7 @@
     "filter.endDate": "დასრულების",
     "filter.clear": "გასუფთავება",
     "filter.selectOrderStatus": "აირჩიეთ შეკვეთის სტატუსი",
+    "filter.selectDateRange": "აირჩიეთ თარიღის პერიოდი",
     "filter.orderType": "შეკვეთის ტიპი",
     "filter.onlineOrder": "ონლაინ შეკვეთა",
     "filter.qrOrder": "QR შეკვეთა",

@@ -99,6 +99,7 @@
     "nav.showFilters": "Ցուցադրել զտիչները",
     "filter.startDate": "Սկսվում է",
     "filter.endDate": "Ավարտվում է",
+    "filter.selectDateRange": "Ընտրեք ամսաթիվների միջակայքը",
     "filter.clear": "Մաքրել",
     "filter.orderType": "Պատվերի տեսակ",
     "filter.onlineOrder": "Առցանց պատվեր",
