@@ -26,6 +26,7 @@ import printRows from "../../PrintRows";
 
 import NotificationSound from '../../utils/NotificationSound';
 import NotificationManager from '../../utils/NotificationManager';
+import OnlineOrdersCard from "../generate/ordersCard/OnlineOrdersCard";
 
 
 const width = Dimensions.get("window").width;
@@ -420,143 +421,15 @@ export const EnteredOrdersList = () => {
 
 
   const renderEnteredOrdersList = ({ item }) => {
-    const deliveryPrice = parseFloat(item.delivery_price);
-    const additionalFees = parseFloat(item.service_fee) / 100;
-    const feeData = JSON.parse(item.fees_details || '{}');
-    const feesDetails = fees?.reduce((acc, fee) => {
-      const feeId = fee['id'];
-      if (feeData[feeId]) {
-        acc.push(`${fee['value']} : ${parseFloat(feeData[feeId])}`);
-      }
-      return acc;
-    }, []);
-
-    const isScheduled = item.take_away ? scheduled.scheduled_takeaway : scheduled.scheduled_delivery;
-
-    return (
-      <Card key={item.id} style={styles.card}>
-        <TouchableOpacity onPress={() => toggleContent(item.id)}>
-          <Card.Content style={styles.head}>
-            <Text variant="headlineMedium" style={styles.header}>
-              <MaterialCommunityIcons
-                name="music-accidental-sharp"
-                style={styles.leftIcon}
-              />
-              {item.id}
-            </Text>
-            <Text style={styles.takeAway}>{item.take_away === 1 ? "("+dictionary["orders.takeAway"] + ")" : ""}</Text>
-            <Text variant="headlineMedium" style={styles.header}>
-              <SimpleLineIcons
-                name={!isOpen.includes(item.id) ? "arrow-up" : "arrow-down"}
-                style={styles.rightIcon}
-              />
-            </Text>
-          </Card.Content>
-        </TouchableOpacity>
-        {!isOpen.includes(item.id) ? (
-          <Card.Content>
-            <Text variant="titleSmall" style={styles.title}>
-              {dictionary["orders.status"]}: {dictionary["orders.pending"]}
-            </Text>
-
-            <Text variant="titleSmall" style={styles.title} numberOfLines={2} ellipsizeMode="tail">
-              {dictionary["orders.fName"]}: {item.firstname} {item.lastname}
-            </Text>
-
-            <Text variant="titleSmall" style={styles.title}>
-              {dictionary["orders.phone"]}: {item.phone_number}
-            </Text>
-
-            <Text variant="titleSmall" style={styles.title} ellipsizeMode="tail">
-              {dictionary["orders.address"]}: {item.address}
-            </Text>
-
-            {item.delivery_scheduled ? (
-              <Text variant="titleSmall" style={styles.title} numberOfLines={2} ellipsizeMode="tail">
-                {dictionary["orders.scheduledDeliveryTime"]}: {item.delivery_scheduled}
-              </Text>
-            ) : null}
-
-            {item.comment ? (
-              <Text variant="titleSmall" style={styles.title} numberOfLines={2} ellipsizeMode="tail">
-                {dictionary["orders.comment"]}: {item.comment}
-              </Text>
-            ) : null}
-
-            <Text variant="titleSmall" style={styles.title} numberOfLines={2} ellipsizeMode="tail">
-              {dictionary["orders.paymentMethod"]}: {item.payment_type}
-            </Text>
-
-            <Divider />
-              <OrdersDetail orderId={item.id} />
-            <Divider />
-
-            <Text variant="titleMedium" style={styles.title}> {dictionary["orders.initialPrice"]}: {item.real_price} {currency}</Text>
-
-            <Text variant="titleMedium" style={styles.title}> {dictionary["orders.discountedPrice"]}: {item.price} {currency}</Text>
-
-            <Text variant="titleMedium" style={styles.title}> {dictionary["orders.deliveryPrice"]}: {deliveryPrice} {currency}</Text>
-
-            {feesDetails?.length > 0 && (
-              <View>
-                <Text variant="titleMedium" style={styles.title}>
-                  {dictionary["orders.additionalFees"]}: {additionalFees} {currency}
-                </Text>
-                <View style={styles.feeDetailsContainer}>
-                  {feesDetails.map((fee, index) => (
-                    <Text key={index} style={styles.feeDetailText}>
-                      {fee} {currency}
-                    </Text>
-                  ))}
-                </View>
-              </View>
-            )}
-
-            <Text variant="titleMedium" style={styles.title}>
-              {dictionary["orders.totalcost"]}: {item.total_cost} {currency}
-            </Text>
-            <Card.Actions>
-              <TouchableOpacity
-                style={styles.buttonAccept}
-                onPress={() => {
-                  setItemId(item.id);
-                  setItemTakeAway(item.take_away);
-                  showModal("accept");
-                }}
-              >
-                <MaterialCommunityIcons name="check-decagram-outline" size={30} color="white" />
-              </TouchableOpacity>
-
-              {item.delivery_scheduled !== null && isScheduled && (
-                <TouchableOpacity
-                  style={styles.buttonDelay}
-                  onPress={() => {
-                    setItemId(item.id);
-                    setDeliveryScheduled(item.delivery_scheduled);
-                    setPickerVisible(true);
-                    setLoadingOptions(false);
-                  }}
-                >
-                  <MaterialCommunityIcons name="bell-ring-outline" size={30} color="white" />
-                </TouchableOpacity>
-              )}
-
-              <TouchableOpacity
-                style={styles.buttonReject}
-                onPress={() => {
-                  setItemId(item.id);
-                  setItemTakeAway(null);
-                  showModal("reject");
-                }}
-              >
-                <MaterialCommunityIcons name="close-circle-outline" size={30} color="white" />
-              </TouchableOpacity>
-            </Card.Actions>
-
-          </Card.Content>
-        ) : null}
-      </Card>
-    )
+    return <OnlineOrdersCard
+      key={item.id}
+      item={item}
+      dictionary={dictionary}
+      currency={currency}
+      scheduled={scheduled}
+      isOpen={isOpen}
+      toggleContent={toggleContent}
+    />
   };
 
 
