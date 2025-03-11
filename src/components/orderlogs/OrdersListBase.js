@@ -185,7 +185,7 @@ export const OrdersListBase = ({ orderType }) => {
     }, []);
 
     return (
-      <Card style={styles.card}>
+      <Card key={item.id} style={styles.card}>
         <TouchableOpacity onPress={() => toggleContent(item.id)}>
           <Card.Content style={styles.head}>
             <Text variant="headlineMedium" style={styles.header}>

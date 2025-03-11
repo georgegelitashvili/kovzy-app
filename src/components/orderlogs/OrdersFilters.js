@@ -1,19 +1,21 @@
-import React, { useState, useContext, useCallback, useEffect } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Modal } from "react-native";
+import React, { useState, useContext, useCallback, useEffect, useMemo } from "react";
+import { View, Text, TouchableOpacity, StyleSheet, Modal } from "react-native";
 import { Calendar } from "react-native-calendars";
+import RNPickerSelect from "react-native-picker-select";
 import { LanguageContext } from "../Language";
 
 const OrdersFilters = ({ onApplyFilters, filters }) => {
-  const { dictionary } = useContext(LanguageContext);
-  const [isPreparedSelected, setIsPreparedSelected] = useState(true); // Default to "Prepared" (status 2)
+  const { dictionary, userLanguage } = useContext(LanguageContext);
+  const [isPreparedSelected, setIsPreparedSelected] = useState(true);
   const [isCancelledSelected, setIsCancelledSelected] = useState(false);
-
   const [dateRange, setDateRange] = useState({
     startDate: filters.startDate ? new Date(filters.startDate) : null,
     endDate: filters.endDate ? new Date(filters.endDate) : null,
   });
   const [isCalendarVisible, setIsCalendarVisible] = useState(false);
+  const [currentMonth, setCurrentMonth] = useState(new Date().toISOString().split("T")[0]); // Default to today
 
+  console.log(userLanguage);
   useEffect(() => {
     applyFilters();
   }, [isPreparedSelected, isCancelledSelected, dateRange]);
@@ -28,11 +30,11 @@ const OrdersFilters = ({ onApplyFilters, filters }) => {
       alert(dictionary["filter.dateRangeError"]);
       return;
     }
-    let orderStatuses = [];
-    if (isPreparedSelected) orderStatuses.push("2"); // Prepared
-    if (isCancelledSelected) orderStatuses.push("-1"); // Cancelled
 
-    // If both are selected, send all statuses
+    let orderStatuses = [];
+    if (isPreparedSelected) orderStatuses.push("2");
+    if (isCancelledSelected) orderStatuses.push("-1");
+
     const orderStatus = orderStatuses.length === 2 ? "all" : orderStatuses.join(",");
 
     const newFilters = {
@@ -48,51 +50,59 @@ const OrdersFilters = ({ onApplyFilters, filters }) => {
     const selectedDate = new Date(day.dateString);
 
     if (!startDate || (startDate && endDate)) {
-      // If no start date is selected or both start and end dates are selected, reset the range
       setDateRange({ startDate: selectedDate, endDate: null });
     } else if (selectedDate.toISOString() === startDate.toISOString()) {
-      // If the selected date is the same as the start date, clear the start date
       setDateRange({ startDate: null, endDate: null });
     } else if (selectedDate < startDate) {
-      // If the selected date is before the start date, set it as the new start date
       setDateRange({ startDate: selectedDate, endDate: null });
     } else {
-      // If the selected date is after the start date, set it as the end date
       setDateRange({ ...dateRange, endDate: selectedDate });
     }
   };
 
-  const clearDateRange = () => {
-    setDateRange({ startDate: null, endDate: null });
+  const generateMarkedDates = () => {
+    let marked = {};
+
+    if (dateRange.startDate) {
+      marked[dateRange.startDate.toISOString().split("T")[0]] = {
+        startingDay: true,
+        color: "green",
+        textColor: "white",
+      };
+    }
+
+    if (dateRange.endDate) {
+      marked[dateRange.endDate.toISOString().split("T")[0]] = {
+        endingDay: true,
+        color: "green",
+        textColor: "white",
+      };
+
+      let current = new Date(dateRange.startDate);
+      current.setDate(current.getDate() + 1);
+
+      while (current < dateRange.endDate) {
+        const dateStr = current.toISOString().split("T")[0];
+        marked[dateStr] = { color: "lightgreen", textColor: "black" };
+        current.setDate(current.getDate() + 1);
+      }
+    }
+
+    return marked;
   };
 
-  // Format marked dates for the calendar
-  const markedDates = {};
-  if (dateRange.startDate) {
-    const startDateStr = dateRange.startDate.toISOString().split("T")[0];
-    markedDates[startDateStr] = { startingDay: true, color: "green", textColor: "white" };
-  }
-  if (dateRange.endDate) {
-    const endDateStr = dateRange.endDate.toISOString().split("T")[0];
-    markedDates[endDateStr] = { endingDay: true, color: "green", textColor: "white" };
-  }
-  if (dateRange.startDate && dateRange.endDate) {
-    // Highlight the range between start and end dates
-    let currentDate = new Date(dateRange.startDate);
-    while (currentDate <= dateRange.endDate) {
-      const currentDateStr = currentDate.toISOString().split("T")[0];
-      if (!markedDates[currentDateStr]) {
-        markedDates[currentDateStr] = { color: "lightgreen", textColor: "black" };
-      }
-      currentDate.setDate(currentDate.getDate() + 1);
-    }
-  }
+  const handleMonthChange = (month) => {
+    const updatedMonth = `${new Date().getFullYear()}-${month.toString().padStart(2, "0")}-01`;
+    setCurrentMonth(updatedMonth);
+  };
 
-  // Format the selected date range for display
-  const selectedRangeText =
-    dateRange.startDate && dateRange.endDate
-      ? `${dateRange.startDate.toLocaleDateString()} - ${dateRange.endDate.toLocaleDateString()}`
-      : dictionary["filter.selectDateRange"];
+  // Generate a list of months for selection
+  const monthOptions = useMemo(() =>
+    Array.from({ length: 12 }, (_, i) => ({
+      label: new Date(2024, i, 1).toLocaleString(userLanguage, { month: "long" }),
+      value: (i + 1).toString().padStart(2, "0"),
+    })), [userLanguage]);
+
 
   return (
     <View contentContainerStyle={styles.scrollViewContent} keyboardShouldPersistTaps="handled">
@@ -120,34 +130,51 @@ const OrdersFilters = ({ onApplyFilters, filters }) => {
       </View>
 
       <View style={styles.dateRangeContainer}>
-        <View style={styles.dateRangeButtonContainer}>
-          <TouchableOpacity
-            style={styles.dateRangeButton}
-            onPress={() => setIsCalendarVisible(true)}
-          >
-            <Text style={styles.dateRangeText}>{selectedRangeText}</Text>
-          </TouchableOpacity>
-          {dateRange.startDate && (
-            <TouchableOpacity style={styles.clearButton} onPress={clearDateRange}>
-              <Text style={styles.clearButtonText}>X</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+        <TouchableOpacity
+          style={styles.dateRangeButton}
+          onPress={() => setIsCalendarVisible(true)}
+        >
+          <Text style={styles.dateRangeText}>Select Date Range</Text>
+        </TouchableOpacity>
       </View>
 
       <Modal visible={isCalendarVisible} transparent={true} animationType="slide">
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
+            {/* Month Selector */}
+            <RNPickerSelect
+              onValueChange={handleMonthChange}
+              items={monthOptions}
+              placeholder={{ label: dictionary["selectMonth"], value: null }}
+              style={{
+                inputIOS: styles.picker,
+                inputAndroid: styles.picker,
+              }}
+            />
+
+            {/* Calendar Component */}
             <Calendar
+              key={currentMonth}
+              current={currentMonth}
+              locale={userLanguage}
+              onMonthChange={(month) => setCurrentMonth(`${month.year}-${month.month.toString().padStart(2, "0")}-01`)}
+              renderHeader={(date) => {
+                return (
+                  <Text style={{ fontSize: 18 }}>
+                    {new Date(date).toLocaleString(userLanguage, { month: "long", year: "numeric" })}
+                  </Text>
+                );
+              }}
               onDayPress={handleDayPress}
-              markedDates={markedDates}
+              markedDates={generateMarkedDates()}
               markingType="period"
             />
+
             <TouchableOpacity
               style={styles.modalCloseButton}
               onPress={() => setIsCalendarVisible(false)}
             >
-              <Text style={styles.modalCloseButtonText}>Done</Text>
+              <Text style={styles.modalCloseButtonText}>{dictionary["done"]}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -157,113 +184,22 @@ const OrdersFilters = ({ onApplyFilters, filters }) => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    width: "100%",
-    padding: 10,
-    backgroundColor: "white",
-  },
-  scrollViewContent: {
-    flexGrow: 1,
-    padding: 7,
-  },
-  label: {
-    fontSize: 14,
-    marginBottom: 1,
-  },
-  statusRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 5,
-  },
-  checkboxContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginVertical: 5,
-    marginRight: 10,
-  },
-  checkbox: {
-    width: 20,
-    height: 20,
-    borderWidth: 1,
-    borderColor: "gray",
-    borderRadius: 4,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 10,
-  },
-  checkboxSelected: {
-    backgroundColor: "#006400",
-    borderColor: "#006400",
-  },
-  checkboxIcon: {
-    color: "white",
-    fontSize: 14,
-  },
-  checkboxLabel: {
-    fontSize: 14,
-  },
-  dateRangeContainer: {
-    marginVertical: 5,
-  },
-  dateRangeButtonContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  dateRangeButton: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: "gray",
-    borderRadius: 5,
-    padding: 5,
-    alignItems: "center",
-  },
-  dateRangeText: {
-    fontSize: 14,
-  },
-  clearButton: {
-    marginLeft: 10,
-    padding: 7,
-    backgroundColor: "#FF0000",
-    borderRadius: 5,
-  },
-  clearButtonText: {
-    color: "white",
-    fontSize: 13,
-  },
-  modalContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-  },
-  modalContent: {
-    width: "90%",
-    backgroundColor: "white",
-    borderRadius: 10,
-    padding: 20,
-  },
-  modalCloseButton: {
-    marginTop: 10,
-    padding: 10,
-    backgroundColor: "#006400",
-    borderRadius: 5,
-    alignItems: "center",
-  },
-  modalCloseButtonText: {
-    color: "white",
-    fontSize: 16,
-  },
-  headerContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 10,
-  },
-  headerText: {
-    fontSize: 18,
-    fontWeight: "bold",
-  },
+  scrollViewContent: { flexGrow: 1, padding: 7 },
+  label: { fontSize: 14, marginBottom: 1 },
+  statusRow: { flexDirection: "row", alignItems: "center", padding: 5 },
+  checkboxContainer: { flexDirection: "row", alignItems: "center", marginVertical: 5, marginRight: 10 },
+  checkbox: { width: 20, height: 20, borderWidth: 1, borderColor: "gray", borderRadius: 4, justifyContent: "center", alignItems: "center", marginRight: 10 },
+  checkboxSelected: { backgroundColor: "#006400", borderColor: "#006400" },
+  checkboxIcon: { color: "white", fontSize: 14 },
+  checkboxLabel: { fontSize: 14 },
+  dateRangeContainer: { marginVertical: 5 },
+  dateRangeButton: { borderWidth: 1, borderColor: "gray", borderRadius: 5, padding: 10, alignItems: "center" },
+  dateRangeText: { fontSize: 14 },
+  modalContainer: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0, 0, 0, 0.5)" },
+  modalContent: { width: "90%", backgroundColor: "white", borderRadius: 10, padding: 20 },
+  modalCloseButton: { marginTop: 10, padding: 10, backgroundColor: "#006400", borderRadius: 5, alignItems: "center" },
+  modalCloseButtonText: { color: "white", fontSize: 16 },
+  picker: { fontSize: 16, padding: 10, borderBottomWidth: 1, borderBottomColor: "gray" },
 });
 
 export default React.memo(OrdersFilters);
