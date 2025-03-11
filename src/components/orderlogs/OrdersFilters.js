@@ -15,7 +15,6 @@ const OrdersFilters = ({ onApplyFilters, filters }) => {
   const [isCalendarVisible, setIsCalendarVisible] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date().toISOString().split("T")[0]); // Default to today
 
-  console.log(userLanguage);
   useEffect(() => {
     applyFilters();
   }, [isPreparedSelected, isCancelledSelected, dateRange]);
@@ -60,7 +59,7 @@ const OrdersFilters = ({ onApplyFilters, filters }) => {
     }
   };
 
-  const generateMarkedDates = () => {
+  const generateMarkedDates = useMemo(() => {
     let marked = {};
 
     if (dateRange.startDate) {
@@ -89,28 +88,40 @@ const OrdersFilters = ({ onApplyFilters, filters }) => {
     }
 
     return marked;
-  };
+  }, [dateRange]);
 
   const handleMonthChange = (month) => {
     const updatedMonth = `${new Date().getFullYear()}-${month.toString().padStart(2, "0")}-01`;
     setCurrentMonth(updatedMonth);
   };
 
-  // Generate a list of months for selection
+  const clearDateRange = () => {
+    setDateRange({ startDate: null, endDate: null });
+  };
+
   const monthOptions = useMemo(() =>
     Array.from({ length: 12 }, (_, i) => ({
       label: new Date(2024, i, 1).toLocaleString(userLanguage, { month: "long" }),
       value: (i + 1).toString().padStart(2, "0"),
     })), [userLanguage]);
 
+  const formatDate = (date) => {
+    if (!date) return "";
+    return date.toLocaleDateString(userLanguage, { day: "numeric", month: "short", year: "numeric" });
+  };
+
+  const dateRangeText = dateRange.startDate && dateRange.endDate
+    ? `${formatDate(dateRange.startDate)} - ${formatDate(dateRange.endDate)}`
+    : dictionary["filter.selectDateRange"];
 
   return (
-    <View contentContainerStyle={styles.scrollViewContent} keyboardShouldPersistTaps="handled">
+    <View style={styles.card}>
       <Text style={styles.label}>{dictionary["filter.orderStatus"]}</Text>
       <View style={styles.statusRow}>
         <TouchableOpacity
           style={styles.checkboxContainer}
           onPress={() => setIsPreparedSelected(!isPreparedSelected)}
+          accessibilityLabel={dictionary["filter.prepared"]}
         >
           <View style={[styles.checkbox, isPreparedSelected && styles.checkboxSelected]}>
             {isPreparedSelected && <Text style={styles.checkboxIcon}>✓</Text>}
@@ -121,6 +132,7 @@ const OrdersFilters = ({ onApplyFilters, filters }) => {
         <TouchableOpacity
           style={styles.checkboxContainer}
           onPress={() => setIsCancelledSelected(!isCancelledSelected)}
+          accessibilityLabel={dictionary["filter.cancelled"]}
         >
           <View style={[styles.checkbox, isCancelledSelected && styles.checkboxSelected]}>
             {isCancelledSelected && <Text style={styles.checkboxIcon}>✓</Text>}
@@ -133,15 +145,24 @@ const OrdersFilters = ({ onApplyFilters, filters }) => {
         <TouchableOpacity
           style={styles.dateRangeButton}
           onPress={() => setIsCalendarVisible(true)}
+          accessibilityLabel="Select Date Range"
         >
-          <Text style={styles.dateRangeText}>Select Date Range</Text>
+          <Text style={styles.dateRangeText}>{dateRangeText}</Text>
         </TouchableOpacity>
+        {dateRange.startDate && dateRange.endDate && (
+          <TouchableOpacity
+            style={styles.clearButton}
+            onPress={clearDateRange}
+            accessibilityLabel="Clear Date Range"
+          >
+            <Text style={styles.clearButtonText}>X</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       <Modal visible={isCalendarVisible} transparent={true} animationType="slide">
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
-            {/* Month Selector */}
             <RNPickerSelect
               onValueChange={handleMonthChange}
               items={monthOptions}
@@ -166,13 +187,14 @@ const OrdersFilters = ({ onApplyFilters, filters }) => {
                 );
               }}
               onDayPress={handleDayPress}
-              markedDates={generateMarkedDates()}
+              markedDates={generateMarkedDates}
               markingType="period"
             />
 
             <TouchableOpacity
               style={styles.modalCloseButton}
               onPress={() => setIsCalendarVisible(false)}
+              accessibilityLabel="Close Calendar"
             >
               <Text style={styles.modalCloseButtonText}>{dictionary["done"]}</Text>
             </TouchableOpacity>
@@ -184,7 +206,17 @@ const OrdersFilters = ({ onApplyFilters, filters }) => {
 };
 
 const styles = StyleSheet.create({
-  scrollViewContent: { flexGrow: 1, padding: 7 },
+  card: {
+    backgroundColor: "white",
+    borderRadius: 10,
+    padding: 16,
+    margin: 0,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
   label: { fontSize: 14, marginBottom: 1 },
   statusRow: { flexDirection: "row", alignItems: "center", padding: 5 },
   checkboxContainer: { flexDirection: "row", alignItems: "center", marginVertical: 5, marginRight: 10 },
@@ -192,9 +224,11 @@ const styles = StyleSheet.create({
   checkboxSelected: { backgroundColor: "#006400", borderColor: "#006400" },
   checkboxIcon: { color: "white", fontSize: 14 },
   checkboxLabel: { fontSize: 14 },
-  dateRangeContainer: { marginVertical: 5 },
-  dateRangeButton: { borderWidth: 1, borderColor: "gray", borderRadius: 5, padding: 10, alignItems: "center" },
+  dateRangeContainer: { flexDirection: "row", alignItems: "center", marginVertical: 5 },
+  dateRangeButton: { flex: 1, borderWidth: 1, borderColor: "gray", borderRadius: 5, padding: 10, alignItems: "center" },
   dateRangeText: { fontSize: 14 },
+  clearButton: { marginLeft: 10, padding: 10, backgroundColor: "#FF0000", borderRadius: 5 },
+  clearButtonText: { color: "white", fontSize: 14 },
   modalContainer: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0, 0, 0, 0.5)" },
   modalContent: { width: "90%", backgroundColor: "white", borderRadius: 10, padding: 20 },
   modalCloseButton: { marginTop: 10, padding: 10, backgroundColor: "#006400", borderRadius: 5, alignItems: "center" },
