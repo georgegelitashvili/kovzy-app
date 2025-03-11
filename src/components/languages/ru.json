@@ -85,6 +85,7 @@
     "nav.showFilters": "Показать фильтры",
     "filter.startDate": "Дата начала",
     "filter.endDate": "Дата окончания",
+    "filter.selectDateRange": "Выберите диапазон дат",
     "filter.clear": "Очистить",
     "filter.orderType": "Тип заказа",
     "filter.onlineOrder": "Онлайн заказ",
@@ -474,5 +475,7 @@
     "settings": "настройки",
     "st.postponeOrder": "Запланированные заказы",
     "pr.warrning": "Сначала отметьте один из этих флажков",
-    "info.warning": "Предупреждение"
+    "info.warning": "Предупреждение",
+    "selectMonth": "Выберите месяц",
+    "done": "Готово"
 }

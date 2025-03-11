@@ -478,5 +478,7 @@
     "settings": "Settings",
     "st.postponeOrder": "Planned orders",
     "pr.warrning": "First check one of these checkboxes",
-    "info.warning": "Warning"
+    "info.warning": "Warning",
+    "selectMonth": "Select Month",
+    "done": "Done"
 }

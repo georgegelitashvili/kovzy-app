@@ -99,6 +99,7 @@
     "nav.showFilters": "Ցուցադրել զտիչները",
     "filter.startDate": "Սկսվում է",
     "filter.endDate": "Ավարտվում է",
+    "filter.selectDateRange": "Ընտրեք ամսաթիվների միջակայքը",
     "filter.clear": "Մաքրել",
     "filter.orderType": "Պատվերի տեսակ",
     "filter.onlineOrder": "Առցանց պատվեր",
@@ -520,5 +521,7 @@
     "settings": "կարգավորումները",
     "st.postponeOrder": "Գծագրված պատվերներ",
     "pr.warrning": "Նախ ընտրեք մեկը այս նշման դաշտերից",
-    "info.warning": "Զգուշացում"
+    "info.warning": "Զգուշացում",
+    "selectMonth": "Ընտրեք ամիսը",
+    "done": "Կատարված է"
 }
