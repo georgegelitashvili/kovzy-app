@@ -100,6 +100,7 @@
     "filter.lastName": "Last Name",
     "filter.applyFilters": "Apply Filters",
     "filter.selectOrderStatus": "Select Order Status",
+    "filter.selectDateRange": "Select Date Range",
     "nav.coupons": "Coupons",
     "nav.customizableTemplates": "Customizable Templates",
     "nav.news" : "News",
