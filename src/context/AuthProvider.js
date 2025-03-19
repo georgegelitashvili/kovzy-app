@@ -7,6 +7,7 @@ import Toast from '../components/generate/Toast';
 import { useFetchLanguages } from "../components/UseFetchLanguages";
 import { LanguageContext } from "../components/Language";
 import Loader from "../components/generate/loader";
+import AppUpdates from "../components/AppUpdates";
 
 export const AuthContext = createContext();
 
@@ -329,6 +330,7 @@ export const AuthProvider = ({ isConnected, children }) => {
         children
       )}
 
+      {user && <AppUpdates />}
 
       {!isVisible && user && (
         <TouchableOpacity onPress={handleClick}>
