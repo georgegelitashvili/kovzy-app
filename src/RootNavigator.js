@@ -19,8 +19,8 @@ const RootNavigator = () => {
       {user?.token ? (
         <Drawer.Navigator
           drawerContent={(props) => {
-            const { key, ...otherProps } = props; // Destructure key from props
-            return <DrawerContent {...otherProps} />; // Spread otherProps without key
+            const { key, ...otherProps } = props;
+            return <DrawerContent {...otherProps} />;
           }}
           initialRouteName="Order"
         >
@@ -39,8 +39,6 @@ const RootNavigator = () => {
             component={ReportsNavigator}
             options={{ title: dictionary["nav.Reports"], unmountOnBlur: true }}
           />
-
-
           <Drawer.Screen
             name="Products"
             component={ProductsNavigator}

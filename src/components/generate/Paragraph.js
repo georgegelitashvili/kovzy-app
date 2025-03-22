@@ -3,8 +3,7 @@ import { StyleSheet } from 'react-native';
 import { Text } from 'react-native-paper';
 
 export default function Paragraph(props) {
-  const { key, ...otherProps } = props;
-  return <Text style={styles.text} {...otherProps} />
+  return <Text style={styles.text} {...props} />
 }
 
 const styles = StyleSheet.create({

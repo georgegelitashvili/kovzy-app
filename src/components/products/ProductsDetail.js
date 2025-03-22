@@ -13,30 +13,16 @@ const width = Dimensions.get("window").width;
 
 export default function ProductsDetail({ navigation, route }) {
   const { id } = route.params;
-
   const { setIsDataSet, domain, branchid } = useContext(AuthContext);
+  const { dictionary, userLanguage } = useContext(LanguageContext);
+  
   const [customizable, setCustomizable] = useState([]);
-  const [options, setOptions] = useState({}); // api options
-  const [optionsIsLoaded, setOptionsIsLoaded] = useState(false); // api options
   const [productEnabled, setProductEnabled] = useState(false);
   const [isConnected, setIsConnected] = useState(true);
-  const [sendEnabled, setSendEnabled] = useState(false);
-  const [sendApi, setSendApi] = useState(false);
-
-  const [isOpen, setOpenState] = useState([]); // my accordion state
   const [loading, setLoading] = useState(true);
+  const [isOpen, setOpenState] = useState([]);
   const [value, setValue] = useState("");
   const [enabled, setEnabled] = useState("");
-
-  const { dictionary, userLanguage } = useContext(LanguageContext);
-
-  const apiOptions = () => {
-    setOptions({
-      url_customizable: `https://${domain}/api/v1/admin/getCustomizablePack`,
-      url_toggle: `https://${domain}/api/v1/admin/customizablePackActivity`,
-    });
-    setOptionsIsLoaded(true);
-  };
 
   useEffect(() => {
     const removeSubscription = NetInfo.addEventListener((state) => {
@@ -47,71 +33,59 @@ export default function ProductsDetail({ navigation, route }) {
   }, []);
 
   useEffect(() => {
-    apiOptions();
-    if (optionsIsLoaded) {
-      setSendApi(true);
+    if (isConnected && domain && branchid) {
+      fetchData();
     }
-  }, [optionsIsLoaded, userLanguage, id]);
-
+  }, [isConnected, domain, branchid, userLanguage, id]);
 
   useEffect(() => {
-    if (sendApi || isConnected) {
-      if (options.url_customizable) {
-        fetchData();
-      }
-      setSendApi(false);
-    }
-  }, [sendApi, isConnected, options.url_customizable]);
-
-  useEffect(() => {
-    if (value) {
-      setSendEnabled(true);
+    if (value && enabled) {
+      handleTogglePack();
     }
   }, [value, enabled]);
 
-  useEffect(() => {
-    if (sendEnabled || isConnected) {
-      axiosInstance.post(options.url_toggle, { customizablePackid: value, enabled: enabled, branchid: branchid });
-      setLoading(true);
-      setProductEnabled(true);
-      setSendEnabled(false);
-    }
-  }, [sendEnabled, isConnected]);
-
-  useEffect(() => {
-    if (productEnabled || isConnected) {
-      if (options.url_customizable) {
-        fetchData();
+  const fetchData = async () => {
+    if (!domain || !branchid) return;
+    
+    try {
+      const response = await axiosInstance.post(
+        `https://${domain}/api/v1/admin/getCustomizablePack`,
+        {
+          pid: id,
+          lang: userLanguage,
+        }
+      );
+      setCustomizable(response.data.customizable);
+    } catch (error) {
+      console.error('Error fetching customizable packs:', error);
+      if (error.status === 401) {
+        setCustomizable([]);
+        setIsDataSet(false);
       }
-      setProductEnabled(false);
-      setSendApi(false);
+    } finally {
+      setLoading(false);
     }
-  }, [productEnabled, isConnected, options.url_customizable]);
+  };
 
-
-  const fetchData = () => {
-    if (!options.url_customizable) {
-      console.error("URL for customizable is not set.");
+  const handleTogglePack = async () => {
+    if (!domain || !branchid || !value) return;
+    
+    try {
+      const response = await axiosInstance.post(
+        `https://${domain}/api/v1/admin/customizablePackActivity`,
+        { 
+          customizablePackid: value, 
+          enabled: enabled, 
+          branchid: branchid 
+        }
+      );
+      setProductEnabled(response.data.data);
+      fetchData(); // Refresh data after toggle
+    } catch (error) {
+      console.error('Error toggling pack:', error);
       return;
     }
-    
-    axiosInstance
-      .post(options.url_customizable, {
-        pid: id,
-        lang: userLanguage,
-      })
-      .then((resp) => {
-        setCustomizable(resp.data.customizable);
-        setLoading(false);
-      })
-      .catch((error) => {
-        if (error) {
-          setCustomizable([]);
-          setIsDataSet(false);
-        }
-      });
-  }
-
+  };
 
   const toggleContent = (value) => {
     setOpenState((prev) =>
@@ -120,7 +94,6 @@ export default function ProductsDetail({ navigation, route }) {
   };
 
   const handlePackButtonPress = (packId, packEnabled) => {
-    // Update API
     setValue(packId);
     setEnabled(packEnabled ? 0 : 1);
   };
@@ -145,32 +118,26 @@ export default function ProductsDetail({ navigation, route }) {
             </Text>
           </Card.Content>
         </TouchableOpacity>
-        {!isOpen.includes(item.id) ? (
-          item.packs?.map((child, index) => {
-            return (
-              <Card.Content key={index + 1}>
-                <View>
-                  <View style={{ flexDirection: 'row', justifyContent: "space-between", }}>
-                    <Text variant="titleMedium" style={styles.title}>
-                      {child.name}
-                    </Text>
-
-                    <Button
-                      textColor="white"
-                      buttonColor={child.enabled ? "#f14c4c" : "#2fa360"}
-                      style={styles.button}
-                      onPress={() => handlePackButtonPress(child.id, child.enabled)}
-                    >
-                      {child.enabled ? dictionary["prod.disableProduct"] : dictionary["prod.enableProduct"]}
-                    </Button>
-                  </View>
-
-                  <Divider style={{ marginVertical: 9 }} />
-                </View>
-              </Card.Content>
-            )
-          })
-        ) : null}
+        {!isOpen.includes(item.id) && item.packs?.map((child, index) => (
+          <Card.Content key={index + 1}>
+            <View>
+              <View style={{ flexDirection: 'row', justifyContent: "space-between" }}>
+                <Text variant="titleMedium" style={styles.title}>
+                  {child.name}
+                </Text>
+                <Button
+                  textColor="white"
+                  buttonColor={child.enabled ? "#f14c4c" : "#2fa360"}
+                  style={styles.button}
+                  onPress={() => handlePackButtonPress(child.id, child.enabled)}
+                >
+                  {child.enabled ? dictionary["prod.disableProduct"] : dictionary["prod.enableProduct"]}
+                </Button>
+              </View>
+              <Divider style={{ marginVertical: 9 }} />
+            </View>
+          </Card.Content>
+        ))}
       </Card>
     );
   };
@@ -180,21 +147,18 @@ export default function ProductsDetail({ navigation, route }) {
   }
 
   return (
-    <>
-      <FlatGrid
-        itemDimension={width}
-        data={customizable || []}
-        maxItemsPerRow={4}
-        renderItem={({ item }) => <RenderCustomizableList item={item} />}
-        adjustGridToStyles={true}
-        contentContainerStyle={{ justifyContent: "flex-start" }}
-        keyExtractor={(item) => item.id.toString()}
-        removeClippedSubviews={true}
-      />
-    </>
+    <FlatGrid
+      itemDimension={width}
+      data={customizable || []}
+      maxItemsPerRow={4}
+      renderItem={({ item }) => <RenderCustomizableList item={item} />}
+      adjustGridToStyles={true}
+      contentContainerStyle={{ justifyContent: "flex-start" }}
+      keyExtractor={(item) => item.id.toString()}
+      removeClippedSubviews={true}
+    />
   );
 }
-
 
 const styles = StyleSheet.create({
   container: {
@@ -204,7 +168,6 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: "#fff",
     justifyContent: "flex-start",
-
     margin: 10,
     borderRadius: 10,
     shadowColor: "#000",
@@ -214,7 +177,6 @@ const styles = StyleSheet.create({
     },
     shadowOpacity: 0.3,
     shadowRadius: 4.65,
-
     elevation: 8,
   },
   head: {

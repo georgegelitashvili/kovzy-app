@@ -10,6 +10,7 @@ import { EnteredOrdersList } from "./components/orders/EnteredOrders";
 import { PostponeOrders } from "./components/orders/PostponeOrders";
 import { AcceptedOrdersList } from "./components/orders/AcceptedOrders";
 import { LanguageContext } from "./components/Language";
+import { TabBarItem } from "./components/TabBarItem";
 
 const Tab = createMaterialTopTabNavigator();
 
@@ -55,7 +56,6 @@ export default function TabContent() {
       try {
         const storedValue = await AsyncStorage.getItem('postponeOrderShow');
         if (storedValue !== null) {
-          // Set the state to the stored value (parsing it to boolean)
           setPostponeOrderShow(JSON.parse(storedValue));
         }
       } catch (error) {
@@ -72,10 +72,19 @@ export default function TabContent() {
         tabBarLabelStyle: {
           fontSize: 15,
         },
+        tabBarItemStyle: {
+          minWidth: 0,
+          paddingHorizontal: 10,
+        },
+        tabBarStyle: {
+          elevation: 0,
+          shadowOpacity: 0,
+        },
+        tabBarItem: (props) => <TabBarItem {...props} />
       }}
     >
       <Tab.Screen
-        name="EnterdOrders"
+        name="EnteredOrders"
         component={EnteredOrdersList}
         options={{ tabBarLabel: dictionary["nav.pendingOrders"], unmountOnBlur: true }}
       />
@@ -95,4 +104,4 @@ export default function TabContent() {
       />
     </Tab.Navigator>
   );
-};
+}

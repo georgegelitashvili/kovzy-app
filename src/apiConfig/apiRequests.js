@@ -2,13 +2,31 @@ import axios from "axios";
 import * as SecureStore from 'expo-secure-store';
 import { removeData } from "../helpers/storage";
 
+// ქეშის ობიექტი
+const cache = new Map();
+const CACHE_DURATION = 5 * 60 * 1000; // 5 წუთი
+
 const axiosInstance = axios.create({
   headers: {
     'Accept': 'application/json',
     'Content-Type': 'application/json',
   },
   withCredentials: true,
+  timeout: 10000, // 10 წამი
 });
+
+// ქეშის გასუფთავების ფუნქცია
+const clearCache = () => {
+  const now = Date.now();
+  for (const [key, value] of cache.entries()) {
+    if (now - value.timestamp > CACHE_DURATION) {
+      cache.delete(key);
+    }
+  }
+};
+
+// ქეშის გასუფთავება ყოველ 5 წუთში
+setInterval(clearCache, CACHE_DURATION);
 
 // Request interceptor to check for empty URLs
 axiosInstance.interceptors.request.use(
@@ -25,6 +43,19 @@ axiosInstance.interceptors.request.use(
       config.headers.Authorization = `Bearer ${JSON.parse(token)}`;
     }
 
+    // ქეშის შემოწმება GET მოთხოვნებისთვის
+    if (config.method === 'get') {
+      const cacheKey = `${config.url}${JSON.stringify(config.params || {})}`;
+      const cachedData = cache.get(cacheKey);
+      
+      if (cachedData && Date.now() - cachedData.timestamp < CACHE_DURATION) {
+        return Promise.reject({
+          config,
+          response: { data: cachedData.data }
+        });
+      }
+    }
+
     return config;
   },
   (error) => {
@@ -36,6 +67,15 @@ axiosInstance.interceptors.request.use(
 // Response interceptor to handle responses and errors
 axiosInstance.interceptors.response.use(
   (response) => {
+    // ქეშის შენახვა GET მოთხოვნებისთვის
+    if (response.config.method === 'get') {
+      const cacheKey = `${response.config.url}${JSON.stringify(response.config.params || {})}`;
+      cache.set(cacheKey, {
+        data: response.data,
+        timestamp: Date.now()
+      });
+    }
+
     // Clear cache for this specific request
     response.config.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
     response.config.headers['Pragma'] = 'no-cache';

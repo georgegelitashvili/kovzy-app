@@ -31,8 +31,9 @@ const cardSize = width / numColumns;
 
 // render entered orders function
 export const PostponeOrders = () => {
-    const { domain, branchid, setUser, user, intervalId, setIntervalId, shouldRenderAuthScreen, setShouldRenderAuthScreen } = useContext(AuthContext);
+    const { domain, branchid, setUser, user, shouldRenderAuthScreen, setShouldRenderAuthScreen } = useContext(AuthContext);
     const NotificationSoundRef = useRef(null);
+    const intervalRef = useRef(null);
     const [orders, setOrders] = useState([]);
     const [fees, setFees] = useState([]);
     const [currency, setCurrency] = useState("");
@@ -124,7 +125,9 @@ export const PostponeOrders = () => {
             console.log('Error fetching entered orders full:', error);
             const statusCode = error?.status || 'Unknown';
             console.log('Status code entered orders:', statusCode);
-            clearInterval(intervalId);
+            if (intervalRef.current) {
+                clearInterval(intervalRef.current);
+            }
             handleReload();
         } finally {
             setLoading(false);

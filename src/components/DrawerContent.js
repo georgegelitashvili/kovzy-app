@@ -1,44 +1,25 @@
-import React, { useState, useContext, useEffect } from "react";
+import React, { useState, useContext, useEffect, useRef } from "react";
 import { View, StyleSheet, ActivityIndicator } from "react-native";
 import { DrawerItem, DrawerContentScrollView } from "@react-navigation/drawer";
 import { Drawer, Text, TouchableRipple, Switch } from "react-native-paper";
 import { MaterialCommunityIcons, Fontisto, SimpleLineIcons } from "@expo/vector-icons";
-import { AuthContext, AuthProvider } from "../context/AuthProvider";
+import { AuthContext } from "../context/AuthProvider";
 import LanguageSelector from "./generate/LanguageSelector";
 import axiosInstance from "../apiConfig/apiRequests";
-import { String, LanguageContext } from "./Language";
+import { LanguageContext } from "./Language";
 
 export default function DrawerContent(props) {
-
-  const { key, ...otherProps } = props;
-  const { domain, branchid, branchName, branchEnabled, setBranchEnabled, deliveronEnabled, logout, intervalId, setIntervalId, setIsLoading } = useContext(AuthContext);
+  const { navigation, ...otherProps } = props;
+  const { domain, branchid, branchName, branchEnabled, setBranchEnabled, deliveronEnabled, logout, setIsLoading } = useContext(AuthContext);
   const { dictionary, userLanguage } = useContext(LanguageContext);
   const [qrOrdersBadge, setQrOrdersBadge] = useState(0);
   const [onlineOrdersBadge, setOnlineOrdersBadge] = useState(0);
-
-  const [options, setOptions] = useState({
-    url_branchActivity: "",
-    url_deliveronStatus: "",
-    url_branchStatus: "",
-    url_deliveronActivity: "",
-  }); // api options
-  const [optionsIsLoaded, setOptionsIsLoaded] = useState(false); // check api options is loaded
-  const [branchChangeOptions, setBranchChangeOptions] = useState({});
-
-  const [isBranchEnabled, setIsBranchEnabled] = useState(false);
   const [loading, setLoading] = useState(false);
-
-  const apiOptions = () => {
-    setOptions({
-      url_branchActivity: `https://${domain}/api/v1/admin/branchActivity`,
-      url_deliveronStatus: `https://${domain}/api/v1/admin/deliveronStatus`,
-      url_branchStatus: `https://${domain}/api/v1/admin/branchStatus`,
-      url_deliveronActivity: `https://${domain}/api/v1/admin/deliveronActivity`,
-    });
-    setOptionsIsLoaded(true);
-  };
+  const intervalRef = useRef(null);
 
   const fetchUnansweredOrders = async () => {
+    if (!domain || !branchid) return;
+    
     try {
       const [responseQr, responseOnline] = await Promise.all([
         axiosInstance.post(`https://${domain}/api/v1/admin/getUnansweredOrders`,
@@ -55,31 +36,26 @@ export default function DrawerContent(props) {
         setQrOrdersBadge(responseQr.data.data.length);
         setOnlineOrdersBadge(responseOnline.data.data.length);
       }
-
     } catch (error) {
       console.error("Error fetching orders:", error);
-      // Clear interval on repeated failures
       if (error.message?.includes('timeout')) {
-        clearInterval(intervalId);
-        setIntervalId(null);
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+        }
       }
     }
   };
 
-
   useEffect(() => {
-    clearInterval(intervalId);
     fetchUnansweredOrders();
-    const newIntervalId = setInterval(() => {
-      fetchUnansweredOrders();
-    }, 10000);
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+    }
+    intervalRef.current = setInterval(fetchUnansweredOrders, 10000);
 
-    setIntervalId(newIntervalId);
-
-    // Cleanup on unmount
     return () => {
-      if (newIntervalId) {
-        clearInterval(newIntervalId);
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
       }
     };
   }, [branchid, domain]);
@@ -87,19 +63,21 @@ export default function DrawerContent(props) {
   const onLogoutPressed = () => {
     setIsLoading(true);
     props.navigation.closeDrawer();
-    clearInterval(intervalId);
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+    }
     logout();
   };
 
   const toggleBranch = async () => {
-    if (loading) return;
+    if (loading || !domain || !branchid) return;
+    
     setLoading(true);
     try {
       const resp = await axiosInstance.post(
-        options.url_branchActivity,
-        branchChangeOptions.data
+        `https://${domain}/api/v1/admin/branchActivity`,
+        { branchid, enabled: branchEnabled ? 1 : 0 }
       );
-      console.log("Branch toggle response:", resp.data);
       setBranchEnabled(resp.data.data);
     } catch (error) {
       console.error('Branch toggle failed:', error);
@@ -109,20 +87,6 @@ export default function DrawerContent(props) {
       }, 1500);
     }
   };
-
-  useEffect(() => {
-    if (domain) {
-      apiOptions();
-    }
-  }, [domain]);
-
-  useEffect(() => {
-    setBranchChangeOptions((prev) => ({
-      ...prev,
-      data: { branchid: branchid, enabled: branchEnabled ? 1 : 0 },
-    }));
-    setIsBranchEnabled(true);
-  }, [branchEnabled, branchid]);
 
   return (
     <DrawerContentScrollView {...otherProps}>
@@ -171,81 +135,76 @@ export default function DrawerContent(props) {
           </TouchableRipple>
         </Drawer.Section>
 
-
-          <DrawerItem
-            icon={({ color, size }) => (
-              <MaterialCommunityIcons
-                name="cards-outline"
-                color={color}
-                size={size}
-              />
-            )}
-            label={dictionary["nav.products"]}
-            onPress={() => {
-              props.navigation.navigate("Products");
-            }}
-          />
-          <DrawerItem
-            icon={({ color, size }) => (
-              <MaterialCommunityIcons name="format-list-bulleted" color={color} size={size} />
-            )}
-            label={() => (
-              <View style={styles.labelContainer}>
-                <Text style={styles.labelText}>{dictionary["nav.onlineOrders"]}</Text>
-                {onlineOrdersBadge > 0 && (
-                  <View style={styles.badge}>
-                    <Text style={styles.badgeText}>{onlineOrdersBadge}</Text>
-                  </View>
-                )}
-              </View>
-            )}
-            onPress={() => props.navigation.navigate("Orders")}
-          />
-          <DrawerItem
-            icon={({ color, size }) => (
-              <MaterialCommunityIcons name="qrcode-scan" color={color} size={size} />
-            )}
-            label={() => (
-              <View style={styles.labelContainer}>
-                <Text style={styles.labelText}>{dictionary["nav.QROrders"]}</Text>
-                {qrOrdersBadge > 0 && (
-                  <View style={styles.badge}>
-                    <Text style={styles.badgeText}>{qrOrdersBadge}</Text>
-                  </View>
-                )}
-              </View>
-            )}
-            onPress={() => props.navigation.navigate("QrOrders")}
-          />
-          <DrawerItem
-            icon={({ color, size }) => (
-              <MaterialCommunityIcons name="chart-line" color={color} size={size} />
-            )}
-            label={dictionary["nav.Reports"]}
-            onPress={() => {
-              props.navigation.navigate("Reports");
-            }}
-          />
-
-          <DrawerItem
-            icon={({ color, size }) => (
-              <SimpleLineIcons name="settings"
-                color={color}
-                size={size} />
-            )}
-            label={dictionary["settings"]}
-            onPress={() => {
-              props.navigation.navigate("Settings");
-            }}
-          />
-          <DrawerItem
-            icon={({ color, size }) => (
-              <MaterialCommunityIcons name="logout" color={color} size={size} />
-            )}
-            label={dictionary.logout}
-            onPress={onLogoutPressed}
-          />
-
+        <DrawerItem
+          key="products"
+          icon={({ color, size }) => (
+            <MaterialCommunityIcons
+              name="cards-outline"
+              color={color}
+              size={size}
+            />
+          )}
+          label={dictionary["nav.products"]}
+          onPress={() => navigation.navigate("Products")}
+        />
+        <DrawerItem
+          key="online-orders"
+          icon={({ color, size }) => (
+            <MaterialCommunityIcons name="format-list-bulleted" color={color} size={size} />
+          )}
+          label={() => (
+            <View style={styles.labelContainer}>
+              <Text style={styles.labelText}>{dictionary["nav.onlineOrders"]}</Text>
+              {onlineOrdersBadge > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{onlineOrdersBadge}</Text>
+                </View>
+              )}
+            </View>
+          )}
+          onPress={() => navigation.navigate("Orders")}
+        />
+        <DrawerItem
+          key="qr-orders"
+          icon={({ color, size }) => (
+            <MaterialCommunityIcons name="qrcode-scan" color={color} size={size} />
+          )}
+          label={() => (
+            <View style={styles.labelContainer}>
+              <Text style={styles.labelText}>{dictionary["nav.QROrders"]}</Text>
+              {qrOrdersBadge > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{qrOrdersBadge}</Text>
+                </View>
+              )}
+            </View>
+          )}
+          onPress={() => navigation.navigate("QrOrders")}
+        />
+        <DrawerItem
+          key="reports"
+          icon={({ color, size }) => (
+            <MaterialCommunityIcons name="chart-line" color={color} size={size} />
+          )}
+          label={dictionary["nav.Reports"]}
+          onPress={() => navigation.navigate("Reports")}
+        />
+        <DrawerItem
+          key="settings"
+          icon={({ color, size }) => (
+            <SimpleLineIcons name="settings" color={color} size={size} />
+          )}
+          label={dictionary["settings"]}
+          onPress={() => navigation.navigate("Settings")}
+        />
+        <DrawerItem
+          key="logout"
+          icon={({ color, size }) => (
+            <MaterialCommunityIcons name="logout" color={color} size={size} />
+          )}
+          label={dictionary.logout}
+          onPress={onLogoutPressed}
+        />
       </View>
     </DrawerContentScrollView>
   );

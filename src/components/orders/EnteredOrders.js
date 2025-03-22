@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useContext, useRef } from "react";
+import React, { useState, useEffect, useCallback, useContext, useRef, useReducer } from "react";
 import {
   StyleSheet,
   Dimensions,
@@ -7,13 +7,15 @@ import {
   TouchableOpacity,
   Alert,
   AppState,
-  FlatList
+  FlatList,
+  VirtualizedList
 } from "react-native";
 
 import { Text, Button, Divider, Card } from "react-native-paper";
 import { FlatGrid } from "react-native-super-grid";
 import { MaterialCommunityIcons, SimpleLineIcons } from "@expo/vector-icons";
 import * as Updates from 'expo-updates';
+import { Audio } from 'expo-av';
 
 import { AuthContext, AuthProvider } from "../../context/AuthProvider";
 import Loader from "../generate/loader";
@@ -26,26 +28,30 @@ import printRows from "../../PrintRows";
 
 import NotificationSound from '../../utils/NotificationSound';
 import NotificationManager from '../../utils/NotificationManager';
-
+import { orderReducer, initialState } from '../../reducers/orderReducer';
+import OrderCard from "./OrderCard";
+import { handleDelaySet } from '../../utils/timeUtils';
+import { debounce } from 'lodash';
 
 const width = Dimensions.get("window").width;
 const numColumns = printRows(width);
-const cardSize = width / numColumns;
+const cardSize = width / 2 - 15;
 
 let newOrderCount;
 const type = 0;
 
-// render entered orders function
 export const EnteredOrdersList = () => {
-  const { domain, branchid, user, intervalId, setIntervalId } = useContext(AuthContext);
-  const [isNotificationReady, setIsNotificationReady] = useState(false);
-  const NotificationSoundRef = useRef(NotificationSound);
-  const [orders, setOrders] = useState([]);
-  const [fees, setFees] = useState([]);
-  const [currency, setCurrency] = useState("");
-  const [scheduled, setScheduled] = useState([]);
-  const [deliveryScheduled, setDeliveryScheduled] = useState(null);
-  const [postponeOrder, setPostponeOrder] = useState(false);
+  const { domain, branchid, user } = useContext(AuthContext);
+  const { dictionary, languageId } = useContext(LanguageContext);
+  const [state, dispatch] = useReducer(orderReducer, initialState);
+  const NotificationSoundRef = useRef(null);
+  const soundRef = useRef(null);
+  const intervalRef = useRef(null);
+  const [width, setWidth] = useState(Dimensions.get('window').width);
+  const [numColumns, setNumColumns] = useState(printRows(width));
+  const [cardSize, setCardSize] = useState(width / 2 - 15);
+  const [retryCount, setRetryCount] = useState(0);
+  const [isPickerVisible, setPickerVisible] = useState(false);
   const [appState, setAppState] = useState(AppState.currentState);
   const [options, setOptions] = useState({
     url_unansweredOrders: "",
@@ -55,49 +61,57 @@ export const EnteredOrdersList = () => {
     url_pushToken: ""
   });
   const [optionsIsLoaded, setOptionsIsLoaded] = useState(false);
-  const [deliveronOptions, setDeliveronOptions] = useState(null);
-  const [isDeliveronOptions, setIsDeliveronOptions] = useState(false);
-  const [deliveron, setDeliveron] = useState([]);
-  const [visible, setVisible] = useState(false);
+  const processedOrdersRef = useRef(new Set());
   const [itemId, setItemId] = useState(null);
-  const [itemTakeAway, setItemTakeAway] = useState(null);
-  const [isOpen, setOpenState] = useState([]);
-  const [modalType, setModalType] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [loadingOptions, setLoadingOptions] = useState(false);
-  const [isPickerVisible, setPickerVisible] = useState(false);
-  const [width, setWidth] = useState(Dimensions.get('window').width);
-  const [numColumns, setNumColumns] = useState(printRows(width));
-  const [cardSize, setCardSize] = useState(width / numColumns);
-  const [previousOrderCount, setPreviousOrderCount] = useState(0);
+  const [cachedOrders, setCachedOrders] = useState(new Map());
 
-  const [retryCount, setRetryCount] = useState(0);
   const MAX_RETRIES = 15;
   const RETRY_DELAY = 5000;
+  const FETCH_INTERVAL = 3000;
+  const DEBOUNCE_DELAY = 300;
 
-  const { dictionary, languageId } = useContext(LanguageContext);
+  useEffect(() => {
+    // Initialize notification sound
+    NotificationSoundRef.current = {
+      orderReceived: async () => {
+        try {
+          if (soundRef.current) {
+            await soundRef.current.unloadAsync();
+          }
+          
+          const { sound } = await Audio.Sound.createAsync(
+            require('../../assets/audio/order.mp3')
+          );
+          soundRef.current = sound;
+          await sound.playAsync();
+        } catch (error) {
+          console.warn('Error playing notification sound:', error);
+        }
+      }
+    };
 
-  const onChangeModalState = (newState) => {
-    console.log("modal close: ", newState);
-    setTimeout(() => {
-      setVisible(false);
-      setIsDeliveronOptions(false);
-      setLoadingOptions(false);
-      setLoading(false);
-      setItemId(null);
-      setDeliveron([]);
-    }, 0);
-  };
+    return () => {
+      if (soundRef.current) {
+        soundRef.current.unloadAsync();
+      }
+      if (NotificationSoundRef.current) {
+        NotificationSoundRef.current = null;
+      }
+    };
+  }, []);
 
-  const toggleContent = (value) => {
-    setOpenState([...isOpen, value]);
-    let index = isOpen.indexOf(value);
-    if (index > -1) setOpenState([...isOpen.filter((i) => i !== value)]);
-  };
+  useEffect(() => {
+    const updateLayout = () => {
+      const newWidth = Dimensions.get('window').width;
+      const columns = printRows(newWidth);
+      setWidth(newWidth);
+      setNumColumns(columns);
+      setCardSize(newWidth / 2 - 15);
+    };
 
-  const handleReload = async () => {
-    await Updates.reloadAsync();
-  };
+    const subscription = Dimensions.addEventListener('change', updateLayout);
+    return () => subscription?.remove();
+  }, []);
 
   const apiOptions = useCallback(() => {
     setOptions({
@@ -111,41 +125,9 @@ export const EnteredOrdersList = () => {
     setOptionsIsLoaded(true);
   }, [domain]);
 
-  const showModal = (type) => {
-    setModalType(type);
-    setVisible(true);
-  };
-
-  useEffect(() => {
-    if (!NotificationSoundRef?.current) {
-      console.warn('NotificationSoundRef not ready');
-      return;
-    }
-
-    setIsNotificationReady(true);
-
-    return () => {
-      setIsNotificationReady(false);
-    };
-  }, [NotificationSoundRef]); 
-
-  useEffect(() => {
-    const updateLayout = () => {
-      const newWidth = Dimensions.get('window').width;
-      const columns = printRows(newWidth);
-      setWidth(newWidth);
-      setNumColumns(columns);
-      setCardSize(newWidth / columns);
-    };
-
-    const subscription = Dimensions.addEventListener('change', updateLayout);
-    return () => subscription?.remove();
-  }, []);
-
   const fetchEnteredOrders = async () => {
-    if (!user || !options.url_unansweredOrders) {
-      return null;
-    }
+    if (!user || !options.url_unansweredOrders) return null;
+
     try {
       const resp = await axiosInstance.post(options.url_unansweredOrders, {
         type: 0,
@@ -154,98 +136,118 @@ export const EnteredOrdersList = () => {
         Languageid: languageId,
         postponeOrder: false
       });
-      const data = resp.data.data;
-      const feesData = resp.data.fees;
-      setOrders(data);
-      setFees(feesData);
-      setCurrency(resp.data.currency);
-      setScheduled(resp.data.scheduled);
+
+      const newOrders = resp.data.data;
+      const currentOrderIds = new Set(newOrders.map(order => order.id));
+      const hasNewOrders = newOrders.some(order => !processedOrdersRef.current.has(order.id));
+
+      if (hasNewOrders) {
+        // პირველად გამოვიტანოთ ალერტი
+        Alert.alert(
+          dictionary["general.alerts"],
+          dictionary["orders.newOrder"],
+          [{ text: dictionary["okay"] }]
+        );
+
+        // შემდეგ დავუკრათ ხმა
+        if (NotificationSoundRef?.current) {
+          try {
+            await NotificationSoundRef.current.orderReceived();
+          } catch (error) {
+            console.warn('Error playing notification sound:', error);
+          }
+        }
+        
+        // ბოლოს განვაახლოთ დამუშავებული შეკვეთების სია
+        currentOrderIds.forEach(id => processedOrdersRef.current.add(id));
+      }
+
+      dispatch({
+        type: 'SET_ORDERS',
+        payload: {
+          orders: newOrders,
+          fees: resp.data.fees,
+          currency: resp.data.currency,
+          scheduled: resp.data.scheduled
+        }
+      });
+
       setRetryCount(0);
     } catch (error) {
-      console.log('Error fetching entered orders full:', error);
-      const statusCode = error?.status || 'Unknown';
-      console.log('Status code entered orders:', statusCode);
+      console.log('Error fetching entered orders:', error);
       if (retryCount < MAX_RETRIES) {
         setRetryCount(prev => prev + 1);
-        console.log(`Retry attempt ${retryCount + 1} of ${MAX_RETRIES}`);
-
-        // Clear current interval
-        clearInterval(intervalId);
-
-        // Attempt retry after delay
-        setTimeout(() => {
-          startInterval();
-        }, RETRY_DELAY);
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+        }
+        setTimeout(startInterval, RETRY_DELAY);
       } else {
-        console.log('Max retries reached, stopping interval');
-        clearInterval(intervalId);
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+        }
         handleReload();
       }
-    } finally {
-      setLoading(false);
     }
   };
 
-  const startInterval = () => {
-    if (intervalId) {
-      clearInterval(intervalId);
-    }
-    console.log('call interval');
-    const newIntervalId = setInterval(() => {
+  const debouncedFetch = useCallback(
+    debounce(() => {
       if (optionsIsLoaded) {
         fetchEnteredOrders();
-      } else {
-        console.log('Options not loaded');
       }
-    }, 5000);
+    }, DEBOUNCE_DELAY),
+    [optionsIsLoaded]
+  );
 
-    setIntervalId(newIntervalId);
-  };
+  const startInterval = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+    }
+    
+    intervalRef.current = setInterval(debouncedFetch, FETCH_INTERVAL);
+  }, [optionsIsLoaded]);
 
-  const handleAppStateChange = (nextAppState) => {
+  const handleAppStateChange = useCallback((nextAppState) => {
     if (appState.match(/inactive|background/) && nextAppState === "active") {
       startInterval();
     } else {
-      clearInterval(intervalId);
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
     }
     setAppState(nextAppState);
-  };
+  }, [appState]);
 
   useEffect(() => {
     if (domain && branchid) {
       apiOptions();
     } else if (domain || branchid) {
       setOptionsIsLoaded(false);
-      setOrders([]);
+      dispatch({ type: 'SET_ORDERS', payload: { orders: [], fees: [], currency: "", scheduled: [] }});
     }
   }, [domain, branchid, apiOptions]);
 
   useEffect(() => {
     if (optionsIsLoaded) {
       const subscribe = AppState.addEventListener('change', handleAppStateChange);
-      console.log('Starting interval...');
-      clearInterval(intervalId);
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
       startInterval();
-      console.log('Interval started.');
       return () => {
-        clearInterval(intervalId);
-        setPreviousOrderCount(0);
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+        }
+        dispatch({ type: 'UPDATE_ORDER_COUNT', payload: 0 });
         subscribe.remove();
       };
     }
   }, [optionsIsLoaded, languageId, appState]);
 
-  // ****************************
-  // Notifications
-  // ****************************
   useEffect(() => {
     const initializeNotifications = async () => {
+      if (!optionsIsLoaded) return;
       try {
-        if (!optionsIsLoaded) {
-          console.log('Options not loaded yet, skipping initialization.');
-          return;
-        }
-
         await NotificationManager.initialize(options, type, branchid, languageId, NotificationSoundRef);
       } catch (error) {
         console.error('Error initializing NotificationManager:', error);
@@ -255,342 +257,145 @@ export const EnteredOrdersList = () => {
     initializeNotifications();
   }, [optionsIsLoaded]);
 
-
-  useEffect(() => {
-    if (itemTakeAway === null || itemTakeAway === 1) return;
-    if (!itemId) {
-      setIsDeliveronOptions(false);
-      return;
-    }
-
-    setDeliveronOptions((prev) => ({
-      ...prev,
-      data: { orderId: itemId },
-    }));
-    setIsDeliveronOptions((prev) => prev || true);
-
-  }, [itemId, itemTakeAway]);
-
-  useEffect(() => {
-    if (isDeliveronOptions && deliveronOptions.data.orderId) {
-      setLoadingOptions(true);
-      axiosInstance
-        .post(options.url_deliveronRecheck, deliveronOptions.data)
-        .then((resp) => resp.data.data)
-        .then((data) => {
-          const { status, content } = data.original ?? {};
-          const alertHandler = (message, shouldClearData = false) => Alert.alert(dictionary["general.alerts"], message, [
-            {
-              text: dictionary["okay"],
-              onPress: () => {
-                if (shouldClearData) {
-                  setIsDeliveronOptions(false);
-                  setLoadingOptions(false);
-                  setDeliveronOptions(null);
-                } else {
-                  setVisible(false);
-                  setLoadingOptions(false);
-                  setIsDeliveronOptions(false);
-                  setDeliveronOptions(null);
-                  setItemId(null);
-                }
-              },
-            },
-          ]);
-
-          if (status === -2 && content === "Module is off") {
-            alertHandler(dictionary["dv.deliveronModuleOff"], true);
-            setDeliveron(data);
-          } else if (status === -1) {
-            alertHandler("Order ID not passed or invalid.");
-          } else if (Array.isArray(content) && content.length === 0) {
-            alertHandler(dictionary["dv.empty"]);
-          } else {
-            setDeliveron(data);
-            setLoadingOptions(false);
-          }
-        })
-        .catch((error) => alertHandler("Error fetching deliveron options."));
-    }
-  }, [isDeliveronOptions, deliveronOptions]);
-
-  useEffect(() => {
-    if (!orders || appState !== "active" || !isNotificationReady) return;
-
-    newOrderCount = Object.keys(orders).length;
-    if (newOrderCount > previousOrderCount) {
-      NotificationSoundRef.current.orderReceived();
-    }
-    setPreviousOrderCount(newOrderCount);
-
-  }, [orders, appState, isNotificationReady]);
-
-  const parseTimeToMinutes = (time) => {
-    const [hours, minutes, seconds] = time.split(':').map(Number);
-    return hours * 60 + minutes + seconds / 60;
+  const handleReload = async () => {
+    await Updates.reloadAsync();
   };
 
-  const formatDateToLocal = (date) => {
-    if (!(date instanceof Date) || isNaN(date)) return "Invalid Date";
-    const pad = (num) => num.toString().padStart(2, '0');
-    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
-  };
+  const handleToggleContent = useCallback((id) => {
+    dispatch({ type: 'TOGGLE_CONTENT', payload: id });
+  }, []);
 
-  const subtractTime = (baseTime, hours = 0, minutes = 0, seconds = 0) => {
-    const time = new Date(baseTime);
-    if (isNaN(time)) return "Invalid base time";
-    time.setHours(time.getHours() - hours);
-    time.setMinutes(time.getMinutes() - minutes);
-    time.setSeconds(time.getSeconds() - seconds);
-    return time;
-  };
-
-  const handleDelaySet = (delay) => {
-    setLoadingOptions(false);
-    if (!deliveryScheduled) {
-      alert("Delivery scheduled time is not set. Please provide a valid time.");
-      return false;
-    }
-
-    const deliveryScheduledTime = new Date(deliveryScheduled.replace(' ', 'T'));
-    if (isNaN(deliveryScheduledTime)) {
-      alert("Invalid delivery scheduled time format.");
-      return false;
-    }
-
-    const delayMinutes = parseTimeToMinutes(delay);
-    const defaultDelayMinutes = parseTimeToMinutes(scheduled.delay_time);
-    const effectiveDelay = delayMinutes < defaultDelayMinutes ? scheduled.delay_time : delay;
-    console.log("Effective Delay:", effectiveDelay);
-
-    const [delayHours, delayMinutesUsed, delaySeconds] = effectiveDelay.split(':').map(Number);
-    const adjustedTime = subtractTime(deliveryScheduledTime, delayHours, delayMinutesUsed, delaySeconds);
-
-    if (isNaN(adjustedTime)) {
-      console.error("Invalid adjusted time:", adjustedTime);
-      return false;
-    }
-
-    const adjustedTimeStamp = adjustedTime.getTime();
-    const deliveryScheduledStamp = deliveryScheduledTime.getTime();
-    const currentTimeStamp = new Date().getTime();
-
-    if (adjustedTimeStamp < currentTimeStamp) {
-      alert("The adjusted delivery time is in the past. Please select a valid time.");
-      return false;
-    }
-
-    if (adjustedTimeStamp >= deliveryScheduledStamp) {
-      alert("The adjusted delivery time is later than the scheduled time. The order cannot be delayed.");
-      return false;
-    }
-
-    try {
-      setPostponeOrder(true);
-      axiosInstance
-        .post(options.url_delayOrders, {
-          Orderid: itemId,
-          orderDelayTime: formatDateToLocal(adjustedTime)
-        })
-        .then((resp) => {
-          return resp.data.data
-        })
-        .then((data) => {
-          setPostponeOrder(false);
-          if (data.status === 0) {
-            Alert.alert(
-              dictionary["general.alerts"],
-              `Order delay till: ${formatDateToLocal(adjustedTime)}`,
-              [
-                {
-                  text: dictionary["okay"],
-                  onPress: () => setPickerVisible(false),
-                },
-              ]
-            );
-
-          }
-          setLoading(false);
-        });
-    } catch (error) {
-      console.error("Error delaying order:", error);
-      Alert.alert("Error", "There was a problem delaying the order. Please try again.");
-    }
-  };
-
-
-  const renderEnteredOrdersList = ({ item }) => {
-    const deliveryPrice = parseFloat(item.delivery_price);
-    const additionalFees = parseFloat(item.service_fee) / 100;
-    const feeData = JSON.parse(item.fees_details || '{}');
-    const feesDetails = fees?.reduce((acc, fee) => {
-      const feeId = fee['id'];
-      if (feeData[feeId]) {
-        acc.push(`${fee['value']} : ${parseFloat(feeData[feeId])}`);
+  const handleAcceptOrder = useCallback((id, takeAway) => {
+    dispatch({
+      type: 'SET_MODAL_STATE',
+      payload: {
+        visible: true,
+        modalType: 'accept',
+        itemId: id,
+        itemTakeAway: takeAway
       }
-      return acc;
-    }, []);
+    });
+  }, []);
 
-    const isScheduled = item.take_away ? scheduled.scheduled_takeaway : scheduled.scheduled_delivery;
+  const handleRejectOrder = useCallback((id) => {
+    dispatch({
+      type: 'SET_MODAL_STATE',
+      payload: {
+        visible: true,
+        modalType: 'reject',
+        itemId: id,
+        itemTakeAway: null
+      }
+    });
+  }, []);
 
-    return (
-      <Card key={item.id} style={styles.card}>
-        <TouchableOpacity onPress={() => toggleContent(item.id)}>
-          <Card.Content style={styles.head}>
-            <Text variant="headlineMedium" style={styles.header}>
-              <MaterialCommunityIcons
-                name="music-accidental-sharp"
-                style={styles.leftIcon}
-              />
-              {item.id}
-            </Text>
-            <Text style={styles.takeAway}>{item.take_away === 1 ? "("+dictionary["orders.takeAway"] + ")" : ""}</Text>
-            <Text variant="headlineMedium" style={styles.header}>
-              <SimpleLineIcons
-                name={!isOpen.includes(item.id) ? "arrow-up" : "arrow-down"}
-                style={styles.rightIcon}
-              />
-            </Text>
-          </Card.Content>
-        </TouchableOpacity>
-        {!isOpen.includes(item.id) ? (
-          <Card.Content>
-            <Text variant="titleSmall" style={styles.title}>
-              {dictionary["orders.status"]}: {dictionary["orders.pending"]}
-            </Text>
+  const handleDelayOrder = useCallback((id, scheduledTime) => {
+    dispatch({ type: 'SET_MODAL_STATE', payload: { itemId: id } });
+    dispatch({ type: 'SET_DELIVERY_SCHEDULED', payload: scheduledTime });
+    setPickerVisible(true);
+    dispatch({ type: 'SET_LOADING_OPTIONS', payload: false });
+  }, []);
 
-            <Text variant="titleSmall" style={styles.title} numberOfLines={2} ellipsizeMode="tail">
-              {dictionary["orders.fName"]}: {item.firstname} {item.lastname}
-            </Text>
+  const handleModalClose = useCallback(() => {
+    dispatch({ type: 'RESET_MODAL_STATE' });
+  }, []);
 
-            <Text variant="titleSmall" style={styles.title}>
-              {dictionary["orders.phone"]}: {item.phone_number}
-            </Text>
+  const handleDelaySetWrapper = useCallback(async (delay) => {
+    const params = {
+      delay,
+      deliveryScheduled: state.deliveryScheduled,
+      scheduled: state.scheduled,
+      itemId: state.itemId,
+      options,
+      dictionary,
+      setLoadingOptions: (value) => dispatch({ type: 'SET_LOADING_OPTIONS', payload: value }),
+      setPostponeOrder: (value) => dispatch({ type: 'SET_POSTPONE_ORDER', payload: value }),
+      setPickerVisible,
+      setLoading: (value) => dispatch({ type: 'SET_LOADING', payload: value })
+    };
 
-            <Text variant="titleSmall" style={styles.title} ellipsizeMode="tail">
-              {dictionary["orders.address"]}: {item.address}
-            </Text>
+    await handleDelaySet(params);
+  }, [state.deliveryScheduled, state.scheduled, state.itemId, options, dictionary]);
 
-            {item.delivery_scheduled ? (
-              <Text variant="titleSmall" style={styles.title} numberOfLines={2} ellipsizeMode="tail">
-                {dictionary["orders.scheduledDeliveryTime"]}: {item.delivery_scheduled}
-              </Text>
-            ) : null}
+  const renderOrderCard = useCallback(({ item }) => (
+    <OrderCard
+      key={item.id}
+      item={item}
+      currency={state.currency}
+      isOpen={state.isOpen.includes(item.id)}
+      fees={state.fees}
+      scheduled={state.scheduled}
+      dictionary={dictionary}
+      onToggle={handleToggleContent}
+      onAccept={handleAcceptOrder}
+      onDelay={handleDelayOrder}
+      onReject={handleRejectOrder}
+    />
+  ), [state.currency, state.isOpen, state.fees, state.scheduled, dictionary, handleToggleContent, handleAcceptOrder, handleDelayOrder, handleRejectOrder]);
 
-            {item.comment ? (
-              <Text variant="titleSmall" style={styles.title} numberOfLines={2} ellipsizeMode="tail">
-                {dictionary["orders.comment"]}: {item.comment}
-              </Text>
-            ) : null}
+  const keyExtractor = useCallback((item) => item.id.toString(), []);
 
-            <Text variant="titleSmall" style={styles.title} numberOfLines={2} ellipsizeMode="tail">
-              {dictionary["orders.paymentMethod"]}: {item.payment_type}
-            </Text>
+  const getItemLayout = useCallback((data, index) => ({
+    length: cardSize,
+    offset: cardSize * index,
+    index,
+  }), [cardSize]);
 
-            <Divider />
-              <OrdersDetail orderId={item.id} />
-            <Divider />
+  const getItem = (data, index) => data[index];
+  const getItemCount = (data) => data.length;
 
-            <Text variant="titleMedium" style={styles.title}> {dictionary["orders.initialPrice"]}: {item.real_price} {currency}</Text>
+  // Reset processed orders when component unmounts or app goes to background
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState) => {
+      if (nextAppState === 'background') {
+        processedOrdersRef.current.clear();
+      }
+    };
 
-            <Text variant="titleMedium" style={styles.title}> {dictionary["orders.discountedPrice"]}: {item.price} {currency}</Text>
-
-            <Text variant="titleMedium" style={styles.title}> {dictionary["orders.deliveryPrice"]}: {deliveryPrice} {currency}</Text>
-
-            {feesDetails?.length > 0 && (
-              <View>
-                <Text variant="titleMedium" style={styles.title}>
-                  {dictionary["orders.additionalFees"]}: {additionalFees} {currency}
-                </Text>
-                <View style={styles.feeDetailsContainer}>
-                  {feesDetails.map((fee, index) => (
-                    <Text key={index} style={styles.feeDetailText}>
-                      {fee} {currency}
-                    </Text>
-                  ))}
-                </View>
-              </View>
-            )}
-
-            <Text variant="titleMedium" style={styles.title}>
-              {dictionary["orders.totalcost"]}: {item.total_cost} {currency}
-            </Text>
-            <Card.Actions>
-              <TouchableOpacity
-                style={styles.buttonAccept}
-                onPress={() => {
-                  setItemId(item.id);
-                  setItemTakeAway(item.take_away);
-                  showModal("accept");
-                }}
-              >
-                <MaterialCommunityIcons name="check-decagram-outline" size={30} color="white" />
-              </TouchableOpacity>
-
-              {item.delivery_scheduled !== null && isScheduled && (
-                <TouchableOpacity
-                  style={styles.buttonDelay}
-                  onPress={() => {
-                    setItemId(item.id);
-                    setDeliveryScheduled(item.delivery_scheduled);
-                    setPickerVisible(true);
-                    setLoadingOptions(false);
-                  }}
-                >
-                  <MaterialCommunityIcons name="bell-ring-outline" size={30} color="white" />
-                </TouchableOpacity>
-              )}
-
-              <TouchableOpacity
-                style={styles.buttonReject}
-                onPress={() => {
-                  setItemId(item.id);
-                  setItemTakeAway(null);
-                  showModal("reject");
-                }}
-              >
-                <MaterialCommunityIcons name="close-circle-outline" size={30} color="white" />
-              </TouchableOpacity>
-            </Card.Actions>
-
-          </Card.Content>
-        ) : null}
-      </Card>
-    )
-  };
-
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    return () => {
+      subscription.remove();
+      processedOrdersRef.current.clear();
+    };
+  }, []);
 
   return (
     <View style={{ flex: 1, width: width }}>
-      {loadingOptions ? <Loader /> : null}
-
-      {/* Always render NotificationSound */}
+      {state.loadingOptions && <Loader />}
       <NotificationSound ref={NotificationSoundRef} />
+      {state.loading && <Loader show={state.loading} />}
 
-      {loading && <Loader show={loading} />}
-
-      {/* Display a fallback message when there are no orders */}
-      {(!orders || orders.length === 0) ? (
-        null
-      ) : (
-        <FlatList
-          data={orders}
-          renderItem={null}  // No items in the FlatList itself
-          keyExtractor={() => Math.random().toString()}
-          showsVerticalScrollIndicator={false}
-          ListHeaderComponent={(
-            <View style={{ flexDirection: 'row', flexWrap: 'nowrap', flex: 1 }}>
-              {visible && (
+      {(!state.orders || state.orders.length === 0) ? null : (
+        <FlatGrid
+          adjustGridToStyles={true}
+          itemDimension={cardSize}
+          spacing={10}
+          data={state.orders}
+          renderItem={renderOrderCard}
+          keyExtractor={keyExtractor}
+          getItemLayout={getItemLayout}
+          fixed={true}
+          staticDimension={width}
+          horizontal={false}
+          numColumns={2}
+          itemContainerStyle={{ 
+            width: cardSize,
+            margin: 5,
+          }}
+          style={{ flex: 1 }}
+          ListHeaderComponent={
+            <View>
+              {state.visible && (
                 <OrdersModal
-                  isVisible={visible}
-                  onChangeState={onChangeModalState}
-                  orders={orders}
-                  hasItemId={itemId}
-                  deliveron={deliveron ?? null}
-                  deliveronOptions={deliveronOptions}
-                  type={modalType}
+                  isVisible={state.visible}
+                  onChangeState={handleModalClose}
+                  orders={state.orders}
+                  hasItemId={state.itemId}
+                  deliveron={state.deliveron}
+                  deliveronOptions={state.deliveronOptions}
+                  type={state.modalType}
                   options={options}
-                  takeAway={itemTakeAway}
+                  takeAway={state.itemTakeAway}
                   PendingOrders={true}
                 />
               )}
@@ -599,32 +404,25 @@ export const EnteredOrdersList = () => {
                 transparent={true}
                 visible={isPickerVisible}
                 animationType="fade"
-                onRequestClose={() => { setPickerVisible(false); setLoadingOptions(false); }}
+                onRequestClose={() => {
+                  setPickerVisible(false);
+                  dispatch({ type: 'SET_LOADING_OPTIONS', payload: false });
+                }}
               >
                 <View style={styles.modalContainer}>
                   <TimePicker
-                    scheduled={scheduled}
+                    scheduled={state.scheduled}
                     showButton={true}
-                    onDelaySet={handleDelaySet}
-                    onClose={() => { setPickerVisible(false); setLoadingOptions(false); }} // Close when done
+                    onDelaySet={handleDelaySetWrapper}
+                    onClose={() => {
+                      setPickerVisible(false);
+                      dispatch({ type: 'SET_LOADING_OPTIONS', payload: false });
+                    }}
                   />
                 </View>
               </Modal>
-
-              <FlatGrid
-                adjustGridToStyles={true}
-                itemDimension={cardSize}
-                spacing={10}
-                data={orders}
-                renderItem={renderEnteredOrdersList}
-                keyExtractor={(item) => (item && item.id ? item.id.toString() : '')}
-                itemContainerStyle={{ justifyContent: 'space-between' }}
-                style={{ flex: 1 }}
-                onEndReachedThreshold={0.5}
-                removeClippedSubviews={true}
-              />
             </View>
-          )}
+          }
         />
       )}
     </View>
@@ -637,7 +435,8 @@ const styles = StyleSheet.create({
     justifyContent: "flex-start",
   },
   card: {
-    margin: 10,
+    flex: 1,
+    margin: 5,
     borderRadius: 10,
     shadowColor: "#000",
     shadowOffset: {
@@ -718,7 +517,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(0, 0, 0, 0.7)", // Semi-transparent background
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
   },
   modalContent: {
     backgroundColor: "#fff",

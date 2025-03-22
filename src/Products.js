@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useContext, useCallback, useMemo } from "react";
-import { StyleSheet, View, TouchableOpacity, Dimensions, RefreshControl, Alert, } from "react-native";
+import React, { useState, useEffect, useContext, useCallback, useMemo, memo } from "react";
+import { StyleSheet, View, TouchableOpacity, Dimensions, RefreshControl, Alert } from "react-native";
 import NetInfo from "@react-native-community/netinfo";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Text, Button, Card, Checkbox } from "react-native-paper";
@@ -15,8 +15,51 @@ import throttle from 'lodash.throttle';
 
 const width = Dimensions.get("window").width;
 
+const MemoizedProductCard = memo(({ item, isExcluded, checkedItems, onCheckboxPress, onButtonPress, onNavigate, dictionary }) => {
+  const buttonText = isExcluded ? dictionary["prod.enableProduct"] : dictionary["prod.disableProduct"];
+
+  return (
+    <Card key={item.id}>
+      <Card.Content style={styles.cardContent}>
+        <Text variant="titleMedium" style={styles.title}>
+          {item.name}
+        </Text>
+        <Checkbox
+          status={checkedItems.includes(item.id) ? 'checked' : 'unchecked'}
+          color='#3490dc'
+          onPress={() => onCheckboxPress(item.id)}
+          style={styles.checkbox}
+        />
+      </Card.Content>
+
+      <Card.Actions>
+        <TouchableOpacity
+          style={[styles.button, { backgroundColor: "#3490dc" }]}
+          onPress={() => onNavigate(item.id)}
+        >
+          <Text style={{ color: "white", fontSize: 16, fontWeight: "500" }}>
+            {dictionary["prod.ingredients"]}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.button,
+            { backgroundColor: isExcluded ? "#2fa360" : "#f14c4c" }
+          ]}
+          onPress={() => onButtonPress(item)}
+        >
+          <Text style={{ color: "white", fontSize: 16, fontWeight: "500" }}>
+            {buttonText}
+          </Text>
+        </TouchableOpacity>
+      </Card.Actions>
+    </Card>
+  );
+});
+
 export default function Products({ navigation }) {
-  const { setIsDataSet, domain, branchid, user, intervalId } = useContext(AuthContext);
+  const { setIsDataSet, domain, branchid, user, intervalId, branchEnabled } = useContext(AuthContext);
   const isFocused = useIsFocused();
   const { dictionary, userLanguage } = useContext(LanguageContext);
 
@@ -29,57 +72,40 @@ export default function Products({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [isConnected, setIsConnected] = useState(true);
-  const [productEnabled, setProductEnabled] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [showFilter, setShowFilter] = useState(false);
   const [checkedItems, setCheckedItems] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
 
-  const [options, setOptions] = useState({
-    url_getProducts: "",
-    url_productActivity: "",
-  }); // api options
+  const fetchData = useCallback(async () => {
+    if (!user || !domain || !branchid || !branchEnabled) return;
 
-  useEffect(() => {
-    if (domain) {
-      setOptions({
-        url_getProducts: `https://${domain}/api/v1/admin/getProducts`,
-        url_productActivity: `https://${domain}/api/v1/admin/productActivity`,
-      });
-    }
-  }, [domain]);
-
-  const fetchData = async () => {
     try {
-      if (!user || !options.url_getProducts) {
-        return null;
-      }
-
-      const response = await axiosInstance.post(options.url_getProducts, {
-        lang: userLanguage,
-        page: page,
-        categoryid: selected,
-        branchid: branchid,
-        like: searchQuery
-      });
+      const response = await axiosInstance.post(
+        `https://${domain}/api/v1/admin/getProducts`,
+        {
+          lang: userLanguage,
+          page: page,
+          categoryid: selected,
+          branchid: branchid,
+          like: searchQuery
+        }
+      );
 
       setCategory(response.data.category);
-
-      // Update excluded products
       const newExcluded = response.data.excluded || [];
       setExcluded(newExcluded);
 
-      // Update products
       const updatedProducts = response.data.products.data.map(product => ({
         ...product,
-        isExcluded: newExcluded.includes(product.id) // Add isExcluded property to each product
+        isExcluded: newExcluded.includes(product.id)
       }));
       setProducts(updatedProducts);
 
       setTotalPages(response.data.products.total / response.data.products.per_page);
     } catch (error) {
-      console.log('Error fetching products:', error);
-      if (error.status == 401) {
+      console.error('Error fetching products:', error);
+      if (error.status === 401) {
         setProducts([]);
         setExcluded([]);
         setIsDataSet(false);
@@ -89,7 +115,7 @@ export default function Products({ navigation }) {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [user, domain, branchid, branchEnabled, userLanguage, page, selected, searchQuery, setIsDataSet, intervalId]);
 
   useEffect(() => {
     const removeSubscription = NetInfo.addEventListener((state) => {
@@ -100,26 +126,24 @@ export default function Products({ navigation }) {
   }, []);
 
   useEffect(() => {
-    if (isConnected && (page || userLanguage || selected)) {
+    if (isConnected && (page || userLanguage || selected || searchQuery) && branchEnabled) {
       setLoading(true);
       setCategory([]);
       fetchData();
     }
-  }, [page, userLanguage, selected, options, isConnected, branchid, setIsDataSet]);
-
-  useEffect(() => {
-    fetchData();
-  }, [page, searchQuery]);
+  }, [isConnected, page, userLanguage, selected, branchid, searchQuery, branchEnabled, fetchData]);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
-      setPage(1);
-      setRefreshing(true);
-      fetchData(); // Call fetchData when component is focused
+      if (branchEnabled) {
+        setPage(1);
+        setRefreshing(true);
+        fetchData();
+      }
     });
 
     return unsubscribe;
-  }, [navigation]);
+  }, [navigation, branchEnabled, fetchData]);
 
   useEffect(() => {
     if (!showFilter) {
@@ -130,125 +154,87 @@ export default function Products({ navigation }) {
     }
   }, [showFilter, showSearch]);
 
-  const onRefresh = async () => {
-    console.log('refresh');
-    // setPage(1);
+  const onRefresh = useCallback(async () => {
+    if (!branchEnabled) return;
     setRefreshing(true);
-    await fetchData(); // Call fetchData when refreshing
+    await fetchData();
     setCheckedItems([]);
-  };
+  }, [branchEnabled, fetchData]);
 
   const handleSearchChange = useCallback(throttle((query) => {
+    if (!branchEnabled) return;
     setSearchQuery(query);
     setPage(1);
-  }), []);
+  }, 500), [branchEnabled]);
 
+  const handleButtonPress = useCallback(async (item) => {
+    if (!domain || !branchid || !branchEnabled) return;
 
-  const checkboxPressed = () => {
-    // Check if any checkbox is checked
+    try {
+      const response = await axiosInstance.post(
+        `https://${domain}/api/v1/admin/productActivity`,
+        { pid: item.id, branchid: branchid }
+      );
+
+      const isAlreadyDisabled = excluded.some((excludedItem) => excludedItem.productid === item.id);
+      
+      if (isAlreadyDisabled) {
+        setExcluded(prevExcluded => prevExcluded.filter(id => id !== item.id));
+      } else {
+        setExcluded(prevExcluded => [...prevExcluded, item.id]);
+      }
+      
+      onRefresh();
+    } catch (error) {
+      console.error('Error updating product activity:', error);
+    }
+  }, [domain, branchid, branchEnabled, excluded, onRefresh]);
+
+  const handleCheckboxPress = useCallback((id) => {
+    if (!branchEnabled) return;
+    setCheckedItems((prevState) => {
+      if (prevState.includes(id)) {
+        return prevState.filter((item) => item !== id);
+      } else {
+        return [...prevState, id];
+      }
+    });
+  }, [branchEnabled]);
+
+  const checkboxPressed = useCallback(() => {
+    if (!branchEnabled) return;
     if (checkedItems.length > 0) {
-      // At least one checkbox is checked, send API requests for each checked item
       checkedItems.forEach(id => {
-        const item = products.find(item => item.id === id); // Assuming 'items' is the array containing your data
+        const item = products.find(item => item.id === id);
         if (item) {
           handleButtonPress(item);
         }
       });
-    } else {
-      // No checkbox is checked, show alert
-      Alert.alert(dictionary["general.alerts"], dictionary["pr.warrning"], [
-        { text: dictionary["okay"], onPress: () => console.log("Alert dismissed") },
-      ]);
     }
-  };
+  }, [branchEnabled, checkedItems, products, handleButtonPress]);
 
-  const handleButtonPress = (item) => {
-    const isAlreadyDisabled = excluded.some((excludedItem) => excludedItem.productid === item.id);
+  const handleNavigate = useCallback((id) => {
+    navigation.navigate('ProductsDetail', { id });
+  }, [navigation]);
 
-    axiosInstance.post(options.url_productActivity, { pid: item.id, branchid: branchid })
-      .then((resp) => {
-        setLoading(false);
-        setProductEnabled(resp.data.data);
-        if (isAlreadyDisabled) {
-          // Product is already excluded, so remove it from the excluded list
-          setExcluded(prevExcluded => prevExcluded.filter(id => id !== item.id));
-        } else {
-          // Product is not excluded, so add it to the excluded list
-          setExcluded(prevExcluded => [...prevExcluded, item.id]);
-        }
-        onRefresh();
-      })
-      .catch(error => {
-        console.error('Error updating product activity:', error);
-        setLoading(false); // Ensure loading state is updated even if there's an error
-      });
-  };
-
-  const handleCheckboxPress = (id) => {
-    setCheckedItems((prevState) => {
-      if (prevState.includes(id)) {
-        // If the id is already in the array, remove it
-        return prevState.filter((item) => item !== id);
-      } else {
-        // If the id is not in the array, add it
-        return [...prevState, id];
-      }
-    });
-  };
-
-  const RenderProductList = ({ item }) => {
+  const renderItem = useCallback(({ item }) => {
     const isExcluded = excluded.some((excludedItem) => excludedItem.productid === item.id);
-    const isDisabled = isExcluded; // Assuming exclusion implies disabled status
-
-    const buttonText = isDisabled ? dictionary["prod.enableProduct"] : dictionary["prod.disableProduct"];
-
     return (
-      <Card key={item.id}>
-        <Card.Content style={styles.cardContent}>
-          <Text variant="titleMedium" style={styles.title}>
-            {item.name}
-          </Text>
-          <Checkbox
-            status={checkedItems.includes(item.id) ? 'checked' : 'unchecked'}
-            color='#3490dc'
-            onPress={() => handleCheckboxPress(item.id)}
-            style={styles.checkbox}
-          />
-        </Card.Content>
-
-        <Card.Actions>
-          <TouchableOpacity
-            style={[
-              styles.button,
-              {
-                backgroundColor: "#3490dc", // Dynamic color
-              },
-            ]}
-            onPress={() => navigation.navigate('ProductsDetail', { id: item.id })}
-          >
-            <Text style={{ color: "white", fontSize: 16, fontWeight: "500" }}>
-              {dictionary["prod.ingredients"]}
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.button,
-              {
-                backgroundColor: isDisabled ? "#2fa360" : "#f14c4c", // Dynamic color
-              },
-            ]}
-            onPress={() => handleButtonPress(item)}
-          >
-            <Text style={{ color: "white", fontSize: 16, fontWeight: "500" }}>
-              {buttonText}
-            </Text>
-          </TouchableOpacity>
-        </Card.Actions>
-      </Card>
+      <MemoizedProductCard
+        item={item}
+        isExcluded={isExcluded}
+        checkedItems={checkedItems}
+        onCheckboxPress={handleCheckboxPress}
+        onButtonPress={handleButtonPress}
+        onNavigate={handleNavigate}
+        dictionary={dictionary}
+      />
     );
-  };
+  }, [excluded, checkedItems, handleCheckboxPress, handleButtonPress, handleNavigate, dictionary]);
 
+  const categoryItems = useMemo(() => 
+    category.map((item) => ({ label: item.name, value: item.id }))
+  , [category]);
 
   if (loading) {
     return <Loader />;
@@ -257,7 +243,6 @@ export default function Products({ navigation }) {
   return (
     <>
       <View style={styles.buttonContainer}>
-        {/* Your other content */}
         <Button
           style={styles.filterButton}
           icon={() => (
@@ -292,6 +277,7 @@ export default function Products({ navigation }) {
           On/Off
         </Button>
       </View>
+
       <View style={{ paddingLeft: 10, paddingRight: 10 }}>
         {showSearch && (
           <TextField
@@ -307,7 +293,7 @@ export default function Products({ navigation }) {
           <SelectOption
             value={selected}
             onValueChange={setSelected}
-            items={category.map((item) => ({ label: item.name, value: item.id }))}
+            items={categoryItems}
           />
         )}
       </View>
@@ -316,31 +302,34 @@ export default function Products({ navigation }) {
         itemDimension={width}
         data={products}
         maxItemsPerRow={4}
-        renderItem={({ item }) => <RenderProductList item={item} />}
+        renderItem={renderItem}
         adjustGridToStyles={true}
         contentContainerStyle={{ justifyContent: "flex-start" }}
         keyExtractor={(item) => item.id.toString()}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
-        extraData={excluded}
-        initialNumToRender={10} // Adjust this number based on your performance needs
-        windowSize={5} // Adjust this number based on your performance needs
+        extraData={[excluded, checkedItems]}
+        initialNumToRender={10}
+        windowSize={5}
         updateCellsBatchingPeriod={50}
         removeClippedSubviews={true}
+        getItemLayout={(data, index) => ({
+          length: 200,
+          offset: 200 * index,
+          index,
+        })}
       />
 
       <View style={styles.paginationContainer}>
         <TouchableOpacity
-          onPress={() => {
-            setPage(page - 1);
-          }}
-          disabled={page === 1}
+          onPress={() => setPage(page - 1)}
+          disabled={page === 1 || !branchEnabled}
         >
           <Text
             style={[
               styles.paginationButton,
-              page === 1 && styles.paginationButtonDisabled,
+              (page === 1 || !branchEnabled) && styles.paginationButtonDisabled,
             ]}
           >
             {dictionary["prevPage"]}
@@ -348,15 +337,13 @@ export default function Products({ navigation }) {
         </TouchableOpacity>
         <Text style={styles.paginationText}>{page}</Text>
         <TouchableOpacity
-          onPress={() => {
-            setPage(page + 1);
-          }}
-          disabled={page === Math.ceil(totalPages)}
+          onPress={() => setPage(page + 1)}
+          disabled={page === Math.ceil(totalPages) || !branchEnabled}
         >
           <Text
             style={[
               styles.paginationButton,
-              page === Math.ceil(totalPages) && styles.paginationButtonDisabled,
+              (page === Math.ceil(totalPages) || !branchEnabled) && styles.paginationButtonDisabled,
             ]}
           >
             {dictionary["nextPage"]}

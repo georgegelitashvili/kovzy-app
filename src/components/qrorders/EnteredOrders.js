@@ -35,9 +35,10 @@ const type = 1;
 
 // render entered orders function
 export const EnteredOrdersList = () => {
-  const { domain, branchid, user, intervalId, setIntervalId } = useContext(AuthContext);
+  const { domain, branchid, user } = useContext(AuthContext);
   const [isNotificationReady, setIsNotificationReady] = useState(false);
   const NotificationSoundRef = useRef(NotificationSound);
+  const intervalRef = useRef(null);
   const [orders, setOrders] = useState([]);
   const [fees, setFees] = useState([]);
   const [currency, setCurrency] = useState("");
@@ -156,16 +157,18 @@ export const EnteredOrdersList = () => {
         setRetryCount(prev => prev + 1);
         console.log(`Retry attempt ${retryCount + 1} of ${MAX_RETRIES}`);
 
-        // Clear current interval
-        clearInterval(intervalId);
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+        }
 
-        // Attempt retry after delay
         setTimeout(() => {
           startInterval();
         }, RETRY_DELAY);
       } else {
         console.log('Max retries reached, stopping interval');
-        clearInterval(intervalId);
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+        }
         handleReload();
       }
     } finally {
@@ -174,26 +177,26 @@ export const EnteredOrdersList = () => {
   };
 
   const startInterval = () => {
-    if (intervalId) {
-      clearInterval(intervalId);
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
     }
     console.log('call interval');
-    const newIntervalId = setInterval(() => {
+    intervalRef.current = setInterval(() => {
       if (optionsIsLoaded) {
         fetchEnteredOrders();
       } else {
         console.log('Options not loaded');
       }
     }, 5000);
-
-    setIntervalId(newIntervalId);
   };
 
   const handleAppStateChange = (nextAppState) => {
     if (appState.match(/inactive|background/) && nextAppState === "active") {
       startInterval();
     } else {
-      clearInterval(intervalId);
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
     }
     setAppState(nextAppState);
   };
@@ -211,12 +214,16 @@ export const EnteredOrdersList = () => {
     if (optionsIsLoaded) {
       const subscribe = AppState.addEventListener('change', handleAppStateChange);
       console.log('Starting interval...');
-      clearInterval(intervalId);
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
       startInterval();
       console.log('Interval started.');
       return () => {
         setPreviousOrderCount(0);
-        clearInterval(intervalId);
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+        }
         subscribe.remove();
       };
     }

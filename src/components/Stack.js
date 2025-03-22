@@ -47,9 +47,10 @@ export const AuthNavigator = () => {
       screenOptions={({ navigation, route }) => ({
         headerMode: 'screen',
         header: (props) => {
-          const { key, ...otherProps } = props; // Destructure key from props
-          return <Header {...otherProps} />; // Spread otherProps without key
+          const { key, ...otherProps } = props;
+          return <Header {...otherProps} />;
         },
+        ...route.params?.options,
         ...route.params?.options, // Pass route params as options
       })}
     >
@@ -119,11 +120,18 @@ export const ReportsNavigator = () => {
       screenOptions={({ navigation, route }) => ({
         headerMode: "screen",
         headerBackTitleVisible: false,
-        header: (props) => <Header {...props} />,
-        ...route.params?.options, // Pass route params as options
+        header: (props) => {
+          const { key, ...otherProps } = props;
+          return <Header {...otherProps} />;
+        },
+        ...route.params?.options,
       })}
     >
-      <Stack.Screen name="Reports" options={{ headerShown: false, unmountOnBlur: true }} component={Reports} />
+      <Stack.Screen 
+        name="ReportsScreen" 
+        options={{ headerShown: false, unmountOnBlur: true }} 
+        component={Reports} 
+      />
     </Stack.Navigator>
   );
 }

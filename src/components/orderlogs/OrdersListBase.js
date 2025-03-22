@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useContext, memo } from "react";
+import React, { useState, useEffect, useCallback, useContext, useRef, memo } from "react";
 import {
   StyleSheet,
   Dimensions,
@@ -31,7 +31,8 @@ export const OrdersListBase = ({ orderType }) => {
     dateRangeEnd: "",
     dateRangeStart: "",
   });
-  const { domain, branchid, user, intervalId } = useContext(AuthContext);
+  const { domain, branchid, user } = useContext(AuthContext);
+  const intervalRef = useRef(null);
   const [orders, setOrders] = useState([]);
   const [fees, setFees] = useState([]);
   const [currency, setCurrency] = useState("");
@@ -77,63 +78,23 @@ export const OrdersListBase = ({ orderType }) => {
   }, []);
 
   const fetchAcceptedOrders = async (appliedFilters = filters, reset = false) => {
-    if (loadingMore || !hasMore) return; // Prevent duplicate calls
+    if (!user || !options.url_getOrdersLogs) return;
 
-    setLoadingMore(true);
     try {
-      if (!user || !options.url_getOrdersLogs) {
-        return null;
-      }
-
-      const requestFilters = {};
-      if (!appliedFilters.orderStatus) {
-        requestFilters.status = { exact: "2" };
-      }
-      if (appliedFilters.orderStatus !== "all") {
-        requestFilters.status = { exact: appliedFilters.orderStatus };
-      }
-      if (appliedFilters.orderStatus === "all") {
-        requestFilters.status = { exact: "all" };
-      }
-      if (orderType !== "all") {
-        requestFilters.type = { exact: orderType };
-      }
-      if (appliedFilters.orderStatus === "") {
-        requestFilters.status = { exact: "all" };
-      }
-      if (appliedFilters.startDate && appliedFilters.endDate) {
-        requestFilters.created_at = {
-          min: appliedFilters.startDate + " 00:00:00",
-          max: appliedFilters.endDate + " 23:59:59",
-        };
-      }
-      if (branchid) {
-        requestFilters.branchid = { exact: branchid };
-      }
-
-      const resp = await axiosInstance.post(options.url_getOrdersLogs, JSON.stringify({
-        Pagination: {
-          limit: 12,
-          page: reset ? 0 : Math.floor(orders.length / 12),
-        },
-        Filters: requestFilters,
-        Languageid: languageId,
+      const resp = await axiosInstance.post(options.url_getOrdersLogs, {
+        ...appliedFilters,
         branchid: branchid,
-      }));
+        Languageid: languageId,
+        page: reset ? 0 : Math.floor(orders.length / 12),
+      });
 
       const newData = resp.data.data;
       const feesData = resp.data.fees;
 
       // Filter out duplicates
-      const uniqueData = [];
-      const seenIds = new Set();
-      for (const item of newData) {
-        const uniqueKey = `${item.id}-${item.created_at}`;
-        if (!seenIds.has(uniqueKey)) {
-          seenIds.add(uniqueKey);
-          uniqueData.push(item);
-        }
-      }
+      const uniqueData = newData.filter(
+        (order) => !orders.some((existingOrder) => existingOrder.id === order.id)
+      );
 
       if (uniqueData.length === 0) {
         setHasMore(false);
@@ -147,7 +108,9 @@ export const OrdersListBase = ({ orderType }) => {
       console.log('Error fetching accepted orders:', error);
       const statusCode = error?.status || 'Unknown';
       console.log('Status code accepted orders:', statusCode);
-      clearInterval(intervalId);
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
     } finally {
       setLoading(false);
       setLoadingMore(false);

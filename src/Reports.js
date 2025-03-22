@@ -1,7 +1,8 @@
 import React, { useContext } from "react";
 import { createMaterialTopTabNavigator } from "@react-navigation/material-top-tabs";
 import { LanguageContext } from "./components/Language";
-import { OrdersListOnline, OrdersListQr } from "./components/orderlogs/OrdersListBase"; // Import the shared components
+import { OrdersListOnline, OrdersListQr } from "./components/orderlogs/OrdersListBase";
+import { TabBarItem } from "./components/TabBarItem";
 
 const Tab = createMaterialTopTabNavigator();
 
@@ -13,6 +14,14 @@ export default function TabContent(props) {
       screenOptions={{
         tabBarLabelStyle: {
           fontSize: 15,
+        },
+        tabBarItemStyle: {
+          minWidth: 0,
+          paddingHorizontal: 10,
+        },
+        tabBarStyle: {
+          elevation: 0,
+          shadowOpacity: 0,
         },
       }}
     >

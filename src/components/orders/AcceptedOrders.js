@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, createContext, useContext } from "react";
+import React, { useState, useEffect, useCallback, createContext, useContext, useRef } from "react";
 import {
   StyleSheet,
   Dimensions,
@@ -33,7 +33,8 @@ const numColumns = printRows(width);
 const cardSize = width / numColumns;
 
 export const AcceptedOrdersList = () => {
-  const { domain, branchid, setUser, user, deleteItem, setIsDataSet, intervalId } = useContext(AuthContext);
+  const { domain, branchid, setUser, user, deleteItem, setIsDataSet } = useContext(AuthContext);
+  const intervalRef = useRef(null);
   const [orders, setOrders] = useState([]);
   const [fees, setFees] = useState([]);
   const [currency, setCurrency] = useState("");
@@ -104,34 +105,39 @@ export const AcceptedOrdersList = () => {
     return () => subscription?.remove();
   }, []);
 
-  const fetchAcceptedOrders = async () => {
-    setOptionsIsLoaded(true);
+  const fetchAcceptedOrders = async (appliedFilters = filters, reset = false) => {
+    if (!user || !options.url_getAcceptedOrders) return;
+
     try {
-      if (!user || !options.url_getAcceptedOrders) {
-        return null;
+      const resp = await axiosInstance.post(options.url_getAcceptedOrders, {
+        ...appliedFilters,
+        branchid: branchid,
+        Languageid: languageId,
+        page: reset ? 0 : page,
+      });
+
+      const uniqueData = resp.data.data.filter(
+        (order) => !orders.some((existingOrder) => existingOrder.id === order.id)
+      );
+
+      if (uniqueData.length === 0) {
+        setHasMore(false);
+      } else {
+        setOrders((prevOrders) => reset ? uniqueData : [...prevOrders, ...uniqueData]);
       }
 
-      const resp = await axiosInstance.post(options.url_getAcceptedOrders, JSON.stringify({
-        Pagination: {
-          limit: 12,
-          page: page
-        },
-        Languageid: languageId,
-        branchid: branchid,
-        type: 0
-      }));
-      const data = resp.data.data;
-      const feesData = resp.data.fees;
-      setOrders(data);
       setFees(feesData);
       setCurrency(resp.data.currency);
     } catch (error) {
-      console.log('Error fetching accepted orders full:', error);
+      console.log('Error fetching accepted orders:', error);
       const statusCode = error?.status || 'Unknown';
       console.log('Status code accepted orders:', statusCode);
-      clearInterval(intervalId);
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   };
 

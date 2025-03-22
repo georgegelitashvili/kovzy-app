@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useState, useRef, useEffect, useCallback } from "react";
-import { AppState, TouchableOpacity, Alert } from 'react-native';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { AppState, TouchableOpacity } from 'react-native';
 import axiosInstance from "../apiConfig/apiRequests";
 import * as SecureStore from 'expo-secure-store';
 import { storeData, getSecureData, removeData, getMultipleData } from "../helpers/storage";
@@ -15,324 +15,279 @@ export const AuthProvider = ({ isConnected, children }) => {
   const [user, setUser] = useState(null);
   const [userObject, setUserObject] = useState(null);
   const [domain, setDomain] = useState(null);
-  const [previousDomain, setPreviousDomain] = useState(null);
   const [branchid, setBranchid] = useState(null);
   const [branchName, setBranchName] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isDataSet, setIsDataSet] = useState(false);
-  const [options, setOptions] = useState({
-    url_login: "",
-    url_logout: "",
-    url_branchStatus: "",
-    url_deliveronStatus: "",
-    url_authUser: ""
-  });
   const [loginError, setLoginError] = useState([]);
   const [isVisible, setIsVisible] = useState(true);
   const [branchEnabled, setBranchEnabled] = useState(false);
   const [deliveronEnabled, setDeliveronEnabled] = useState(false);
-  const [intervalId, setIntervalId] = useState(null);
   const [appState, setAppState] = useState(AppState.currentState);
   const [shouldRenderAuthScreen, setShouldRenderAuthScreen] = useState(false);
-  const [defaultLang, setDefaultLang] = useState(null);
   const [showReload, setShowReload] = useState(false);
 
+  const intervalRef = useRef(null);
   const { userLanguageChange, dictionary } = useContext(LanguageContext);
-
   const { languages } = useFetchLanguages(domain);
 
-  const handleLanguageChange = e => userLanguageChange(e);
+  const apiUrls = useMemo(() => ({
+    login: domain ? `https://${domain}/api/v1/admin/auth/login` : "",
+    logout: domain ? `https://${domain}/api/v1/admin/auth/logout` : "",
+    branchStatus: domain ? `https://${domain}/api/v1/admin/branchStatus` : "",
+    deliveronStatus: domain ? `https://${domain}/api/v1/admin/deliveronStatus` : "",
+    authUser: domain ? `https://${domain}/api/v1/admin/auth/authorized` : "",
+  }), [domain]);
 
-  const handleClick = () => {
+  const handleClick = useCallback(() => {
     setIsVisible(true);
-  };
+  }, []);
 
-  const readData = async () => {
+  const readData = useCallback(async () => {
     try {
-      const data = await getMultipleData(["domain", "branch", "branchNames"]);
-      const [domain, branchid, branchName] = data;
-
+      const [domain, branchid, branchName] = await getMultipleData(["domain", "branch", "branchNames"]);
       if (domain && branchid && branchName) {
         setDomain(domain);
         setBranchid(branchid);
         setBranchName(branchName);
         setIsDataSet(true);
-
       } else {
         setIsDataSet(false);
       }
     } catch (e) {
       console.log(e.message);
-      // Handle error or set appropriate state
     }
-  };
+  }, []);
 
-  const apiOptions = useCallback(() => {
-    if (domain) {
-      setOptions(prevOptions => ({
-        ...prevOptions,
-        url_login: `https://${domain}/api/v1/admin/auth/login`,
-        url_logout: `https://${domain}/api/v1/admin/auth/logout`,
-        url_branchStatus: `https://${domain}/api/v1/admin/branchStatus`,
-        url_deliveronStatus: `https://${domain}/api/v1/admin/deliveronStatus`,
-        url_authUser: `https://${domain}/api/v1/admin/auth/authorized`,
-      }));
-    }
-  }, [domain, isDataSet]);
-
-  const deleteItem = async (key) => {
+  const deleteItem = useCallback(async (key) => {
     try {
-      const result = await SecureStore.deleteItemAsync(key);
-      if (result) {
-        console.log(key + ': Secure storage item deleted successfully.');
-      } else {
-        console.log(key + ': Secure storage item does not exist.');
-      }
+      await SecureStore.deleteItemAsync(key);
     } catch (error) {
-      console.log('Error occurred while deleting secure storage:', error);
+      console.log('Error deleting secure storage:', error);
     }
-  };
+  }, []);
 
-  const fetchData = async () => {
-    if (!domain || !branchid || !options) return;
+  const fetchData = useCallback(async () => {
+    if (!domain || !branchid || !apiUrls.deliveronStatus || !apiUrls.branchStatus) return;
 
     try {
       const [deliveronResponse, branchResponse] = await Promise.all([
-        axiosInstance.post(options.url_deliveronStatus, { timeout: 5000 }),
-        axiosInstance.post(options.url_branchStatus, { branchid }, { timeout: 5000 }),
+        axiosInstance.post(apiUrls.deliveronStatus, { timeout: 5000 }),
+        axiosInstance.post(apiUrls.branchStatus, { branchid }, { timeout: 5000 }),
       ]);
 
-      setDeliveronEnabled(deliveronResponse.data.data.status === 0);
-      setBranchEnabled(branchResponse.data.data);
-      setIsVisible(branchResponse.data.data);
+      const newDeliveronStatus = deliveronResponse.data.data.status === 0;
+      const newBranchStatus = branchResponse.data.data;
+
+      setDeliveronEnabled(newDeliveronStatus);
+      setBranchEnabled(newBranchStatus);
+      setIsVisible(!newBranchStatus);
     } catch (error) {
       console.error('Error fetching data:', error.message || error);
-      clearInterval(intervalId);
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
       setShowReload(true);
+      setBranchEnabled(false);
+      setIsVisible(true);
     }
-  };
+  }, [domain, branchid, apiUrls]);
 
-  const loadUser = async () => {
+  const loadUser = useCallback(async () => {
     setIsLoading(true);
-    const userObj = await getSecureData('user');
-    if (userObj && options.url_authUser) {
-      console.log('object of user', userObj);
-      setUserObject(userObj);
-      await axiosInstance.get(options.url_authUser)
-        .then(response => {
-          if (response.data.user) {
-            setUser(userObj);
-          } else {
-            setUser(null);
-            clearInterval(intervalId);
-            setIntervalId(null);
-            setIsLoading(false);
-          }
-        })
-        .catch(error => {
-          console.error('Error loading user:', error.message || error);
+    try {
+      const userObj = await getSecureData('user');
+      if (userObj && apiUrls.authUser) {
+        const response = await axiosInstance.get(apiUrls.authUser);
+        if (response.data.user) {
+          setUser(userObj);
+        } else {
           setUser(null);
-          clearInterval(intervalId);
-          setIntervalId(null);
-          setShowReload(true);
-          setIsLoading(false);
-        });
+          if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error loading user:', error.message || error);
+      setUser(null);
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+      setShowReload(true);
+    } finally {
+      setIsLoading(false);
     }
-  };
+  }, [apiUrls.authUser]);
 
-  const startInterval = () => {
-    const newIntervalId = setInterval(fetchData, 3000);
-    setIntervalId(newIntervalId);
-  };
-
-  const stopInterval = () => {
-    if (intervalId) {
-      clearInterval(intervalId);
-      setIntervalId(null);
+  const startInterval = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
     }
-  };
+    intervalRef.current = setInterval(fetchData, 3000);
+  }, [fetchData]);
+
+  const stopInterval = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+  }, []);
 
   useEffect(() => {
     readData();
-    apiOptions();
-    stopInterval();
-  }, [domain, isDataSet]);
+  }, []);
 
   useEffect(() => {
     if (languages.length > 0) {
       const defaultLanguage = languages.find(language => language.default === 1);
-      setDefaultLang(defaultLanguage ? defaultLanguage.lang : null);
-      handleLanguageChange(defaultLanguage.lang);
-      storeData('rcml-lang', defaultLanguage.lang);
-      storeData('languages', languages);
+      if (defaultLanguage) {
+        userLanguageChange(defaultLanguage.lang);
+        storeData('rcml-lang', defaultLanguage.lang);
+        storeData('languages', languages);
+      }
     }
-  }, [languages]);
+  }, [languages, userLanguageChange]);
 
   useEffect(() => {
-    if (!options || !options.url_deliveronStatus || !options.url_branchStatus) {
-      console.error('Missing URL parameters in options');
-      return;
-    }
+    if (!apiUrls.deliveronStatus || !apiUrls.branchStatus) return;
     
     fetchData();
     startInterval();
 
     const handleAppStateChange = (nextAppState) => {
       if (appState.match(/inactive|background/) && nextAppState === 'active') {
-        // App has come to the foreground
         fetchData();
         startInterval();
-        if (!user && isConnected && options.url_authUser != "") {
+        if (!user && isConnected && apiUrls.authUser) {
           loadUser();
         }
       } else {
-        // App has gone to the background
         stopInterval();
       }
-
       setAppState(nextAppState);
     };
 
     const subscribe = AppState.addEventListener('change', handleAppStateChange);
-
     return () => {
       stopInterval();
       subscribe.remove();
     };
-  }, [appState, domain, branchid, options, isConnected, user, branchEnabled, deliveronEnabled]);
-
+  }, [appState, apiUrls, isConnected, user]);
 
   useEffect(() => {
-    if (!user && options.url_authUser && isConnected) {
+    if (!user && apiUrls.authUser && isConnected) {
       loadUser();
-    } else {
-      setIsLoading(false);
     }
-  }, [user, options, isConnected]);
+  }, [user, apiUrls.authUser, isConnected]);
 
+  const handleReload = useCallback(() => {
+    setShowReload(false);
+    fetchData();
+    loadUser();
+  }, [fetchData, loadUser]);
 
-  const handleReload = () => {
-    setShowReload(false);  // Hide reload button on click
-    fetchData();           // Reattempt data fetch
-    loadUser();            // Reattempt to load user
-  };
+  const contextValue = useMemo(() => ({
+    domain,
+    setDomain,
+    user,
+    setUser,
+    loginError,
+    isLoading,
+    setIsLoading,
+    setIsDataSet,
+    branchid,
+    setBranchid,
+    branchName,
+    branchEnabled,
+    setBranchEnabled,
+    deliveronEnabled,
+    setDeliveronEnabled,
+    deleteItem,
+    shouldRenderAuthScreen,
+    setShouldRenderAuthScreen,
+    languages,
+    login: async (username, password) => {
+      setIsLoading(true);
+      try {
+        const response = await axiosInstance.post(apiUrls.login, { password, username });
+        const { token: authorized, user } = response.data;
+
+        if (response.error) {
+          setLoginError(response.error.message);
+          return;
+        }
+
+        const userResponse = {
+          token: authorized,
+          id: user.id,
+          username: user.username,
+        };
+
+        setUser(userResponse);
+        setLoginError([]);
+        await Promise.all([
+          SecureStore.setItemAsync('credentials', JSON.stringify({ username, password })),
+          SecureStore.setItemAsync('token', JSON.stringify(authorized)),
+          SecureStore.setItemAsync('user', JSON.stringify(userResponse))
+        ]);
+      } catch (error) {
+        console.log('Error logging in:', error);
+        setLoginError('An error occurred while logging in. Please try again.');
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    logout: async () => {
+      setIsLoading(true);
+      try {
+        const response = await axiosInstance.post(apiUrls.logout);
+        if (response.data.message) {
+          await Promise.all([
+            deleteItem("token"),
+            deleteItem("credentials"),
+            deleteItem("user"),
+            deleteItem("rcml-lang"),
+            deleteItem("languages"),
+            removeData(["domain", "branch", "branchNames"])
+          ]);
+          
+          setDomain(null);
+          setBranchid(null);
+          setBranchName(null);
+          setIsDataSet(false);
+          setUser(null);
+          setUserObject(null);
+        }
+      } catch (error) {
+        console.log('Error logging out:', error);
+        await Promise.all([
+          deleteItem("token"),
+          deleteItem("credentials"),
+          deleteItem("user"),
+          deleteItem("rcml-lang"),
+          deleteItem("languages"),
+          removeData(["domain", "branch", "branchNames"])
+        ]);
+        
+        setDomain(null);
+        setBranchid(null);
+        setBranchName(null);
+        setIsDataSet(false);
+        setUser(null);
+        setUserObject(null);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+  }), [
+    domain, user, loginError, isLoading, branchid, branchName, branchEnabled,
+    deliveronEnabled, deleteItem, shouldRenderAuthScreen, languages, apiUrls
+  ]);
 
   return (
-    <AuthContext.Provider
-      value={{
-        domain,
-        setDomain,
-        user,
-        setUser,
-        loginError,
-        isLoading,
-        setIsLoading,
-        setIsDataSet,
-        branchid,
-        setBranchid,
-        branchName,
-        branchEnabled,
-        setBranchEnabled,
-        deliveronEnabled,
-        setDeliveronEnabled,
-        deleteItem,
-        intervalId,
-        setIntervalId,
-        shouldRenderAuthScreen,
-        setShouldRenderAuthScreen,
-        languages,
-        login: async (username, password) => {
-          setIsLoading(true);
-          try {
-            const response = await axiosInstance.post(options.url_login, { password, username });
-            // return false;
-            const error = response.error;
-            // Accessing the value of authorized
-            const authorized = response.data.token;
-            const user = response.data.user;
-
-            if (error) {
-              setLoginError(response.error.message);
-              return;
-            }
-
-            const userResponse = {
-              token: authorized,
-              id: user.id,
-              username: user.username,
-            };
-
-            setUser(userResponse);
-            setLoginError([]);
-            SecureStore.setItemAsync('credentials', JSON.stringify({ username, password }));
-            SecureStore.setItemAsync('token', JSON.stringify(authorized));
-            SecureStore.setItemAsync('user', JSON.stringify(userResponse));
-          } catch (error) {
-            console.log('Error logging in:', error);
-            setLoginError('An error occurred while logging in. Please try again.');
-            setIsLoading(false);
-          } finally {
-            setIsLoading(false);
-          }
-        },
-        logout: async () => {
-          setIsLoading(true);
-          try {
-            const response = await axiosInstance.post(options.url_logout);
-            if (response.data.message) {
-              deleteItem("token");
-              deleteItem("credentials");
-              deleteItem("user");
-              removeData(["domain", "branch", "branchNames"]);
-              setDomain(null);
-              setBranchid(null);
-              setBranchName(null);
-              setIsDataSet(false);
-              setUser(null);
-              setIsLoading(false);
-              setUserObject(null);
-            }
-          } catch (error) {-
-            console.log('Error logging out:', error);
-            deleteItem("token");
-            deleteItem("credentials");
-            deleteItem("user");
-            deleteItem("rcml-lang");
-            deleteItem("languages");
-            removeData(["domain", "branch", "branchNames"]);
-            setDomain(null);
-            setBranchid(null);
-            setBranchName(null);
-            setIsDataSet(false);
-            setUser(null);
-            setIsLoading(false);
-          } finally {
-            setIsLoading(false);
-          }
-        },
-      }}
-    >
-
+    <AuthContext.Provider value={contextValue}>
       {!isConnected && !user && showReload && (
-        Alert.alert("ALERT", "connection lost", [
-          {
-            text: "retry", onPress: () => {
-              setIsLoading(true);
-              handleReload();
-            }
-          },
-        ])
-      )}
-
-      {!user && userObject && isLoading ? (
-        <Loader text={dictionary["loading"]} />
-      ) : (
-        children
-      )}
-
-      {user && <AppUpdates />}
-
-      {!isVisible && user && (
         <TouchableOpacity onPress={handleClick}>
           <Toast
             type="failed"
@@ -343,6 +298,24 @@ export const AuthProvider = ({ isConnected, children }) => {
         </TouchableOpacity>
       )}
 
+      {isLoading ? (
+        <Loader text={dictionary["loading"]} />
+      ) : (
+        children
+      )}
+
+      {user && <AppUpdates />}
+
+      {!branchEnabled && isVisible && user && (
+        <TouchableOpacity onPress={handleClick}>
+          <Toast
+            type="failed"
+            title={dictionary["info.warning"]}
+            subtitle={dictionary["orders.branchEnabled"]}
+            animate={false}
+          />
+        </TouchableOpacity>
+      )}
     </AuthContext.Provider>
   );
 };
