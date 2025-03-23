@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useContext } from "react";
 import { StyleSheet, View, TouchableOpacity } from 'react-native';
 import { Text, Card, Divider } from 'react-native-paper';
 import { MaterialCommunityIcons, SimpleLineIcons } from '@expo/vector-icons';
 import OrdersDetail from '../OrdersDetail';
+import { String, LanguageContext } from "../Language";
 
 const OrderCard = ({
   item,
@@ -10,7 +11,6 @@ const OrderCard = ({
   isOpen,
   fees,
   scheduled,
-  dictionary,
   onToggle,
   onAccept,
   onDelay,
@@ -27,6 +27,7 @@ const OrderCard = ({
     return acc;
   }, []);
 
+  const { dictionary, languageId } = useContext(LanguageContext);
   const isScheduled = item.take_away ? scheduled.scheduled_takeaway : scheduled.scheduled_delivery;
 
   const renderButtons = () => {
@@ -298,4 +299,4 @@ export default React.memo(OrderCard, (prevProps, nextProps) => {
     prevProps.currency === nextProps.currency &&
     JSON.stringify(prevProps.fees) === JSON.stringify(nextProps.fees)
   );
-}); 
+});

@@ -12,7 +12,10 @@ export default function SelectOption({ errorText, description, placeholder = "",
             useNativeAndroidPickerStyle={false}
             placeholder={{ label: placeholder }}
             style={pickerSelectStyles}
-            items={items.map((item, index) => ({ label: item.label, value: item.value, key: index.toString() }))}
+            items={items.map(item => ({
+              label: item.label,
+              value: item.value
+            }))}
             {...props}
           />
         )}

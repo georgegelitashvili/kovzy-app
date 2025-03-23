@@ -147,7 +147,7 @@ export const AuthProvider = ({ isConnected, children }) => {
         storeData('languages', languages);
       }
     }
-  }, [languages, userLanguageChange]);
+  }, [languages]);
 
   useEffect(() => {
     if (!apiUrls.deliveronStatus || !apiUrls.branchStatus) return;

@@ -18,5 +18,5 @@ export const languageOptions = [
     {label: 'ქართული', value: 'ka'},
     {label: 'English', value: 'en'},
     {label: 'Русский', value: 'ru'},
-    { label: 'հայերեն', value: 'hy'},
+    {label: 'հայերեն', value: 'hy'},
 ];

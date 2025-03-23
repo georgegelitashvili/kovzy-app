@@ -100,27 +100,22 @@ export const AcceptedOrdersList = () => {
     return () => subscription?.remove();
   }, []);
 
-  const fetchAcceptedOrders = async (appliedFilters = filters, reset = false) => {
+  const fetchAcceptedOrders = async () => {
     if (!user || !options.url_getAcceptedOrders) return;
 
     try {
-      const resp = await axiosInstance.post(options.url_getAcceptedOrders, {
-        ...appliedFilters,
-        branchid: branchid,
+      const resp = await axiosInstance.post(options.url_getAcceptedOrders, JSON.stringify({
+        Pagination: {
+          limit: 12,
+          page: page
+        },
         Languageid: languageId,
-        page: reset ? 0 : page,
-      });
-
-      const uniqueData = resp.data.data.filter(
-        (order) => !orders.some((existingOrder) => existingOrder.id === order.id)
-      );
-
-      if (uniqueData.length === 0) {
-        setHasMore(false);
-      } else {
-        setOrders((prevOrders) => reset ? uniqueData : [...prevOrders, ...uniqueData]);
-      }
-
+        branchid: branchid,
+        type: 1
+      }));
+      const data = resp.data.data;
+      const feesData = resp.data.fees;
+      setOrders(data);
       setFees(feesData);
       setCurrency(resp.data.currency);
     } catch (error) {
@@ -170,21 +165,7 @@ export const AcceptedOrdersList = () => {
     }
   }, [itemId]);
 
-
-  const openURLInBrowser = async (url) => {
-    const supported = await Linking.canOpenURL(url);
-
-    if (supported) {
-      await Linking.openURL(url);
-    } else {
-      Alert.alert(`Don't know how to open this URL: ${url}`);
-    }
-  };
-
   const RenderEnteredOrdersList = ({ item }) => {
-    const trackLink = [JSON.parse(item.deliveron_data)]?.map(link => {
-      return link.trackLink ?? null;
-    });
     const additionalFees = parseFloat(item.service_fee) / 100;
     const feeData = JSON.parse(item.fees_details || '{}');
     const feesDetails = fees?.reduce((acc, fee) => {
@@ -228,14 +209,6 @@ export const AcceptedOrdersList = () => {
             <Text variant="titleSmall" style={styles.title}>
               {dictionary["orders.phone"]}: {item.phone_number}
             </Text>
-
-            {trackLink[0] ? (
-              <TouchableOpacity onPress={() => openURLInBrowser(trackLink[0].toString())}>
-                <Text variant="titleSmall" style={styles.title}>
-                  {"Tracking link:"} <Text style={[styles.title, { color: '#3490dc' }]}>{trackLink[0]}</Text>
-                </Text>
-              </TouchableOpacity>
-            ) : null}
 
             {item.delivery_scheduled ? (
               <Text variant="titleSmall" style={styles.title} numberOfLines={2} ellipsizeMode="tail">

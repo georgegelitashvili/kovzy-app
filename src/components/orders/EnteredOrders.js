@@ -307,7 +307,6 @@ export const EnteredOrdersList = () => {
       scheduled: state.scheduled,
       itemId: state.itemId,
       options,
-      dictionary,
       setLoadingOptions: (value) => dispatch({ type: 'SET_LOADING_OPTIONS', payload: value }),
       setPostponeOrder: (value) => dispatch({ type: 'SET_POSTPONE_ORDER', payload: value }),
       setPickerVisible,
