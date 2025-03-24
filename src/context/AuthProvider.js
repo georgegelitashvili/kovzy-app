@@ -43,21 +43,25 @@ export const AuthProvider = ({ isConnected, children }) => {
     setIsVisible(true);
   }, []);
 
-  const readData = useCallback(async () => {
+  const readData = async () => {
     try {
-      const [domain, branchid, branchName] = await getMultipleData(["domain", "branch", "branchNames"]);
+      const data = await getMultipleData(["domain", "branch", "branchNames"]);
+      const [domain, branchid, branchName] = data;
+
       if (domain && branchid && branchName) {
         setDomain(domain);
         setBranchid(branchid);
         setBranchName(branchName);
         setIsDataSet(true);
+
       } else {
         setIsDataSet(false);
       }
     } catch (e) {
       console.log(e.message);
+      // Handle error or set appropriate state
     }
-  }, []);
+  };
 
   const deleteItem = useCallback(async (key) => {
     try {
@@ -135,8 +139,13 @@ export const AuthProvider = ({ isConnected, children }) => {
   }, []);
 
   useEffect(() => {
-    readData();
-  }, []);
+    const fetchData = async () => {
+      await new Promise((res) => setTimeout(res, 500)); // 500ms delay before fetching
+      await readData();
+    };
+
+    fetchData();
+  }, [domain]);
 
   useEffect(() => {
     if (languages.length > 0) {
@@ -180,12 +189,6 @@ export const AuthProvider = ({ isConnected, children }) => {
       loadUser();
     }
   }, [user, apiUrls.authUser, isConnected]);
-
-  const handleReload = useCallback(() => {
-    setShowReload(false);
-    fetchData();
-    loadUser();
-  }, [fetchData, loadUser]);
 
   const contextValue = useMemo(() => ({
     domain,

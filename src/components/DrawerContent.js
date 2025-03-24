@@ -10,7 +10,7 @@ import { LanguageContext } from "./Language";
 
 export default function DrawerContent(props) {
   const { navigation, ...otherProps } = props;
-  const { domain, branchid, branchName, branchEnabled, setBranchEnabled, deliveronEnabled, logout, setIsLoading } = useContext(AuthContext);
+  const { domain, branchid, branchName, branchEnabled, setBranchEnabled, logout, setIsLoading } = useContext(AuthContext);
   const { dictionary, userLanguage } = useContext(LanguageContext);
   const [qrOrdersBadge, setQrOrdersBadge] = useState(0);
   const [onlineOrdersBadge, setOnlineOrdersBadge] = useState(0);
