@@ -36,10 +36,14 @@ const OrdersFilters = ({ onApplyFilters, filters }) => {
 
     const orderStatus = orderStatuses.length === 2 ? "all" : orderStatuses.join(",");
 
+    // If only one date is selected, use it for both start and end date (single day filter)
+    // If two dates are selected, use them as a range
     const newFilters = {
       orderStatus,
       startDate: dateRange.startDate ? dateRange.startDate.toISOString().split("T")[0] : null,
-      endDate: dateRange.endDate ? dateRange.endDate.toISOString().split("T")[0] : null,
+      endDate: dateRange.endDate 
+        ? dateRange.endDate.toISOString().split("T")[0] 
+        : (dateRange.startDate ? dateRange.startDate.toISOString().split("T")[0] : null),
     };
     onApplyFilters(newFilters);
   }, [onApplyFilters, dateRange, isPreparedSelected, isCancelledSelected, dictionary]);
@@ -47,15 +51,25 @@ const OrdersFilters = ({ onApplyFilters, filters }) => {
   const handleDayPress = (day) => {
     const { startDate, endDate } = dateRange;
     const selectedDate = new Date(day.dateString);
-
+    
+    // If no date is selected or both dates are selected (complete range), start new selection
     if (!startDate || (startDate && endDate)) {
       setDateRange({ startDate: selectedDate, endDate: null });
-    } else if (selectedDate.toISOString() === startDate.toISOString()) {
-      setDateRange({ startDate: null, endDate: null });
-    } else if (selectedDate < startDate) {
-      setDateRange({ startDate: selectedDate, endDate: null });
-    } else {
-      setDateRange({ ...dateRange, endDate: selectedDate });
+    } 
+    // If only start date is selected
+    else if (startDate && !endDate) {
+      // If same date is clicked again, treat it as single date selection
+      if (selectedDate.toISOString() === startDate.toISOString()) {
+        setDateRange({ startDate: selectedDate, endDate: selectedDate });
+      } 
+      // If earlier date is selected, make it the new start date
+      else if (selectedDate < startDate) {
+        setDateRange({ startDate: selectedDate, endDate: startDate });
+      } 
+      // If later date is selected, make it the end date
+      else {
+        setDateRange({ ...dateRange, endDate: selectedDate });
+      }
     }
   };
 
@@ -63,27 +77,49 @@ const OrdersFilters = ({ onApplyFilters, filters }) => {
     let marked = {};
 
     if (dateRange.startDate) {
-      marked[dateRange.startDate.toISOString().split("T")[0]] = {
-        startingDay: true,
-        color: "green",
-        textColor: "white",
-      };
-    }
+      const startDateStr = dateRange.startDate.toISOString().split("T")[0];
+      
+      // If we have both start and end date (range selection)
+      if (dateRange.endDate) {
+        const endDateStr = dateRange.endDate.toISOString().split("T")[0];
+        
+        marked[startDateStr] = {
+          startingDay: true,
+          color: "green",
+          textColor: "white",
+        };
 
-    if (dateRange.endDate) {
-      marked[dateRange.endDate.toISOString().split("T")[0]] = {
-        endingDay: true,
-        color: "green",
-        textColor: "white",
-      };
+        // If start and end dates are the same (single date selection)
+        if (startDateStr === endDateStr) {
+          marked[startDateStr] = {
+            selected: true,
+            selectedColor: "green",
+          };
+        } 
+        // If different dates (range selection)
+        else {
+          marked[endDateStr] = {
+            endingDay: true,
+            color: "green",
+            textColor: "white",
+          };
 
-      let current = new Date(dateRange.startDate);
-      current.setDate(current.getDate() + 1);
+          let current = new Date(dateRange.startDate);
+          current.setDate(current.getDate() + 1);
 
-      while (current < dateRange.endDate) {
-        const dateStr = current.toISOString().split("T")[0];
-        marked[dateStr] = { color: "lightgreen", textColor: "black" };
-        current.setDate(current.getDate() + 1);
+          while (current < dateRange.endDate) {
+            const dateStr = current.toISOString().split("T")[0];
+            marked[dateStr] = { color: "lightgreen", textColor: "black" };
+            current.setDate(current.getDate() + 1);
+          }
+        }
+      } 
+      // If only start date is selected (waiting for second selection)
+      else {
+        marked[startDateStr] = {
+          selected: true,
+          selectedColor: "green",
+        };
       }
     }
 
@@ -110,8 +146,12 @@ const OrdersFilters = ({ onApplyFilters, filters }) => {
     return date.toLocaleDateString(userLanguage, { day: "numeric", month: "short", year: "numeric" });
   };
 
-  const dateRangeText = dateRange.startDate && dateRange.endDate
-    ? `${formatDate(dateRange.startDate)} - ${formatDate(dateRange.endDate)}`
+  const dateRangeText = dateRange.startDate 
+    ? (dateRange.endDate 
+        ? (dateRange.startDate.toISOString() === dateRange.endDate.toISOString()
+            ? formatDate(dateRange.startDate)
+            : `${formatDate(dateRange.startDate)} - ${formatDate(dateRange.endDate)}`)
+        : formatDate(dateRange.startDate))
     : dictionary["filter.selectDateRange"];
 
   return (
@@ -149,7 +189,7 @@ const OrdersFilters = ({ onApplyFilters, filters }) => {
         >
           <Text style={styles.dateRangeText}>{dateRangeText}</Text>
         </TouchableOpacity>
-        {dateRange.startDate && dateRange.endDate && (
+        {dateRange.startDate && (
           <TouchableOpacity
             style={styles.clearButton}
             onPress={clearDateRange}
@@ -188,7 +228,7 @@ const OrdersFilters = ({ onApplyFilters, filters }) => {
               }}
               onDayPress={handleDayPress}
               markedDates={generateMarkedDates}
-              markingType="period"
+              markingType={dateRange.endDate ? "period" : "simple"}
             />
 
             <TouchableOpacity
