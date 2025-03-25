@@ -70,7 +70,6 @@ export const OrdersListBase = ({ orderType }) => {
   }, [domain]);
 
   const handleApplyFilters = useCallback((newFilters) => {
-    console.log("New Filters applied: ", newFilters);
     setFilters(newFilters);
     setOrders([]);
     setHasMore(true);
@@ -79,29 +78,55 @@ export const OrdersListBase = ({ orderType }) => {
 
   const fetchAcceptedOrders = async (appliedFilters = filters, reset = false) => {
     if (!user || !options.url_getOrdersLogs) return;
-
+    
     try {
-      const resp = await axiosInstance.post(options.url_getOrdersLogs, {
-        ...appliedFilters,
-        branchid: branchid,
+      const requestFilters = {
+        status: { exact: appliedFilters.orderStatus},
+        type: { exact: orderType.toString() }, 
+        branchid: { exact: branchid.toString() },
+      };
+  
+      if (appliedFilters.startDate) {
+        const startDate = new Date(appliedFilters.startDate);
+        startDate.setHours(0, 0, 0, 0);
+        
+        const endDate = appliedFilters.endDate 
+          ? new Date(appliedFilters.endDate)
+          : new Date(appliedFilters.startDate);
+        
+        endDate.setHours(23, 59, 59, 999);
+  
+        requestFilters.created_at = {
+          min: startDate.toISOString().replace('T', ' ').replace('.000Z', ''),
+          max: endDate.toISOString().replace('T', ' ').replace('.000Z', '')
+        };
+      }
+  
+      const requestBody = {
         Languageid: languageId,
-        page: reset ? 0 : Math.floor(orders.length / 12),
-      });
-
+        Pagination: {
+          limit: 12,
+          page: reset ? 0 : Math.floor(orders.length / 12)
+        },
+        Filters: requestFilters
+      };
+  
+      const resp = await axiosInstance.post(options.url_getOrdersLogs, requestBody);
+  
       const newData = resp.data.data;
       const feesData = resp.data.fees;
-
+  
       // Filter out duplicates
       const uniqueData = newData.filter(
         (order) => !orders.some((existingOrder) => existingOrder.id === order.id)
       );
-
+  
       if (uniqueData.length === 0) {
         setHasMore(false);
       } else {
         setOrders((prevOrders) => reset ? uniqueData : [...prevOrders, ...uniqueData]);
       }
-
+  
       setFees(feesData);
       setCurrency(resp.data.currency);
     } catch (error) {
