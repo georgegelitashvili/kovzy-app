@@ -20,12 +20,13 @@ export const AuthProvider = ({ isConnected, children }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isDataSet, setIsDataSet] = useState(false);
   const [loginError, setLoginError] = useState([]);
-  const [isVisible, setIsVisible] = useState(true);
+  const [isVisible, setIsVisible] = useState(false);
   const [branchEnabled, setBranchEnabled] = useState(false);
   const [deliveronEnabled, setDeliveronEnabled] = useState(false);
   const [appState, setAppState] = useState(AppState.currentState);
   const [shouldRenderAuthScreen, setShouldRenderAuthScreen] = useState(false);
   const [showReload, setShowReload] = useState(false);
+  const [isInitialFetch, setIsInitialFetch] = useState(true);
 
   const intervalRef = useRef(null);
   const { userLanguageChange, dictionary } = useContext(LanguageContext);
@@ -81,19 +82,25 @@ export const AuthProvider = ({ isConnected, children }) => {
       ]);
 
       const newDeliveronStatus = deliveronResponse.data.data.status === 0;
-      const newBranchStatus = branchResponse.data.data;
+      const newBranchStatus = branchResponse.data.data === true;
+
+      console.log('ფილიალის სტატუსი:', newBranchStatus);
 
       setDeliveronEnabled(newDeliveronStatus);
       setBranchEnabled(newBranchStatus);
+      
       setIsVisible(!newBranchStatus);
+      setIsInitialFetch(false);
+
     } catch (error) {
-      console.error('Error fetching data:', error.message || error);
+      console.error('შეცდომა მონაცემების მიღებისას:', error.message || error);
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
       setShowReload(true);
       setBranchEnabled(false);
       setIsVisible(true);
+      setIsInitialFetch(false);
     }
   }, [domain, branchid, apiUrls]);
 
@@ -309,7 +316,7 @@ export const AuthProvider = ({ isConnected, children }) => {
 
       {user && <AppUpdates />}
 
-      {!branchEnabled && isVisible && user && (
+      {!branchEnabled && user && isVisible && (
         <TouchableOpacity onPress={handleClick}>
           <Toast
             type="failed"

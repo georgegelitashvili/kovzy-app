@@ -31,7 +31,7 @@
     "@sentry/react-native": "~6.3.0",
     "@types/react": "~18.3.12",
     "axios": "^1.7.4",
-    "expo": "~52.0.38",
+    "expo": "~52.0.41",
     "expo-application": "~6.0.2",
     "expo-av": "~15.0.2",
     "expo-background-fetch": "^13.0.5",

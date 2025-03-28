@@ -62,8 +62,8 @@ export const EnteredOrdersList = () => {
   });
   const [optionsIsLoaded, setOptionsIsLoaded] = useState(false);
   const processedOrdersRef = useRef(new Set());
-  const [itemId, setItemId] = useState(null);
-  const [cachedOrders, setCachedOrders] = useState(new Map());
+  const lastOrdersRef = useRef(new Set());
+  const isInitialFetchRef = useRef(true);
 
   const MAX_RETRIES = 15;
   const RETRY_DELAY = 5000;
@@ -125,7 +125,7 @@ export const EnteredOrdersList = () => {
     setOptionsIsLoaded(true);
   }, [domain]);
 
-  const fetchEnteredOrders = async () => {
+  const fetchEnteredOrders = useCallback(async () => {
     if (!user || !options.url_unansweredOrders) return null;
 
     try {
@@ -138,28 +138,48 @@ export const EnteredOrdersList = () => {
       });
 
       const newOrders = resp.data.data;
-      const currentOrderIds = new Set(newOrders.map(order => order.id));
-      const hasNewOrders = newOrders.some(order => !processedOrdersRef.current.has(order.id));
-
-      if (hasNewOrders) {
-        // პირველად გამოვიტანოთ ალერტი
-        Alert.alert(
-          dictionary["general.alerts"],
-          dictionary["orders.newOrder"],
-          [{ text: dictionary["okay"] }]
-        );
-
-        // შემდეგ დავუკრათ ხმა
-        if (NotificationSoundRef?.current) {
-          try {
-            await NotificationSoundRef.current.orderReceived();
-          } catch (error) {
-            console.warn('Error playing notification sound:', error);
+      console.log('მიღებული შეკვეთების რაოდენობა:', newOrders.length);
+      
+      if (isInitialFetchRef.current) {
+        // პირველი fetch-ისთვის
+        isInitialFetchRef.current = false;
+        if (newOrders.length > 0) {
+          Alert.alert(
+            dictionary["general.alerts"],
+            dictionary["orders.newOrder"],
+            [{ text: dictionary["okay"] }]
+          );
+          
+          if (NotificationSoundRef?.current) {
+            try {
+              await NotificationSoundRef.current.orderReceived();
+            } catch (error) {
+              console.warn('Error playing notification sound:', error);
+            }
           }
         }
+        newOrders.forEach(order => lastOrdersRef.current.add(order.id));
+      } else {
+        // შემდგომი fetch-ებისთვის
+        const hasNewOrders = newOrders.some(order => !lastOrdersRef.current.has(order.id));
         
-        // ბოლოს განვაახლოთ დამუშავებული შეკვეთების სია
-        currentOrderIds.forEach(id => processedOrdersRef.current.add(id));
+        if (hasNewOrders) {
+          Alert.alert(
+            dictionary["general.alerts"],
+            dictionary["orders.newOrder"],
+            [{ text: dictionary["okay"] }]
+          );
+
+          if (NotificationSoundRef?.current) {
+            try {
+              await NotificationSoundRef.current.orderReceived();
+            } catch (error) {
+              console.warn('Error playing notification sound:', error);
+            }
+          }
+          
+          newOrders.forEach(order => lastOrdersRef.current.add(order.id));
+        }
       }
 
       dispatch({
@@ -171,6 +191,8 @@ export const EnteredOrdersList = () => {
           scheduled: resp.data.scheduled
         }
       });
+      
+      console.log('state-ში შენახული შეკვეთების რაოდენობა:', state.orders.length);
 
       setRetryCount(0);
     } catch (error) {
@@ -188,15 +210,15 @@ export const EnteredOrdersList = () => {
         handleReload();
       }
     }
-  };
+  }, [user, options.url_unansweredOrders, branchid, languageId, dictionary, retryCount]);
 
   const debouncedFetch = useCallback(
     debounce(() => {
-      if (optionsIsLoaded) {
+      if (optionsIsLoaded && user && options.url_unansweredOrders) {
         fetchEnteredOrders();
       }
     }, DEBOUNCE_DELAY),
-    [optionsIsLoaded]
+    [optionsIsLoaded, user, options.url_unansweredOrders, fetchEnteredOrders]
   );
 
   const startInterval = useCallback(() => {
@@ -209,6 +231,8 @@ export const EnteredOrdersList = () => {
 
   const handleAppStateChange = useCallback((nextAppState) => {
     if (appState.match(/inactive|background/) && nextAppState === "active") {
+      isInitialFetchRef.current = true;
+      lastOrdersRef.current.clear();
       startInterval();
     } else {
       if (intervalRef.current) {
@@ -317,20 +341,25 @@ export const EnteredOrdersList = () => {
   }, [state.deliveryScheduled, state.scheduled, state.itemId, options, dictionary]);
 
   const renderOrderCard = useCallback(({ item }) => (
-    <OrderCard
-      key={item.id}
-      item={item}
-      currency={state.currency}
-      isOpen={state.isOpen.includes(item.id)}
-      fees={state.fees}
-      scheduled={state.scheduled}
-      dictionary={dictionary}
-      onToggle={handleToggleContent}
-      onAccept={handleAcceptOrder}
-      onDelay={handleDelayOrder}
-      onReject={handleRejectOrder}
-    />
-  ), [state.currency, state.isOpen, state.fees, state.scheduled, dictionary, handleToggleContent, handleAcceptOrder, handleDelayOrder, handleRejectOrder]);
+    <View style={{
+      width: width / 2 - 15,
+      marginHorizontal: 5
+    }}>
+      <OrderCard
+        key={item.id}
+        item={item}
+        currency={state.currency}
+        isOpen={state.isOpen.includes(item.id)}
+        fees={state.fees}
+        scheduled={state.scheduled}
+        dictionary={dictionary}
+        onToggle={handleToggleContent}
+        onAccept={handleAcceptOrder}
+        onDelay={handleDelayOrder}
+        onReject={handleRejectOrder}
+      />
+    </View>
+  ), [state.currency, state.isOpen, state.fees, state.scheduled, dictionary, handleToggleContent, handleAcceptOrder, handleDelayOrder, handleRejectOrder, width]);
 
   const keyExtractor = useCallback((item) => item.id.toString(), []);
 
@@ -364,66 +393,80 @@ export const EnteredOrdersList = () => {
       <NotificationSound ref={NotificationSoundRef} />
       {state.loading && <Loader show={state.loading} />}
 
-      {(!state.orders || state.orders.length === 0) ? null : (
-        <FlatGrid
-          adjustGridToStyles={true}
-          itemDimension={cardSize}
-          spacing={10}
-          data={state.orders}
-          renderItem={renderOrderCard}
-          keyExtractor={keyExtractor}
-          getItemLayout={getItemLayout}
-          fixed={true}
-          staticDimension={width}
-          horizontal={false}
-          numColumns={2}
-          itemContainerStyle={{ 
-            width: cardSize,
-            margin: 5,
-          }}
-          style={{ flex: 1 }}
-          ListHeaderComponent={
-            <View>
-              {state.visible && (
-                <OrdersModal
-                  isVisible={state.visible}
-                  onChangeState={handleModalClose}
-                  orders={state.orders}
-                  hasItemId={state.itemId}
-                  deliveron={state.deliveron}
-                  deliveronOptions={state.deliveronOptions}
-                  type={state.modalType}
-                  options={options}
-                  takeAway={state.itemTakeAway}
-                  PendingOrders={true}
-                />
-              )}
-
-              <Modal
-                transparent={true}
-                visible={isPickerVisible}
-                animationType="fade"
-                onRequestClose={() => {
-                  setPickerVisible(false);
-                  dispatch({ type: 'SET_LOADING_OPTIONS', payload: false });
-                }}
-              >
-                <View style={styles.modalContainer}>
-                  <TimePicker
-                    scheduled={state.scheduled}
-                    showButton={true}
-                    onDelaySet={handleDelaySetWrapper}
-                    onClose={() => {
-                      setPickerVisible(false);
-                      dispatch({ type: 'SET_LOADING_OPTIONS', payload: false });
-                    }}
-                  />
-                </View>
-              </Modal>
-            </View>
+      <FlatList
+        numColumns={2}
+        data={state.orders || []}
+        renderItem={renderOrderCard}
+        keyExtractor={keyExtractor}
+        removeClippedSubviews={false}
+        maxToRenderPerBatch={50}
+        windowSize={41}
+        initialNumToRender={30}
+        updateCellsBatchingPeriod={10}
+        onEndReachedThreshold={0.5}
+        onEndReached={() => {
+          if (state.orders?.length > 0) {
+            debouncedFetch();
           }
-        />
-      )}
+        }}
+        contentContainerStyle={{
+          paddingHorizontal: 5,
+          paddingBottom: 20
+        }}
+        columnWrapperStyle={{
+          justifyContent: 'space-between',
+          marginVertical: 5
+        }}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Text>{dictionary["orders.noOrders"]}</Text>
+          </View>
+        }
+        refreshing={state.loading}
+        onRefresh={() => {
+          debouncedFetch();
+        }}
+        ListHeaderComponent={
+          <View>
+            {state.visible && (
+              <OrdersModal
+                isVisible={state.visible}
+                onChangeState={handleModalClose}
+                orders={state.orders}
+                hasItemId={state.itemId}
+                deliveron={state.deliveron}
+                deliveronOptions={state.deliveronOptions}
+                type={state.modalType}
+                options={options}
+                takeAway={state.itemTakeAway}
+                PendingOrders={true}
+              />
+            )}
+
+            <Modal
+              transparent={true}
+              visible={isPickerVisible}
+              animationType="fade"
+              onRequestClose={() => {
+                setPickerVisible(false);
+                dispatch({ type: 'SET_LOADING_OPTIONS', payload: false });
+              }}
+            >
+              <View style={styles.modalContainer}>
+                <TimePicker
+                  scheduled={state.scheduled}
+                  showButton={true}
+                  onDelaySet={handleDelaySetWrapper}
+                  onClose={() => {
+                    setPickerVisible(false);
+                    dispatch({ type: 'SET_LOADING_OPTIONS', payload: false });
+                  }}
+                />
+              </View>
+            </Modal>
+          </View>
+        }
+      />
     </View>
   );
 };
@@ -525,4 +568,12 @@ const styles = StyleSheet.create({
     elevation: 5,
     width: "80%",
   },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    width: '100%',
+    height: 200
+  }
 });
