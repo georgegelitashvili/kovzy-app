@@ -126,7 +126,9 @@ export const EnteredOrdersList = () => {
   }, [domain]);
 
   const fetchEnteredOrders = useCallback(async () => {
-    if (!user || !options.url_unansweredOrders) return null;
+    if (!user || !options.url_unansweredOrders) {
+      return null;
+    }
 
     try {
       const resp = await axiosInstance.post(options.url_unansweredOrders, {
@@ -138,10 +140,9 @@ export const EnteredOrdersList = () => {
       });
 
       const newOrders = resp.data.data;
-      console.log('მიღებული შეკვეთების რაოდენობა:', newOrders.length);
       
       if (isInitialFetchRef.current) {
-        // პირველი fetch-ისთვის
+        console.log('Initial fetch completed');
         isInitialFetchRef.current = false;
         if (newOrders.length > 0) {
           Alert.alert(
@@ -160,7 +161,6 @@ export const EnteredOrdersList = () => {
         }
         newOrders.forEach(order => lastOrdersRef.current.add(order.id));
       } else {
-        // შემდგომი fetch-ებისთვის
         const hasNewOrders = newOrders.some(order => !lastOrdersRef.current.has(order.id));
         
         if (hasNewOrders) {
@@ -192,18 +192,27 @@ export const EnteredOrdersList = () => {
         }
       });
       
-      console.log('state-ში შენახული შეკვეთების რაოდენობა:', state.orders.length);
+      console.log('State updated successfully');
+      dispatch({ type: 'SET_LOADING', payload: false });
 
       setRetryCount(0);
     } catch (error) {
-      console.log('Error fetching entered orders:', error);
+      console.log('Error in fetchEnteredOrders:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        config: error.config
+      });
+      
       if (retryCount < MAX_RETRIES) {
+        console.log(`Retrying... Attempt ${retryCount + 1} of ${MAX_RETRIES}`);
         setRetryCount(prev => prev + 1);
         if (intervalRef.current) {
           clearInterval(intervalRef.current);
         }
         setTimeout(startInterval, RETRY_DELAY);
       } else {
+        console.log('Max retries reached, reloading app');
         if (intervalRef.current) {
           clearInterval(intervalRef.current);
         }
@@ -289,19 +298,72 @@ export const EnteredOrdersList = () => {
     dispatch({ type: 'TOGGLE_CONTENT', payload: id });
   }, []);
 
-  const handleAcceptOrder = useCallback((id, takeAway) => {
-    dispatch({
-      type: 'SET_MODAL_STATE',
-      payload: {
-        visible: true,
-        modalType: 'accept',
-        itemId: id,
-        itemTakeAway: takeAway
+  const handleAcceptOrder = useCallback(async (itemId, itemTakeAway) => {
+    try {
+      dispatch({ type: 'SET_LOADING', payload: true });
+      
+      if (itemTakeAway === 1) {
+        dispatch({
+          type: 'SET_MODAL_STATE',
+          payload: {
+            visible: true,
+            modalType: 'accept',
+            itemId: itemId,
+            itemTakeAway: itemTakeAway
+          }
+        });
+        dispatch({ type: 'SET_LOADING', payload: false });
+        return;
       }
-    });
-  }, []);
+
+      const response = await axiosInstance.post(options.url_deliveronRecheck, {
+        orderId: itemId,
+      });
+
+      if (response.data?.data?.original?.content.length !== 0) {
+        dispatch({
+          type: 'SET_DELIVERON_DATA',
+          payload: response.data.data
+        });
+        dispatch({
+          type: 'SET_MODAL_STATE',
+          payload: {
+            visible: true,
+            modalType: 'accept',
+            itemId: itemId,
+            itemTakeAway: itemTakeAway
+          }
+        });
+      } else if (response.data?.data?.original?.content.length === 0) {
+        dispatch({
+          type: 'SET_DELIVERON_DATA',
+          payload: []
+        });
+        Alert.alert("ALERT", dictionary["dv.empty"], [
+          {
+            text: "okay", onPress: () => {
+              dispatch({
+                type: 'SET_DELIVERON_DATA',
+                payload: []
+              });
+            }
+          },
+        ]);
+      }
+      dispatch({ type: 'SET_LOADING', payload: false });
+    } catch (error) {
+      console.log('Error in handleAcceptOrder:', error);
+      dispatch({
+        type: 'SET_DELIVERON_DATA',
+        payload: []
+      });
+      dispatch({ type: 'SET_LOADING', payload: false });
+    }
+  }, [options.url_deliveronRecheck]);
 
   const handleRejectOrder = useCallback((id) => {
+    dispatch({ type: 'SET_LOADING', payload: true });
+    
     dispatch({
       type: 'SET_MODAL_STATE',
       payload: {
@@ -311,13 +373,18 @@ export const EnteredOrdersList = () => {
         itemTakeAway: null
       }
     });
+    
+    dispatch({ type: 'SET_LOADING', payload: false });
   }, []);
 
   const handleDelayOrder = useCallback((id, scheduledTime) => {
+    dispatch({ type: 'SET_LOADING', payload: true });
+    
     dispatch({ type: 'SET_MODAL_STATE', payload: { itemId: id } });
     dispatch({ type: 'SET_DELIVERY_SCHEDULED', payload: scheduledTime });
     setPickerVisible(true);
-    dispatch({ type: 'SET_LOADING_OPTIONS', payload: false });
+    
+    dispatch({ type: 'SET_LOADING', payload: false });
   }, []);
 
   const handleModalClose = useCallback(() => {
@@ -357,9 +424,10 @@ export const EnteredOrdersList = () => {
         onAccept={handleAcceptOrder}
         onDelay={handleDelayOrder}
         onReject={handleRejectOrder}
+        loading={state.loading}
       />
     </View>
-  ), [state.currency, state.isOpen, state.fees, state.scheduled, dictionary, handleToggleContent, handleAcceptOrder, handleDelayOrder, handleRejectOrder, width]);
+  ), [state.currency, state.isOpen, state.fees, state.scheduled, state.loading, dictionary, handleToggleContent, handleAcceptOrder, handleDelayOrder, handleRejectOrder, width]);
 
   const keyExtractor = useCallback((item) => item.id.toString(), []);
 

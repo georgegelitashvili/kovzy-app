@@ -13,8 +13,8 @@ export default function SelectOption({ errorText, description, placeholder = "",
             placeholder={{ label: placeholder }}
             style={pickerSelectStyles}
             items={items.map(item => ({
-              label: item.label,
-              value: item.value
+              label: item.name || item.label || item.companyName || item.type || "Default Label",
+              value: item.id || item.value || item.companyId || item.type
             }))}
             {...props}
           />

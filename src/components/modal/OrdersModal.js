@@ -7,25 +7,42 @@ import TimePicker from "../generate/TimePicker";
 import { LanguageContext } from "../Language";
 
 const generateItems = (deliveron) => {
-  const { status, content } = deliveron.original ?? {};
-
-  if (status === -2 || status === -1 || !content) {
-    return null;
-  }
-
-  if (Array.isArray(content)) {
-    return content.map((item) => ({
+  if (Array.isArray(deliveron) && deliveron.length > 0) {
+    return deliveron.map((item) => ({
       label: `${item.name || item.companyName} - ${item.price ?? item.price_before_accept}`,
       value: item.id ?? item.companyId ?? item.type,
     }));
   }
 
-  return [
-    {
+  if (deliveron?.data?.original?.content) {
+    const content = deliveron.data.original.content;
+    if (Array.isArray(content)) {
+      return content.map((item) => ({
+        label: `${item.name || item.companyName} - ${item.price ?? item.price_before_accept}`,
+        value: item.id ?? item.companyId ?? item.type,
+      }));
+    }
+    return [{
       label: `${content.name || content.companyName} - ${content.price ?? content.price_before_accept}`,
       value: content.id ?? content.companyId ?? content.type,
-    },
-  ];
+    }];
+  }
+
+  if (deliveron?.original?.content) {
+    const content = deliveron.original.content;
+    if (Array.isArray(content)) {
+      return content.map((item) => ({
+        label: `${item.name || item.companyName} - ${item.price ?? item.price_before_accept}`,
+        value: item.id ?? item.companyId ?? item.type,
+      }));
+    }
+    return [{
+      label: `${content.name || content.companyName} - ${content.price ?? content.price_before_accept}`,
+      value: content.id ?? content.companyId ?? content.type,
+    }];
+  }
+
+  return [];
 };
 
 export default function OrdersModal({
@@ -53,6 +70,8 @@ export default function OrdersModal({
       setForDelivery(0);
     }
   }, [isVisible]);
+
+  console.log('deliveron', deliveron);
 
   const modalContent = useMemo(() => {
     const commonProps = {
@@ -87,10 +106,9 @@ export default function OrdersModal({
   }, [type, hasItemId, deliveron, options, takeAway, items, deliveronOptions, orders, forDelivery]);
 
   if (
-    takeAway !== 1 &&
     type !== "reject" &&
     type !== "status" &&
-    (deliveron.length === 0 || deliveron.original?.content.length === 0)
+    type !== "accept"
   ) {
     return null;
   }

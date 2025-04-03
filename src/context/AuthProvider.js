@@ -88,7 +88,7 @@ export const AuthProvider = ({ isConnected, children }) => {
 
       setDeliveronEnabled(newDeliveronStatus);
       setBranchEnabled(newBranchStatus);
-      
+
       setIsVisible(!newBranchStatus);
       setIsInitialFetch(false);
 
@@ -167,7 +167,7 @@ export const AuthProvider = ({ isConnected, children }) => {
 
   useEffect(() => {
     if (!apiUrls.deliveronStatus || !apiUrls.branchStatus) return;
-    
+
     fetchData();
     startInterval();
 
@@ -261,7 +261,7 @@ export const AuthProvider = ({ isConnected, children }) => {
             deleteItem("languages"),
             removeData(["domain", "branch", "branchNames"])
           ]);
-          
+
           setDomain(null);
           setBranchid(null);
           setBranchName(null);
@@ -279,7 +279,7 @@ export const AuthProvider = ({ isConnected, children }) => {
           deleteItem("languages"),
           removeData(["domain", "branch", "branchNames"])
         ]);
-        
+
         setDomain(null);
         setBranchid(null);
         setBranchName(null);

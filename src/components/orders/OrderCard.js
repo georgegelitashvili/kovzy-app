@@ -14,7 +14,8 @@ const OrderCard = ({
   onToggle,
   onAccept,
   onDelay,
-  onReject
+  onReject,
+  loading
 }) => {
   const deliveryPrice = parseFloat(item.delivery_price);
   const additionalFees = parseFloat(item.service_fee) / 100;
@@ -38,24 +39,27 @@ const OrderCard = ({
     return (
       <View style={styles.buttonContainer}>
         <TouchableOpacity
-          style={styles.buttonAccept}
-          onPress={() => onAccept(item.id, item.take_away)}
+          style={[styles.buttonAccept, loading && styles.buttonDisabled]}
+          onPress={() => !loading && onAccept(item.id, item.take_away)}
+          disabled={loading}
         >
           <MaterialCommunityIcons name="check-decagram-outline" size={30} color="white" />
         </TouchableOpacity>
 
         {item.delivery_scheduled !== null && isScheduled && (
           <TouchableOpacity
-            style={styles.buttonDelay}
-            onPress={() => onDelay(item.id, item.delivery_scheduled)}
+            style={[styles.buttonDelay, loading && styles.buttonDisabled]}
+            onPress={() => !loading && onDelay(item.id, item.delivery_scheduled)}
+            disabled={loading}
           >
             <MaterialCommunityIcons name="bell-ring-outline" size={30} color="white" />
           </TouchableOpacity>
         )}
 
         <TouchableOpacity
-          style={styles.buttonReject}
-          onPress={() => onReject(item.id)}
+          style={[styles.buttonReject, loading && styles.buttonDisabled]}
+          onPress={() => !loading && onReject(item.id)}
+          disabled={loading}
         >
           <MaterialCommunityIcons name="close-circle-outline" size={30} color="white" />
         </TouchableOpacity>
@@ -65,7 +69,7 @@ const OrderCard = ({
 
   return (
     <Card key={item.id} style={styles.card}>
-      <TouchableOpacity onPress={() => onToggle(item.id)}>
+      <TouchableOpacity onPress={() => !loading && onToggle(item.id)} disabled={loading}>
         <Card.Content style={styles.head}>
           <Text variant="headlineMedium" style={styles.header}>
             <MaterialCommunityIcons
@@ -290,6 +294,9 @@ const styles = StyleSheet.create({
     color: "#fff",
     marginLeft: 28,
   },
+  buttonDisabled: {
+    opacity: 0.5,
+  },
 });
 
 export default React.memo(OrderCard, (prevProps, nextProps) => {
@@ -297,6 +304,7 @@ export default React.memo(OrderCard, (prevProps, nextProps) => {
     prevProps.item.id === nextProps.item.id &&
     prevProps.isOpen === nextProps.isOpen &&
     prevProps.currency === nextProps.currency &&
+    prevProps.loading === nextProps.loading &&
     JSON.stringify(prevProps.fees) === JSON.stringify(nextProps.fees)
   );
 });
