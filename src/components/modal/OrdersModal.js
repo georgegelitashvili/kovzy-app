@@ -71,8 +71,6 @@ export default function OrdersModal({
     }
   }, [isVisible]);
 
-  console.log('deliveron', deliveron);
-
   const modalContent = useMemo(() => {
     const commonProps = {
       itemId: hasItemId,
