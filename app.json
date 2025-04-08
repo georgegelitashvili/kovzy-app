@@ -8,7 +8,7 @@
     "userInterfaceStyle": "light",
     "newArchEnabled": false,
     "splash": {
-      "image": "./assets/splash.png",
+      "image": "./assets/splash-icon-dark.png",
       "resizeMode": "cover",
       "backgroundColor": "#ffffff"
     },
@@ -24,22 +24,12 @@
       "bundleIdentifier": "com.kovzy.app",
       "config": {
         "usesNonExemptEncryption": false
-      },
-      "splash": {
-        "image": "./assets/splash.png",
-        "resizeMode": "cover",
-        "backgroundColor": "#ffffff"
       }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FFFFFF"
-      },
-      "splash": {
-        "image": "./assets/splash.png",
-        "resizeMode": "cover",
-        "backgroundColor": "#ffffff"
       },
       "permissions": [
         "NOTIFICATIONS",
