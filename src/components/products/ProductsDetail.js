@@ -17,12 +17,14 @@ export default function ProductsDetail({ navigation, route }) {
   const { dictionary, userLanguage } = useContext(LanguageContext);
   
   const [customizable, setCustomizable] = useState([]);
+  const [customizableId, setCustomizableId] = useState('');
   const [productEnabled, setProductEnabled] = useState(false);
   const [isConnected, setIsConnected] = useState(true);
   const [loading, setLoading] = useState(true);
   const [isOpen, setOpenState] = useState([]);
   const [value, setValue] = useState("");
   const [enabled, setEnabled] = useState("");
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     const removeSubscription = NetInfo.addEventListener((state) => {
@@ -39,28 +41,40 @@ export default function ProductsDetail({ navigation, route }) {
   }, [isConnected, domain, branchid, userLanguage, id]);
 
   useEffect(() => {
-    if (value && enabled) {
-      handleTogglePack();
-    }
-  }, [value, enabled]);
+    handleTogglePack();
+  }, [value, customizableId, enabled]);
 
   const fetchData = async () => {
     if (!domain || !branchid) return;
     
+    setError(null);
     try {
       const response = await axiosInstance.post(
         `https://${domain}/api/v1/admin/getCustomizablePack`,
         {
+          branch_id: branchid,
           pid: id,
           lang: userLanguage,
         }
       );
-      setCustomizable(response.data.customizable);
+
+      if (response.data?.customizable) {
+        setCustomizable(response.data.customizable);
+      } else {
+        setCustomizable([]);
+        setError('No customizable packs found');
+      }
     } catch (error) {
       console.error('Error fetching customizable packs:', error);
-      if (error.status === 401) {
-        setCustomizable([]);
+      setCustomizable([]);
+      
+      if (error.response?.status === 404) {
+        setError('No customizable packs available');
+      } else if (error.response?.status === 401) {
         setIsDataSet(false);
+        setError('Authentication failed. Please login again.');
+      } else {
+        setError(`Failed to fetch data: ${error.response?.data?.error?.message || 'Unknown error'}`);
       }
     } finally {
       setLoading(false);
@@ -69,18 +83,22 @@ export default function ProductsDetail({ navigation, route }) {
 
   const handleTogglePack = async () => {
     if (!domain || !branchid || !value) return;
-    
+
     try {
       const response = await axiosInstance.post(
         `https://${domain}/api/v1/admin/customizablePackActivity`,
-        { 
-          customizablePackid: value, 
-          enabled: enabled, 
-          branchid: branchid 
+        {
+          product_id: id,
+          customizable_id: customizableId,
+          customizable_pack_id: value,
+          branch_id: branchid
         }
       );
+
       setProductEnabled(response.data.data);
       fetchData(); // Refresh data after toggle
+      setCustomizableId("");
+      setValue("");
     } catch (error) {
       console.error('Error toggling pack:', error);
       return;
@@ -91,11 +109,6 @@ export default function ProductsDetail({ navigation, route }) {
     setOpenState((prev) =>
       prev.includes(value) ? prev.filter((i) => i !== value) : [...prev, value]
     );
-  };
-
-  const handlePackButtonPress = (packId, packEnabled) => {
-    setValue(packId);
-    setEnabled(packEnabled ? 0 : 1);
   };
 
   const RenderCustomizableList = ({ item }) => {
@@ -119,7 +132,7 @@ export default function ProductsDetail({ navigation, route }) {
           </Card.Content>
         </TouchableOpacity>
         {!isOpen.includes(item.id) && item.packs?.map((child, index) => (
-          <Card.Content key={index + 1}>
+          <Card.Content key={index + item.id + child.id}>
             <View>
               <View style={{ flexDirection: 'row', justifyContent: "space-between" }}>
                 <Text variant="titleMedium" style={styles.title}>
@@ -127,11 +140,15 @@ export default function ProductsDetail({ navigation, route }) {
                 </Text>
                 <Button
                   textColor="white"
-                  buttonColor={child.enabled ? "#f14c4c" : "#2fa360"}
+                  buttonColor={child.is_enabled && child.enabled? "#f14c4c" : "#2fa360"}
                   style={styles.button}
-                  onPress={() => handlePackButtonPress(child.id, child.enabled)}
+                  onPress={() => {
+                    setCustomizableId(item.id);
+                    setValue(child.id);
+                    setEnabled(child.is_enabled ? 0 : 1);
+                  }}
                 >
-                  {child.enabled ? dictionary["prod.disableProduct"] : dictionary["prod.enableProduct"]}
+                  {child.is_enabled ? dictionary["prod.disableProduct"] : dictionary["prod.enableProduct"]}
                 </Button>
               </View>
               <Divider style={{ marginVertical: 9 }} />
@@ -144,6 +161,21 @@ export default function ProductsDetail({ navigation, route }) {
 
   if (loading) {
     return <Loader />;
+  }
+
+  if (error) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>{error}</Text>
+        <Button 
+          mode="contained" 
+          onPress={fetchData}
+          style={styles.retryButton}
+        >
+          {dictionary["general.retry"]}
+        </Button>
+      </View>
+    );
   }
 
   return (
@@ -200,5 +232,19 @@ const styles = StyleSheet.create({
   button: {
     fontSize: 10,
     padding: 0,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorText: {
+    textAlign: 'center',
+    marginBottom: 20,
+    color: '#f14c4c',
+  },
+  retryButton: {
+    marginTop: 10,
   },
 });
