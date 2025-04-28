@@ -184,7 +184,7 @@ export default function DrawerContent(props) {
           )}
           onPress={() => {
             navigation.closeDrawer();
-            navigation.navigate("QrOrders", { screen: "QREnteredOrders" });
+            navigation.navigate("QrOrders", { screen: "QrOrdersScreen" });
           }}
         />
         <DrawerItem

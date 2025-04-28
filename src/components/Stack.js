@@ -110,7 +110,7 @@ export const QrOrdersNavigator = () => {
       })}
     >
       <Stack.Screen 
-        name="QrOrders"
+        name="QrOrdersScreen"
         options={{ 
           headerShown: false,
           unmountOnBlur: true 

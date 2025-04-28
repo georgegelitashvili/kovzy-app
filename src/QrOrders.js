@@ -49,13 +49,13 @@ export default function TabContent() {
         tabBar={renderTabBar}
       >
         <Tab.Screen
-          name="QREnteredOrders"
+          name="EnteredOrders"
           component={EnteredOrdersList}
           options={{ tabBarLabel: dictionary["nav.pendingOrders"], unmountOnBlur: true }}
         />
-  
+
         <Tab.Screen
-          name="QRAcceptedOrders"
+          name="AcceptedOrders"
           component={AcceptedOrdersList}
           options={{ tabBarLabel: dictionary["nav.acceptedOrders"], unmountOnBlur: true }}
         />
