@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useContext } from "react";
 import {
-  Alert
+  Alert,
+  View,
+  StyleSheet
 } from "react-native";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createMaterialTopTabNavigator } from "@react-navigation/material-top-tabs";
@@ -66,6 +68,26 @@ export default function TabContent() {
     loadStoredValue();
   }, []);
 
+  const renderTabBar = props => {
+    return (
+      <View style={styles.tabBar}>
+        {Object.keys(props.descriptors).map(key => {
+          const { options, route } = props.descriptors[key];
+          const label = options.tabBarLabel || options.title || route.name;
+          return (
+            <TabBarItem
+              key={key}
+              label={label}
+              onPress={() => props.navigation.navigate(route.name)}
+              active={props.state.index === props.navigationState.routes.findIndex(r => r.name === route.name)}
+              {...props.descriptors[key]}
+            />
+          );
+        })}
+      </View>
+    );
+  };
+
   return (
     <Tab.Navigator
       screenOptions={{
@@ -80,8 +102,8 @@ export default function TabContent() {
           elevation: 0,
           shadowOpacity: 0,
         },
-        tabBarItem: (props) => <TabBarItem {...props} />
       }}
+      tabBar={renderTabBar}
     >
       <Tab.Screen
         name="EnteredOrders"
@@ -89,13 +111,13 @@ export default function TabContent() {
         options={{ tabBarLabel: dictionary["nav.pendingOrders"], unmountOnBlur: true }}
       />
 
-      {postponeOrderShow ? (
+      {postponeOrderShow && (
         <Tab.Screen
           name="PlannedOrders"
           component={PostponeOrders}
           options={{ tabBarLabel: dictionary["nav.plannedOrders"], unmountOnBlur: true }}
         />
-      ) : null}
+      )}
 
       <Tab.Screen
         name="AcceptedOrders"
@@ -105,3 +127,13 @@ export default function TabContent() {
     </Tab.Navigator>
   );
 }
+
+const styles = StyleSheet.create({
+  tabBar: {
+    flexDirection: 'row',
+    backgroundColor: 'white',
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+});

@@ -16,21 +16,20 @@ import NotificationScreen from './settings/NotificationScreen';
 
 const Stack = createStackNavigator();
 
-const Header = ({ options, navigation }) => {
+const Header = ({ options, navigation, route }) => {
   const theme = useTheme();
   const headerStyle = options?.headerStyle;
-  const title = options?.headerTitle ?? options?.title ?? navigation?.route?.name;
+  const title = options?.headerTitle ?? options?.title ?? route?.name;
 
   return (
     <Appbar.Header
       theme={{ colors: { primary: theme.colors.surface } }}
-      style={{ marginTop: headerStyle?.marginTop, backgroundColor: 'white', }}>
-      {navigation?.canGoBack() ?
-        <Appbar.BackAction
-          style={{ fontWeight: 'bold' }}
-          onPress={navigation.goBack}
-        />
-        : null}
+      style={{ marginTop: headerStyle?.marginTop, backgroundColor: 'white' }}>
+      {navigation?.canGoBack() ? (
+        <Appbar.BackAction onPress={navigation.goBack} />
+      ) : (
+        <Appbar.Action icon="menu" onPress={() => navigation.toggleDrawer()} />
+      )}
       <Appbar.Content
         title={title}
         titleStyle={{ fontSize: headerStyle?.fontSize, fontWeight: 'bold' }}
@@ -99,17 +98,25 @@ export const OrdersNavigator = () => {
     </Stack.Navigator>
   );
 };
+
 export const QrOrdersNavigator = () => {
   return (
     <Stack.Navigator
       screenOptions={({ navigation, route }) => ({
         headerMode: "screen",
         headerBackTitleVisible: false,
-        header: (props) => <Header {...props} />,
-        ...route.params?.options, // Pass route params as options
+        header: (props) => <Header {...props} navigation={navigation} route={route} />,
+        ...route.params?.options,
       })}
     >
-      <Stack.Screen name="QrOrder" options={{ headerShown: false, unmountOnBlur: true }} component={QrOrders} />
+      <Stack.Screen 
+        name="QrOrders"
+        options={{ 
+          headerShown: false,
+          unmountOnBlur: true 
+        }} 
+        component={QrOrders} 
+      />
     </Stack.Navigator>
   );
 };

@@ -162,7 +162,10 @@ export default function DrawerContent(props) {
               )}
             </View>
           )}
-          onPress={() => navigation.navigate("Orders")}
+          onPress={() => {
+            navigation.closeDrawer();
+            navigation.navigate("Orders", { screen: "EnteredOrders" });
+          }}
         />
         <DrawerItem
           key="qr-orders"
@@ -179,7 +182,10 @@ export default function DrawerContent(props) {
               )}
             </View>
           )}
-          onPress={() => navigation.navigate("QrOrders")}
+          onPress={() => {
+            navigation.closeDrawer();
+            navigation.navigate("QrOrders", { screen: "QREnteredOrders" });
+          }}
         />
         <DrawerItem
           key="reports"
@@ -187,7 +193,10 @@ export default function DrawerContent(props) {
             <MaterialCommunityIcons name="chart-line" color={color} size={size} />
           )}
           label={dictionary["nav.Reports"]}
-          onPress={() => navigation.navigate("Reports")}
+          onPress={() => {
+            navigation.closeDrawer();
+            navigation.navigate("Reports", { screen: "ReportsScreen" });
+          }}
         />
         <DrawerItem
           key="settings"

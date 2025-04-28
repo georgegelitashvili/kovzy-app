@@ -134,13 +134,14 @@ export const AcceptedOrdersList = () => {
   const onChangeModalState = useCallback((newState) => {
     setVisible(newState);
     if (!newState) {  // If the modal is closed
-        setLoading(false);  // Ensure the loading state is reset when modal is closed
-        setLoadingOptions(false);  // Reset the options loading state as well
+      setLoading(false);  // Reset loading state
+      setLoadingOptions(false);  // Reset options loading state
     }
     setItemId(null);
-    setOrders([]);
-    fetchAcceptedOrders();
-}, [orders]);
+    if (!newState) {  // Only fetch new orders when closing the modal
+      fetchAcceptedOrders();
+    }
+  }, [fetchAcceptedOrders]);
 
   useEffect(() => {
     if (domain && branchid) {

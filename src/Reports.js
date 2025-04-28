@@ -1,4 +1,5 @@
 import React, { useContext } from "react";
+import { View, StyleSheet } from "react-native";
 import { createMaterialTopTabNavigator } from "@react-navigation/material-top-tabs";
 import { LanguageContext } from "./components/Language";
 import { OrdersListOnline, OrdersListQr } from "./components/orderlogs/OrdersListBase";
@@ -8,6 +9,26 @@ const Tab = createMaterialTopTabNavigator();
 
 export default function TabContent(props) {
   const { dictionary } = useContext(LanguageContext);
+
+  const renderTabBar = props => {
+    return (
+      <View style={styles.tabBar}>
+        {Object.keys(props.descriptors).map(key => {
+          const { options } = props.descriptors[key];
+          const label = options.tabBarLabel || options.title || key;
+          return (
+            <TabBarItem
+              key={key}
+              label={label}
+              onPress={() => props.navigation.navigate(key)}
+              active={props.state.index === props.navigationState.routes.findIndex(route => route.key === key)}
+              {...props.descriptors[key]}
+            />
+          );
+        })}
+      </View>
+    );
+  };
 
   return (
     <Tab.Navigator
@@ -24,6 +45,7 @@ export default function TabContent(props) {
           shadowOpacity: 0,
         },
       }}
+      tabBar={renderTabBar}
     >
       <Tab.Screen
         name="OnlineOrdersLogs"
@@ -38,3 +60,13 @@ export default function TabContent(props) {
     </Tab.Navigator>
   );
 }
+
+const styles = StyleSheet.create({
+  tabBar: {
+    flexDirection: 'row',
+    backgroundColor: 'white',
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+});
