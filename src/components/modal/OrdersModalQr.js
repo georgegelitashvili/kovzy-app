@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo, useContext, useEffect } from "react";
-import { StyleSheet, View, Modal, Text, ScrollView } from "react-native";
+import { StyleSheet, View, Modal, Text } from "react-native";
 import OrdersModalAccept from "./OrdersModalQrAccept";
 import OrdersModalReject from "./OrdersModalQrReject";
 import OrdersModalStatus from "./OrdersModalQrStatus";
@@ -17,17 +17,15 @@ export default function OrdersModal({
   PendingOrders,
 }) {
   const { dictionary } = useContext(LanguageContext);
-  const [forDelivery, setForDelivery] = useState(0); // Default to 0
+  const [forDelivery, setForDelivery] = useState(0);
+
   const hideModal = useCallback(() => onChangeState(false), [onChangeState]);
 
-  // Reset forDelivery when the modal is visible
   useEffect(() => {
     if (isVisible) {
       setForDelivery(0);
     }
   }, [isVisible]);
-
-  console.log("Modal type:", type);
 
   const modalContent = useMemo(() => {
     const commonProps = {
@@ -54,15 +52,11 @@ export default function OrdersModal({
           <View>
             <Text>Error: Invalid Modal Type</Text>
           </View>
-        ); // Fallback for unknown type
+        );
     }
   }, [type, hasItemId, options, takeAway, orders, forDelivery]);
 
-  if (
-    type !== "reject" &&
-    type !== "status" &&
-    type !== "accept"
-  ) {
+  if (type !== "reject" && type !== "status" && type !== "accept") {
     return null;
   }
 
@@ -75,21 +69,19 @@ export default function OrdersModal({
     >
       <View style={styles.modal}>
         <View style={styles.modalContent}>
-          <ScrollView contentContainerStyle={styles.scrollContainer}>
-            {type === "accept" && (
-              <>
-                <Text style={styles.contentTitle}>
-                  {dictionary["orders.approvingWarning"]}
-                </Text>
-                <TimePicker
-                  onChange={(newTime) => setForDelivery(newTime)}
-                  showButton={false}
-                  backgroundColor={"white"}
-                />
-              </>
-            )}
-            {modalContent}
-          </ScrollView>
+          {type === "accept" && (
+            <View style={styles.headerContent}>
+              <Text style={styles.contentTitle}>
+                {dictionary["orders.approvingWarning"]}
+              </Text>
+              <TimePicker
+                onChange={(newTime) => setForDelivery(newTime)}
+                showButton={false}
+                backgroundColor={"white"}
+              />
+            </View>
+          )}
+          {modalContent}
         </View>
       </View>
     </Modal>
@@ -111,13 +103,12 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     elevation: 5,
   },
-  scrollContainer: {
-    paddingBottom: 20,
+  headerContent: {
+    marginBottom: 10,
   },
   contentTitle: {
     fontSize: 18,
-    marginTop: 20,
-    marginBottom: 20,
+    marginVertical: 10,
     textAlign: "center",
   },
 });

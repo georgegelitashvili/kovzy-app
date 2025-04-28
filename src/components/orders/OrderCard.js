@@ -17,7 +17,6 @@ const OrderCard = ({
   onReject,
   loading
 }) => {
-  console.log("OrderCard", item);
   const deliveryPrice = parseFloat(item.delivery_price);
   const additionalFees = parseFloat(item.service_fee) / 100;
   const feeData = JSON.parse(item.fees_details || '{}');
@@ -84,12 +83,29 @@ const OrderCard = ({
           </Text>
           <Text variant="headlineMedium" style={styles.header}>
             <SimpleLineIcons
-              name={!isOpen ? "arrow-up" : "arrow-down"}
+              name={isOpen ? "arrow-down" : "arrow-up"}
               style={styles.rightIcon}
             />
           </Text>
         </Card.Content>
       </TouchableOpacity>
+
+      {isOpen && (
+        <Card.Content>
+          <OrderDetails
+            item={item}
+            dictionary={dictionary}
+            currency={currency}
+            deliveryPrice={deliveryPrice}
+            additionalFees={additionalFees}
+            feesDetails={feesDetails}
+          />
+
+          <Card.Actions>
+            {renderButtons()}
+          </Card.Actions>
+        </Card.Content>
+      )}
 
       {!isOpen && (
         <Card.Content>

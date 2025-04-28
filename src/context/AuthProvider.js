@@ -8,6 +8,7 @@ import { useFetchLanguages } from "../components/UseFetchLanguages";
 import { LanguageContext } from "../components/Language";
 import Loader from "../components/generate/loader";
 import AppUpdates from "../components/AppUpdates";
+import { EventRegister } from 'react-native-event-listeners';
 
 export const AuthContext = createContext();
 
@@ -19,17 +20,75 @@ export const AuthProvider = ({ isConnected, children }) => {
   const [branchName, setBranchName] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isDataSet, setIsDataSet] = useState(false);
-  const [loginError, setLoginError] = useState([]);
+  const [loginError, setLoginError] = useState(null);
+  const [error, setError] = useState(null);
   const [isVisible, setIsVisible] = useState(false);
   const [branchEnabled, setBranchEnabled] = useState(false);
   const [deliveronEnabled, setDeliveronEnabled] = useState(false);
   const [appState, setAppState] = useState(AppState.currentState);
-  const [shouldRenderAuthScreen, setShouldRenderAuthScreen] = useState(false);
   const [showReload, setShowReload] = useState(false);
   const [isInitialFetch, setIsInitialFetch] = useState(true);
 
   const intervalRef = useRef(null);
   const { userLanguageChange, dictionary } = useContext(LanguageContext);
+
+  const readData = async () => {
+    try {
+      const [domainValue, branchValue, branchNames] = await getMultipleData(['domain', 'branch', 'branchNames']);
+      if (domainValue) setDomain(domainValue);
+      if (branchValue) setBranchid(branchValue);
+      if (branchNames) setBranchName(branchNames);
+    } catch (error) {
+      console.error('Error reading data:', error);
+      handleError(error, 'READ_DATA_ERROR');
+    }
+  };
+
+  const startInterval = () => {
+    stopInterval();
+    intervalRef.current = setInterval(fetchData, 10000);
+  };
+
+  const stopInterval = () => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+  };
+
+  const clearErrors = useCallback(() => {
+    setLoginError(null);
+    setError(null);
+  }, []);
+
+  const handleError = useCallback((error, type = 'UNKNOWN') => {
+    const errorMessage = error?.message || dictionary?.['errors.UNKNOWN'];
+    setError({ type, message: errorMessage });
+    EventRegister.emit('apiError', { type, message: errorMessage });
+  }, [dictionary]);
+
+  const cleanupAuth = useCallback(async () => {
+    try {
+      await Promise.all([
+        deleteItem("token"),
+        deleteItem("credentials"),
+        deleteItem("user"),
+        deleteItem("rcml-lang"),
+        deleteItem("languages"),
+        removeData(["domain", "branch", "branchNames"])
+      ]);
+      setDomain(null);
+      setBranchid(null);
+      setBranchName(null);
+      setIsDataSet(false);
+      setUser(null);
+      setUserObject(null);
+      clearErrors();
+    } catch (error) {
+      console.error('Error cleaning up auth data:', error);
+      handleError(error, 'CLEANUP_ERROR');
+    }
+  }, [clearErrors, handleError]);
 
   const apiUrls = useMemo(() => {
     if (!domain || domain === 'null' || domain === 'undefined' || domain === null) {
@@ -55,64 +114,53 @@ export const AuthProvider = ({ isConnected, children }) => {
 
   const { languages } = useFetchLanguages(apiUrls);
 
-  const handleClick = useCallback(() => {
-    setIsVisible(true);
-  }, []);
-
-  const readData = async () => {
+  const login = useCallback(async (username, password) => {
+    clearErrors();
+    setIsLoading(true);
     try {
-      const data = await getMultipleData(["domain", "branch", "branchNames"]);
-      const [domainValue, branchidValue, branchNameValue] = data;
+      const response = await axiosInstance.post(apiUrls?.login, { password, username });
+      const { token: authorized, user } = response.data;
 
-      // Validate domain format
-      const isValidDomain = domainValue && 
-                           typeof domainValue === 'string' && 
-                           domainValue !== 'null' && 
-                           domainValue !== 'undefined' &&
-                           domainValue.includes('.');
-
-      if (isValidDomain && branchidValue && branchNameValue) {
-        console.log('Domain validation passed:', domainValue);
-        setDomain(domainValue);
-        setBranchid(branchidValue);
-        setBranchName(branchNameValue);
-        setIsDataSet(true);
-      } else {
-        console.warn('Domain validation failed:', { 
-          domainValue, 
-          isValidDomain,
-          branchidValue, 
-          branchNameValue 
-        });
-        await cleanupData();
+      if (!authorized || !user) {
+        throw new Error(dictionary?.['errors.LOGIN_FAILED']);
       }
-    } catch (e) {
-      console.error('Error reading data:', e);
-      await cleanupData();
-    }
-  };
 
-  const cleanupData = async () => {
-    try {
+      const userResponse = {
+        token: authorized,
+        id: user.id,
+        username: user.username,
+      };
+
       await Promise.all([
-        deleteItem("token"),
-        deleteItem("credentials"),
-        deleteItem("user"),
-        deleteItem("rcml-lang"),
-        deleteItem("languages"),
-        removeData(["domain", "branch", "branchNames"])
+        SecureStore.setItemAsync('credentials', JSON.stringify({ username, password })),
+        SecureStore.setItemAsync('token', JSON.stringify(authorized)),
+        SecureStore.setItemAsync('user', JSON.stringify(userResponse))
       ]);
+
+      setUser(userResponse);
     } catch (error) {
-      console.error('Error cleaning up data:', error);
+      const errorMessage = error.response?.data?.message || error.message;
+      setLoginError(errorMessage);
+      handleError(error, 'LOGIN_ERROR');
     } finally {
-      setIsDataSet(false);
-      setDomain(null);
-      setBranchid(null);
-      setBranchName(null);
-      setUser(null);
-      setUserObject(null);
+      setIsLoading(false);
     }
-  };
+  }, [apiUrls, dictionary, handleError, clearErrors]);
+
+  const logout = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      if (apiUrls?.logout) {
+        await axiosInstance.post(apiUrls.logout);
+      }
+      await cleanupAuth();
+    } catch (error) {
+      console.error('Error logging out:', error);
+      handleError(error, 'LOGOUT_ERROR');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [apiUrls, cleanupAuth, handleError]);
 
   const deleteItem = useCallback(async (key) => {
     try {
@@ -122,92 +170,136 @@ export const AuthProvider = ({ isConnected, children }) => {
     }
   }, []);
 
+  const loadUser = useCallback(async () => {
+    try {
+      const [credentials, token] = await Promise.all([
+        getSecureData('credentials'),
+        getSecureData('token')
+      ]);
+
+      if (credentials && token) {
+        const { username, password } = credentials;
+        await login(username, password);
+      }
+    } catch (error) {
+      console.error('Error loading user:', error);
+      handleError(error, 'LOAD_USER_ERROR');
+    }
+  }, [login, handleError]);
+
   const fetchData = useCallback(async () => {
     if (!domain || !branchid || !apiUrls?.deliveronStatus || !apiUrls?.branchStatus) {
-      console.warn('Missing required data for fetchData:', { domain, branchid });
+      console.warn('Missing required data for fetchData:', { 
+        hasDomain: !!domain, 
+        hasBranchId: !!branchid,
+        hasDeliveronStatus: !!apiUrls?.deliveronStatus,
+        hasBranchStatus: !!apiUrls?.branchStatus
+      });
       return;
     }
 
-    try {
-      const [deliveronResponse, branchResponse] = await Promise.all([
-        axiosInstance.post(apiUrls.deliveronStatus, { timeout: 5000 }),
-        axiosInstance.post(apiUrls.branchStatus, { branchid }, { timeout: 5000 }),
-      ]);
+    const MAX_RETRIES = 5;
+    const RETRY_DELAY = 2000;
+    let retryCount = 0;
 
-      const newDeliveronStatus = deliveronResponse?.data?.data?.status === 0;
-      const newBranchStatus = branchResponse?.data?.data === true;
+    const attemptFetch = async () => {
+      try {
+        const [deliveronResponse, branchResponse] = await Promise.all([
+          axiosInstance.post(apiUrls.deliveronStatus),
+          axiosInstance.post(apiUrls.branchStatus, { branchid }),
+        ]);
 
-      setDeliveronEnabled(newDeliveronStatus);
-      setBranchEnabled(newBranchStatus);
-      setIsVisible(!newBranchStatus);
-      setIsInitialFetch(false);
+        console.log('Status responses:', {
+          deliveron: deliveronResponse?.data,
+          branch: branchResponse?.data
+        });
 
-    } catch (error) {
-      console.error('Error fetching status:', {
-        message: error.message,
-        domain,
-        branchid,
-        status: error.response?.status
-      });
-      
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-      setShowReload(true);
-      setBranchEnabled(false);
-      setIsVisible(true);
-      setIsInitialFetch(false);
+        if (!deliveronResponse?.data?.data || !branchResponse?.data?.data) {
+          console.warn('Invalid response data:', {
+            deliveronData: deliveronResponse?.data,
+            branchData: branchResponse?.data
+          });
+          throw new Error('Invalid response data');
+        }
 
-      // Handle 401 unauthorized error
-      if (error.response?.status === 401) {
-        setUser(null);
-        await deleteItem("token");
-        await deleteItem("credentials");
-        await deleteItem("user");
-      }
-    }
-  }, [domain, branchid, apiUrls, deleteItem]);
+        const newDeliveronStatus = deliveronResponse?.data?.data?.status === 0;
+        const newBranchStatus = branchResponse?.data?.data === true;
 
-  const loadUser = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const userObj = await getSecureData('user');
-      if (userObj && apiUrls?.authUser) {
-        const response = await axiosInstance.get(apiUrls.authUser);
-        if (response.data.user) {
-          setUser(userObj);
-        } else {
+        if (newBranchStatus !== branchEnabled) {
+          console.log('Branch status changing:', {
+            from: branchEnabled,
+            to: newBranchStatus,
+            reason: 'API response'
+          });
+        }
+
+        setDeliveronEnabled(newDeliveronStatus);
+        setBranchEnabled(newBranchStatus);
+        setIsVisible(!newBranchStatus);
+        setIsInitialFetch(false);
+        setShowReload(false);
+
+        retryCount = 0;
+
+      } catch (error) {
+        const errorResponse = error.response?.data;
+        const errorStatus = error.response?.status;
+        
+        console.error('Error fetching status:', {
+          message: error.message,
+          domain,
+          branchid,
+          status: errorStatus,
+          retry: retryCount + 1,
+          responseData: errorResponse,
+          errorDetails: error.toString()
+        });
+
+        if (errorStatus === 401) {
+          console.log('Unauthorized access, clearing credentials...');
           setUser(null);
-          if (intervalRef.current) {
-            clearInterval(intervalRef.current);
+          await deleteItem("token");
+          await deleteItem("credentials");
+          await deleteItem("user");
+          return;
+        }
+
+        if (errorResponse?.branch?.data === false) {
+          setBranchEnabled(false);
+          setIsVisible(true);
+          setIsInitialFetch(false);
+          return;
+        }
+
+        if (!errorStatus || errorStatus >= 500 || error.code === 'ECONNREFUSED') {
+          if (retryCount < MAX_RETRIES) {
+            const delay = RETRY_DELAY * Math.pow(2, retryCount);
+            retryCount++;
+            console.log(`Retrying... Attempt ${retryCount} of ${MAX_RETRIES} after ${delay}ms`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            return attemptFetch();
           }
         }
-      }
-    } catch (error) {
-      console.error('Error loading user:', error.message || error);
-      setUser(null);
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-      setShowReload(true);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [apiUrls?.authUser]);
 
-  const startInterval = useCallback(() => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-    }
-    intervalRef.current = setInterval(fetchData, 3000);
-  }, [fetchData]);
+        console.warn('Max retries reached but keeping previous branch state');
+        setShowReload(true);
+        setIsInitialFetch(false);
+      }
+    };
 
-  const stopInterval = useCallback(() => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
-  }, []);
+    await attemptFetch();
+  }, [domain, branchid, apiUrls, deleteItem, branchEnabled]);
+
+  useEffect(() => {
+    const sessionExpiredListener = EventRegister.addEventListener('sessionExpired', () => {
+      cleanupAuth();
+      handleError({ message: dictionary?.['errors.SESSION_EXPIRED'] }, 'SESSION_EXPIRED');
+    });
+
+    return () => {
+      EventRegister.removeEventListener(sessionExpiredListener);
+    };
+  }, [cleanupAuth, handleError, dictionary]);
 
   useEffect(() => {
     const initializeData = async () => {
@@ -222,10 +314,9 @@ export const AuthProvider = ({ isConnected, children }) => {
     initializeData();
   }, [isConnected]);
 
-  // Add a retry mechanism for language fetching
   useEffect(() => {
     let retryCount = 0;
-    const MAX_RETRIES = 3;
+    const MAX_RETRIES = 5;
     const RETRY_DELAY = 2000;
 
     const fetchLanguagesWithRetry = async () => {
@@ -296,6 +387,8 @@ export const AuthProvider = ({ isConnected, children }) => {
     user,
     setUser,
     loginError,
+    error,
+    clearErrors,
     isLoading,
     setIsLoading,
     setIsDataSet,
@@ -306,115 +399,40 @@ export const AuthProvider = ({ isConnected, children }) => {
     setBranchEnabled,
     deliveronEnabled,
     setDeliveronEnabled,
+    login,
+    logout,
     deleteItem,
-    shouldRenderAuthScreen,
-    setShouldRenderAuthScreen,
-    languages,
-    login: async (username, password) => {
-      setIsLoading(true);
-      try {
-        const response = await axiosInstance.post(apiUrls.login, { password, username });
-        const { token: authorized, user } = response.data;
-
-        if (response.error) {
-          setLoginError(response.error.message);
-          return;
-        }
-
-        const userResponse = {
-          token: authorized,
-          id: user.id,
-          username: user.username,
-        };
-
-        setUser(userResponse);
-        setLoginError([]);
-        await Promise.all([
-          SecureStore.setItemAsync('credentials', JSON.stringify({ username, password })),
-          SecureStore.setItemAsync('token', JSON.stringify(authorized)),
-          SecureStore.setItemAsync('user', JSON.stringify(userResponse))
-        ]);
-      } catch (error) {
-        console.log('Error logging in:', error);
-        setLoginError('An error occurred while logging in. Please try again.');
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    logout: async () => {
-      setIsLoading(true);
-      try {
-        const response = await axiosInstance.post(apiUrls.logout);
-        if (response.data.message) {
-          await Promise.all([
-            deleteItem("token"),
-            deleteItem("credentials"),
-            deleteItem("user"),
-            deleteItem("rcml-lang"),
-            deleteItem("languages"),
-            removeData(["domain", "branch", "branchNames"])
-          ]);
-
-          setDomain(null);
-          setBranchid(null);
-          setBranchName(null);
-          setIsDataSet(false);
-          setUser(null);
-          setUserObject(null);
-        }
-      } catch (error) {
-        console.log('Error logging out:', error);
-        await Promise.all([
-          deleteItem("token"),
-          deleteItem("credentials"),
-          deleteItem("user"),
-          deleteItem("rcml-lang"),
-          deleteItem("languages"),
-          removeData(["domain", "branch", "branchNames"])
-        ]);
-
-        setDomain(null);
-        setBranchid(null);
-        setBranchName(null);
-        setIsDataSet(false);
-        setUser(null);
-        setUserObject(null);
-      } finally {
-        setIsLoading(false);
-      }
-    },
+    languages
   }), [
-    domain, user, loginError, isLoading, branchid, branchName, branchEnabled,
-    deliveronEnabled, deleteItem, shouldRenderAuthScreen, languages, apiUrls
+    domain, user, loginError, error, isLoading, branchid, branchName,
+    branchEnabled, deliveronEnabled, login, logout, deleteItem,
+    languages, clearErrors
   ]);
 
   return (
     <AuthContext.Provider value={contextValue}>
-      {!isConnected && !user && showReload && (
-        <TouchableOpacity onPress={handleClick}>
+      {error && (
+        <TouchableOpacity onPress={() => clearErrors()}>
           <Toast
             type="failed"
-            title={dictionary["info.warning"]}
-            subtitle={dictionary["orders.branchEnabled"]}
-            animate={false}
+            title={dictionary?.["info.warning"]}
+            subtitle={error.message}
+            animate={true}
           />
         </TouchableOpacity>
       )}
-
       {isLoading ? (
-        <Loader text={dictionary["loading"]} />
+        <Loader text={dictionary?.["loading"]} />
       ) : (
         children
       )}
-
-      {user && <AppUpdates />}
-
+      {user && <AppUpdates onError={(error) => handleError(error, 'UPDATE_ERROR')} />}
       {!branchEnabled && user && isVisible && (
-        <TouchableOpacity onPress={handleClick}>
+        <TouchableOpacity onPress={() => setIsVisible(true)}>
           <Toast
             type="failed"
-            title={dictionary["info.warning"]}
-            subtitle={dictionary["orders.branchEnabled"]}
+            title={dictionary?.["info.warning"]}
+            subtitle={dictionary?.["orders.branchEnabled"]}
             animate={false}
           />
         </TouchableOpacity>

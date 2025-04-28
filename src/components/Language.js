@@ -1,43 +1,30 @@
-import React, { useState, createContext, useEffect } from 'react';
-import { storeData, getData } from '../helpers/storage';
-import { languageList, dictionaryList } from './languages';
+import React, { createContext, useState, useContext, useEffect } from 'react';
+import { getData, storeData } from '../helpers/storage';
+import { dictionaryList, languageList } from './languages';
 
 export const LanguageContext = createContext({
-  userLanguage: 'en',
-  dictionary: dictionaryList.en,
-  userLanguageChange: () => { }
+  userLanguage: 'ka',
+  dictionary: dictionaryList.ka,
+  userLanguageChange: () => {},
+  languageId: null
 });
 
 export function LanguageProvider({ children }) {
-  const [userLanguage, setUserLanguage] = useState('en');
-  const [dictionary, setDictionary] = useState(dictionaryList.en);
-  const [languageId, setLanguageId] = useState();
+  const [userLanguage, setUserLanguage] = useState('ka');
+  const [dictionary, setDictionary] = useState(dictionaryList.ka);
+  const [languageId, setLanguageId] = useState(null);
 
   useEffect(() => {
-    const fetchLanguageAndId = async () => {
-      try {
-        const storedLang = await getData('rcml-lang');
-        // console.log('Initial stored language:', storedLang);
-        const finalLang = storedLang ?? 'en';
-
-        const languages = await getData('languages');
-        // console.log('Available languages:', languages);
-        if (languages) {
-          const language = languages.find(lang => lang.lang === finalLang);
-          if (language) {
-            setUserLanguage(finalLang);
-            setDictionary(dictionaryList[finalLang] || dictionaryList.en);
-            setLanguageId(language.id);
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching language:', error);
-        setUserLanguage('en');
-        setDictionary(dictionaryList.en);
+    // Set initial language
+    const initLanguage = async () => {
+      const savedLanguage = await getData('rcml-lang');
+      if (savedLanguage && languageList[savedLanguage]) {
+        setUserLanguage(savedLanguage);
+        setDictionary(dictionaryList[savedLanguage]);
       }
     };
 
-    fetchLanguageAndId();
+    initLanguage();
   }, []);
 
   useEffect(() => {
@@ -68,7 +55,7 @@ export function LanguageProvider({ children }) {
       setUserLanguage(selected);
       setDictionary(dictionaryList[selected] || dictionaryList.en);
 
-      const stored = await storeData('rcml-lang', selected);
+      await storeData('rcml-lang', selected);
     } catch (error) {
       console.error('Error changing language:', error);
     }
@@ -81,9 +68,15 @@ export function LanguageProvider({ children }) {
     languageId
   };
 
+  // Make the language context globally accessible
+  global.languageContext = provider;
+
   return (
     <LanguageContext.Provider value={provider}>
       {children}
     </LanguageContext.Provider>
   );
 }
+
+// Custom hook to use the language context
+export const useLanguage = () => useContext(LanguageContext);

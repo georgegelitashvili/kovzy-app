@@ -478,5 +478,22 @@
     "pr.warrning": "ჯერ მონიშნეთ ერთი ამ მონიშვნის ველებიდან",
     "info.warning": "გაფრთხილება",
     "selectMonth": "აირჩიეთ თვე",
-    "done": "დასრულება"
+    "done": "დასრულება",
+    "errors.BAD_REQUEST": "არასწორი მოთხოვნა",
+    "errors.UNAUTHORIZED": "გაიარეთ ავტორიზაცია",
+    "errors.FORBIDDEN": "წვდომა აკრძალულია",
+    "errors.NOT_FOUND": "მონაცემები ვერ მოიძებნა",
+    "errors.VALIDATION_ERROR": "მონაცემები არასწორია",
+    "errors.SERVER_ERROR": "სერვერის შეცდომა",
+    "errors.SERVICE_UNAVAILABLE": "სერვისი მიუწვდომელია",
+    "errors.API_ERROR": "დაფიქსირდა შეცდომა",
+    "errors.NETWORK_ERROR": "ქსელთან კავშირის პრობლემა",
+    "errors.REQUEST_ERROR": "მოთხოვნის შეცდომა ან დრო ამოიწურა",
+    "errors.NGROK_ERROR": "Ngrok კავშირის პრობლემა",
+    "errors.UNKNOWN": "დაფიქსირდა გაურკვეველი შეცდომა",
+    "errors.LOGIN_ERROR": "ავტორიზაციის შეცდომა",
+    "errors.LOGOUT_ERROR": "გასვლის შეცდომა",
+    "errors.SESSION_EXPIRED": "თქვენი სესია ამოიწურა. გთხოვთ, შეხვიდეთ ხელახლა.",
+    "errors.CLEANUP_ERROR": "სესიის მონაცემების გასუფთავების შეცდომა",
+    "errors.UPDATE_ERROR": "განახლებების შემოწმების შეცდომა"
 }

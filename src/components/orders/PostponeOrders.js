@@ -6,7 +6,8 @@ import {
     TouchableOpacity,
     Alert,
     AppState,
-    FlatList
+    FlatList,
+    RefreshControl
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { Text, Button, Divider, Card } from "react-native-paper";
@@ -357,54 +358,38 @@ export const PostponeOrders = () => {
     };
 
 
-    if (loading) {
-        return <Loader show={loading} />;
-    }
-
-    if (!orders || orders.length === 0) {
-        return null;
-    }
-
     return (
-        <View style={{ flex: 1, width: width }}>
-            {loadingOptions ? <Loader /> : null}
+        <View style={styles.container}>
+            {loadingOptions && <Loader />}
+            {loading && <Loader show={loading} />}
             <NotificationSound ref={NotificationSoundRef} />
 
-            <FlatList
-                data={[{}]} // Dummy data for the FlatList since we're using ListHeaderComponent for main content
-                renderItem={null} // No items in the FlatList itself
-                keyExtractor={() => 'dummy'} // Static key for the dummy item
-                showsVerticalScrollIndicator={false}
-                ListHeaderComponent={
-                    <View style={{ flexDirection: 'row', flexWrap: 'nowrap', flex: 1 }}>
-                        {visible && (
-                            <OrdersModal
-                                isVisible={visible}
-                                onChangeState={onChangeModalState}
-                                orders={orders}
-                                hasItemId={itemId}
-                                deliveron={deliveron ?? null}
-                                deliveronOptions={deliveronOptions}
-                                type={modalType}
-                                options={options}
-                                takeAway={itemTakeAway}
-                                PendingOrders={true}
-                            />
-                        )}
+            {visible && (
+                <OrdersModal
+                    isVisible={visible}
+                    onChangeState={onChangeModalState}
+                    orders={orders}
+                    hasItemId={itemId}
+                    deliveron={deliveron ?? null}
+                    deliveronOptions={deliveronOptions}
+                    type={modalType}
+                    options={options}
+                    takeAway={itemTakeAway}
+                    PendingOrders={true}
+                />
+            )}
 
-                        <FlatGrid
-                            adjustGridToStyles={true}
-                            itemDimension={cardSize}
-                            spacing={10}
-                            data={orders}
-                            renderItem={({ item }) => <RenderPostponeOrdersList item={item} />}
-                            keyExtractor={(item) => (item && item.id ? item.id.toString() : '')}
-                            itemContainerStyle={{ justifyContent: 'space-between' }}
-                            style={{ flex: 1 }}
-                            onEndReachedThreshold={0.5}
-                            removeClippedSubviews={true}
-                        />
-                    </View>
+            <FlatGrid
+                adjustGridToStyles={true}
+                itemDimension={cardSize}
+                spacing={10}
+                data={orders}
+                renderItem={({ item }) => <RenderPostponeOrdersList item={item} />}
+                keyExtractor={(item) => (item && item.id ? item.id.toString() : '')}
+                style={{ flex: 1 }}
+                contentContainerStyle={{ paddingBottom: 20 }}
+                refreshControl={
+                    <RefreshControl refreshing={loading} onRefresh={fetchPostponeOrders} />
                 }
             />
         </View>

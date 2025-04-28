@@ -477,5 +477,22 @@
     "pr.warrning": "Сначала отметьте один из этих флажков",
     "info.warning": "Предупреждение",
     "selectMonth": "Выберите месяц",
-    "done": "Готово"
+    "done": "Готово",
+    "errors.BAD_REQUEST": "Неверный запрос",
+    "errors.UNAUTHORIZED": "Пожалуйста, войдите в систему",
+    "errors.FORBIDDEN": "Доступ запрещен",
+    "errors.NOT_FOUND": "Данные не найдены",
+    "errors.VALIDATION_ERROR": "Неверные данные",
+    "errors.SERVER_ERROR": "Ошибка сервера",
+    "errors.SERVICE_UNAVAILABLE": "Сервис недоступен",
+    "errors.API_ERROR": "Произошла ошибка",
+    "errors.NETWORK_ERROR": "Проблема с подключением к сети",
+    "errors.REQUEST_ERROR": "Ошибка запроса или таймаут",
+    "errors.NGROK_ERROR": "Ошибка подключения Ngrok",
+    "errors.UNKNOWN": "Произошла неизвестная ошибка",
+    "errors.LOGIN_ERROR": "Ошибка входа в систему",
+    "errors.LOGOUT_ERROR": "Ошибка выхода из системы",
+    "errors.SESSION_EXPIRED": "Ваша сессия истекла. Пожалуйста, войдите снова.",
+    "errors.CLEANUP_ERROR": "Ошибка очистки данных сессии",
+    "errors.UPDATE_ERROR": "Ошибка проверки обновлений"
 }

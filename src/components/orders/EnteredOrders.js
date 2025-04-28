@@ -8,7 +8,6 @@ import {
   Alert,
   AppState,
   FlatList,
-  VirtualizedList
 } from "react-native";
 
 import { Text, Button, Divider, Card } from "react-native-paper";
@@ -456,84 +455,68 @@ export const EnteredOrdersList = () => {
   }, []);
 
   return (
-    <View style={{ flex: 1, width: width }}>
+    <View style={styles.container}>
       {state.loadingOptions && <Loader />}
       <NotificationSound ref={NotificationSoundRef} />
       {state.loading && <Loader show={state.loading} />}
 
+      {state.visible && (
+        <OrdersModal
+          isVisible={state.visible}
+          onChangeState={handleModalClose}
+          orders={state.orders}
+          hasItemId={state.itemId}
+          deliveron={state.deliveron}
+          deliveronOptions={state.deliveronOptions}
+          type={state.modalType}
+          options={options}
+          takeAway={state.itemTakeAway}
+          PendingOrders={true}
+        />
+      )}
+
+      <Modal
+        transparent={true}
+        visible={isPickerVisible}
+        animationType="fade"
+        onRequestClose={() => {
+          setPickerVisible(false);
+          dispatch({ type: 'SET_LOADING_OPTIONS', payload: false });
+        }}
+      >
+        <View style={styles.modalContainer}>
+          <TimePicker
+            scheduled={state.scheduled}
+            showButton={true}
+            onDelaySet={handleDelaySetWrapper}
+            onClose={() => {
+              setPickerVisible(false);
+              dispatch({ type: 'SET_LOADING_OPTIONS', payload: false });
+            }}
+          />
+        </View>
+      </Modal>
+
       <FlatList
         numColumns={2}
-        data={state.orders || []}
+        data={state.orders}
         renderItem={renderOrderCard}
         keyExtractor={keyExtractor}
-        removeClippedSubviews={false}
-        maxToRenderPerBatch={50}
-        windowSize={41}
-        initialNumToRender={30}
-        updateCellsBatchingPeriod={10}
+        getItemLayout={getItemLayout}
+        removeClippedSubviews={true}
+        maxToRenderPerBatch={10}
+        windowSize={21}
+        initialNumToRender={10}
         onEndReachedThreshold={0.5}
-        onEndReached={() => {
-          if (state.orders?.length > 0) {
-            debouncedFetch();
-          }
-        }}
-        contentContainerStyle={{
-          paddingHorizontal: 5,
-          paddingBottom: 20
-        }}
-        columnWrapperStyle={{
-          justifyContent: 'space-between',
-          marginVertical: 5
-        }}
+        onEndReached={debouncedFetch}
+        contentContainerStyle={styles.listContainer}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text>{dictionary["orders.noOrders"]}</Text>
           </View>
         }
         refreshing={state.loading}
-        onRefresh={() => {
-          debouncedFetch();
-        }}
-        ListHeaderComponent={
-          <View>
-            {state.visible && (
-              <OrdersModal
-                isVisible={state.visible}
-                onChangeState={handleModalClose}
-                orders={state.orders}
-                hasItemId={state.itemId}
-                deliveron={state.deliveron}
-                deliveronOptions={state.deliveronOptions}
-                type={state.modalType}
-                options={options}
-                takeAway={state.itemTakeAway}
-                PendingOrders={true}
-              />
-            )}
-
-            <Modal
-              transparent={true}
-              visible={isPickerVisible}
-              animationType="fade"
-              onRequestClose={() => {
-                setPickerVisible(false);
-                dispatch({ type: 'SET_LOADING_OPTIONS', payload: false });
-              }}
-            >
-              <View style={styles.modalContainer}>
-                <TimePicker
-                  scheduled={state.scheduled}
-                  showButton={true}
-                  onDelaySet={handleDelaySetWrapper}
-                  onClose={() => {
-                    setPickerVisible(false);
-                    dispatch({ type: 'SET_LOADING_OPTIONS', payload: false });
-                  }}
-                />
-              </View>
-            </Modal>
-          </View>
-        }
+        onRefresh={debouncedFetch}
       />
     </View>
   );
@@ -542,7 +525,16 @@ export const EnteredOrdersList = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: "flex-start",
+  },
+  listContainer: {
+    paddingHorizontal: 5,
+    paddingBottom: 20,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
   },
   card: {
     flex: 1,
@@ -636,12 +628,4 @@ const styles = StyleSheet.create({
     elevation: 5,
     width: "80%",
   },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-    width: '100%',
-    height: 200
-  }
 });

@@ -19,7 +19,9 @@
     }
   },
   "dependencies": {
-    "@expo/vector-icons": "^14.0.3",
+    "@babel/runtime": "^7.27.0",
+    "@expo/cli": "^0.22.26",
+    "@expo/vector-icons": "^14.0.2",
     "@react-native-async-storage/async-storage": "1.23.1",
     "@react-native-community/datetimepicker": "8.2.0",
     "@react-native-community/netinfo": "11.4.1",
@@ -31,12 +33,13 @@
     "@sentry/react-native": "~6.10.0",
     "@types/react": "~18.3.12",
     "axios": "^1.7.4",
-    "expo": "~52.0.46",
+    "expo": "^52.0.46",
     "expo-application": "~6.0.2",
     "expo-av": "~15.0.2",
     "expo-background-fetch": "~13.0.6",
     "expo-battery": "^9.0.2",
     "expo-constants": "~17.0.8",
+    "expo-font": "~13.0.4",
     "expo-in-app-updates": "^0.9.0",
     "expo-intent-launcher": "^12.0.2",
     "expo-keep-awake": "~14.0.3",
@@ -44,12 +47,15 @@
     "expo-secure-store": "~14.0.1",
     "expo-status-bar": "~2.0.1",
     "expo-task-manager": "~12.0.6",
-    "expo-updates": "~0.27.4",
+    "expo-updates": "^0.27.4",
+    "is-online": "^11.0.0",
     "lodash": "^4.17.21",
     "lodash.throttle": "^4.1.1",
+    "metro-react-native-babel-transformer": "^0.77.0",
     "react": "18.3.1",
     "react-native": "0.76.9",
     "react-native-calendars": "^1.1310.0",
+    "react-native-event-listeners": "^1.0.7",
     "react-native-gesture-handler": "~2.20.2",
     "react-native-modal-datetime-picker": "^18.0.0",
     "react-native-pager-view": "6.5.1",
@@ -67,5 +73,9 @@
     "react-native-picker-select/@react-native-picker/picker": "^2.4.8"
   },
   "private": true,
-  "devDependencies": {}
+  "devDependencies": {
+    "@babel/core": "^7.26.10",
+    "@babel/plugin-transform-runtime": "^7.26.10",
+    "@babel/preset-env": "^7.26.9"
+  }
 }

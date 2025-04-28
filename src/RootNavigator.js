@@ -1,15 +1,39 @@
-import React, { useContext } from "react";
+import React, { useContext, useState, useEffect } from "react";
+import { View, StyleSheet } from "react-native";
 import { createDrawerNavigator } from "@react-navigation/drawer";
 import { AuthContext } from "./context/AuthProvider";
 import { OrdersNavigator, QrOrdersNavigator, ReportsNavigator, ProductsNavigator, AuthNavigator, SettingsNavigator } from "./components/Stack";
 import DrawerContent from "./components/DrawerContent";
 import { LanguageContext } from "./components/Language";
+import ErrorDisplay from "./components/generate/ErrorDisplay";
+import Loader from "./components/generate/loader";
 
 const Drawer = createDrawerNavigator();
 
 const RootNavigator = () => {
-  const { user } = useContext(AuthContext);
+  const { user, isLoading, branchEnabled } = useContext(AuthContext);
   const { dictionary } = useContext(LanguageContext);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (!branchEnabled && user?.token) {
+      setError({ type: 'SERVICE_UNAVAILABLE', message: dictionary?.["orders.branchEnabled"] });
+    } else {
+      setError(null);
+    }
+  }, [branchEnabled, user, dictionary]);
+
+  if (isLoading) {
+    return <Loader text={dictionary?.["loading"]} />;
+  }
+
+  if (error) {
+    return (
+      <View style={styles.errorContainer}>
+        <ErrorDisplay error={error} />
+      </View>
+    );
+  }
 
   if (!user?.token) {
     return <AuthNavigator />;
@@ -75,5 +99,13 @@ const RootNavigator = () => {
     </Drawer.Navigator>
   );
 };
+
+const styles = StyleSheet.create({
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    padding: 20,
+  }
+});
 
 export default RootNavigator;

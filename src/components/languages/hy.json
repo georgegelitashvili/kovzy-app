@@ -523,5 +523,22 @@
     "pr.warrning": "Նախ ընտրեք մեկը այս նշման դաշտերից",
     "info.warning": "Զգուշացում",
     "selectMonth": "Ընտրեք ամիսը",
-    "done": "Կատարված է"
+    "done": "Կատարված է",
+    "errors.BAD_REQUEST": "Անվավեր հարցում",
+    "errors.UNAUTHORIZED": "Խնդրում ենք մուտք գործել",
+    "errors.FORBIDDEN": "Մուտքն արգելված է",
+    "errors.NOT_FOUND": "Տվյալները չեն գտնվել",
+    "errors.VALIDATION_ERROR": "Անվավեր տվյալներ",
+    "errors.SERVER_ERROR": "Սերվերի սխալ",
+    "errors.SERVICE_UNAVAILABLE": "Ծառայությունն անհասանելի է",
+    "errors.API_ERROR": "Տեղի ունեցավ սխալ",
+    "errors.NETWORK_ERROR": "Ցանցային կապի խնդիր",
+    "errors.REQUEST_ERROR": "Հարցման սխալ կամ ժամանակը սպառվեց",
+    "errors.NGROK_ERROR": "Ngrok կապի սխալ",
+    "errors.UNKNOWN": "Տեղի ունեցավ անհայտ սխալ",
+    "errors.LOGIN_ERROR": "Մուտքի սխալ",
+    "errors.LOGOUT_ERROR": "Ելքի սխալ",
+    "errors.SESSION_EXPIRED": "Ձեր սեսիան ավարտվել է։ Խնդրում ենք կրկին մուտք գործել։",
+    "errors.CLEANUP_ERROR": "Սեսիայի տվյալների մաքրման սխալ",
+    "errors.UPDATE_ERROR": "Թարմացումների ստուգման սխալ"
 }

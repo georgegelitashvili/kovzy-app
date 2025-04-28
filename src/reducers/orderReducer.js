@@ -21,13 +21,15 @@ export const initialState = {
 export const orderReducer = (state, action) => {
   switch (action.type) {
     case 'SET_ORDERS':
+      // When orders are set, initialize all of them as open
       return {
         ...state,
         orders: action.payload.orders,
         fees: action.payload.fees,
         currency: action.payload.currency,
         scheduled: action.payload.scheduled,
-        loading: false
+        loading: false,
+        isOpen: action.payload.orders.map(order => order.id) // Initialize all orders as open
       };
     case 'TOGGLE_CONTENT':
       const isOpen = [...state.isOpen];
@@ -82,4 +84,4 @@ export const orderReducer = (state, action) => {
     default:
       return state;
   }
-}; 
+};

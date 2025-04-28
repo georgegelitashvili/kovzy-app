@@ -3,15 +3,13 @@ import {
   StyleSheet,
   Dimensions,
   View,
-  ScrollView,
   TouchableOpacity,
   Linking,
   Alert,
-  FlatList,
   RefreshControl,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
-import { Text, Button, Divider, Card } from "react-native-paper";
+import { Text, Divider, Card } from "react-native-paper";
 import { FlatGrid } from "react-native-super-grid";
 import {
   MaterialCommunityIcons,
@@ -327,82 +325,63 @@ export const AcceptedOrdersList = () => {
     );
   };
 
-  if (loading) {
-    return <Loader show={loading} />;
-  }
-
   return (
-    <View style={{ flex: 1, width: width, }}>
-      {loadingOptions ? <Loader /> : null}
-      <FlatList
-        data={[{}]} // Dummy data for FlatList to use ListHeaderComponent
-        renderItem={null} // No actual items to render
-        keyExtractor={() => 'dummy'} // Static key for dummy data
-        showsVerticalScrollIndicator={false}
-        ListHeaderComponent={
-          <View style={{ flexDirection: 'row', flexWrap: 'nowrap', flex: 1 }}>
-            {visible ? (
-              <OrdersModal
-                isVisible={visible}
-                onChangeState={onChangeModalState}
-                orders={orders}
-                hasItemId={itemId}
-                deliveron={deliveron}
-                deliveronOptions={deliveronOptions}
-                type={modalType}
-                options={options}
-                PendingOrders={false}
-              />
-            ) : null}
-            <FlatGrid
-              adjustGridToStyles={true}
-              itemDimension={cardSize}
-              spacing={10}
-              data={orders}
-              renderItem={({ item }) => <RenderEnteredOrdersList item={item} />}
-              keyExtractor={(item) => (item && item.id ? item.id.toString() : '')}
-              itemContainerStyle={{ justifyContent: 'space-between' }}
-              style={{ flex: 1 }}
-              onEndReachedThreshold={0.5}
-              removeClippedSubviews={true}
-            />
+    <View style={styles.container}>
+      {loadingOptions && <Loader />}
+      {loading && <Loader show={loading} />}
+      
+      {visible && (
+        <OrdersModal
+          isVisible={visible}
+          onChangeState={onChangeModalState}
+          orders={orders}
+          hasItemId={itemId}
+          deliveron={deliveron}
+          deliveronOptions={deliveronOptions}
+          type={modalType}
+          options={options}
+          PendingOrders={false}
+        />
+      )}
+
+      <FlatGrid
+        itemDimension={cardSize}
+        data={orders}
+        spacing={10}
+        renderItem={({ item }) => <RenderEnteredOrdersList item={item} />}
+        keyExtractor={(item) => (item && item.id ? item.id.toString() : '')}
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingBottom: 20 }}
+        refreshControl={
+          <RefreshControl refreshing={loading} onRefresh={fetchAcceptedOrders} />
+        }
+        ListFooterComponent={
+          <View style={styles.paginationContainer}>
+            <TouchableOpacity
+              onPress={decrement}
+              disabled={page === 0}
+            >
+              <Text style={[styles.paginationButton, page === 0 && styles.paginationButtonDisabled]}>
+                {dictionary["prevPage"]}
+              </Text>
+            </TouchableOpacity>
+            <Text style={styles.paginationText}>{page}</Text>
+            <TouchableOpacity
+              onPress={increment}
+              disabled={page === Math.ceil(increment)}
+            >
+              <Text
+                style={[
+                  styles.paginationButton,
+                  page === Math.ceil(increment) && styles.paginationButtonDisabled,
+                ]}
+              >
+                {dictionary["nextPage"]}
+              </Text>
+            </TouchableOpacity>
           </View>
         }
       />
-
-      <View style={styles.paginationContainer}>
-        <TouchableOpacity
-          onPress={() => {
-            decrement();
-          }}
-          disabled={page === 0}
-        >
-          <Text
-            style={[
-              styles.paginationButton,
-              page === 0 && styles.paginationButtonDisabled,
-            ]}
-          >
-            {dictionary["prevPage"]}
-          </Text>
-        </TouchableOpacity>
-        <Text style={styles.paginationText}>{page}</Text>
-        <TouchableOpacity
-          onPress={() => {
-            increment();
-          }}
-          disabled={page === Math.ceil(increment)}
-        >
-          <Text
-            style={[
-              styles.paginationButton,
-              page === Math.ceil(increment) && styles.paginationButtonDisabled,
-            ]}
-          >
-            {dictionary["nextPage"]}
-          </Text>
-        </TouchableOpacity>
-      </View>
     </View>
   );
 };

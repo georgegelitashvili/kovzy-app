@@ -1,18 +1,27 @@
-import React, { useRef, useEffect, useState } from "react";
-import { View, Text, StyleSheet, Dimensions, Animated, useWindowDimensions } from "react-native";
+import React, { useRef, useEffect, useState, useContext } from "react";
+import { View, Text, StyleSheet, Animated, useWindowDimensions } from "react-native";
 import Icon from "react-native-vector-icons/Ionicons";
+import { LanguageContext } from '../Language';
 
 const Toast = ({ type, title, subtitle, animate, addStyles }) => {
   const [value, setValue] = useState(0);
-  const ICON = type === "success" ? "checkmark-circle" : "alert-circle";
+  const { dictionary } = useContext(LanguageContext);
+  
+  const ICON = {
+    success: "checkmark-circle",
+    warning: "alert-circle",
+    failed: "close-circle",
+    info: "information-circle"
+  }[type] || "alert-circle";
 
   const COLOR = {
-    "success": "#21A67A",
-    "warning": "#FFAB00",
-    "failed": "#f14c4c"
-  };
+    success: "#2fa360",
+    warning: "#f57c00",
+    failed: "#d32f2f",
+    info: "#1976d2"
+  }[type] || "#f44336";
 
-  const { width: screenWidth } = useWindowDimensions(); // Get current screen width
+  const { width: screenWidth } = useWindowDimensions();
 
   useEffect(() => {
     if (animate) {
@@ -41,70 +50,89 @@ const Toast = ({ type, title, subtitle, animate, addStyles }) => {
     }, value);
   };
 
+  const getLocalizedMessage = (message, type) => {
+    if (type === 'failed' && dictionary) {
+      return dictionary[`errors.${message}`] || message;
+    }
+    return message;
+  };
+
   return (
     <Animated.View
-      style={{ transform: [{ translateY: slideAnim }], marginBottom: 25 }}
+      style={[
+        { transform: [{ translateY: slideAnim }] },
+        styles.animatedContainer
+      ]}
     >
       <View style={[styles.toastBox, addStyles]}>
-        <View style={[styles.uiLine, { backgroundColor: COLOR[type] }]} />
+        <View style={[styles.uiLine, { backgroundColor: COLOR }]} />
         <Icon
           name={ICON}
           size={24}
-          color={COLOR[type]}
-          style={{ marginHorizontal: 5 }}
+          color={COLOR}
+          style={styles.icon}
         />
-
-        <View>
+        <View style={styles.textContainer}>
           <Text style={styles.toastTitle}>{title}</Text>
-          <Text style={styles.toastMsg}>{subtitle}</Text>
+          <Text style={styles.toastMsg}>
+            {getLocalizedMessage(subtitle, type)}
+          </Text>
         </View>
       </View>
     </Animated.View>
   );
 };
 
-export default Toast;
-
 const styles = StyleSheet.create({
-  toastBox: {
+  animatedContainer: {
+    marginBottom: 25,
     position: "absolute",
+    width: "100%",
     top: -130,
     zIndex: 1024,
+  },
+  toastBox: {
     height: 70,
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#F9FCFA",
     padding: 10,
-    borderRadius: 6,
+    borderRadius: 8,
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
-      height: 7,
+      height: 3,
     },
-    shadowOpacity: 0.41,
-    shadowRadius: 9.11,
-    elevation: 14,
+    shadowOpacity: 0.27,
+    shadowRadius: 4.65,
+    elevation: 6,
     marginHorizontal: 10,
-    alignSelf: 'center', // Center the toast
-    width: '90%', // Set the width to 90% of the screen width
+    alignSelf: 'center',
+    width: '90%',
   },
-
   uiLine: {
     width: 4,
     height: "100%",
     borderRadius: 3,
   },
-
+  icon: {
+    marginHorizontal: 8,
+  },
+  textContainer: {
+    flex: 1,
+    marginLeft: 4,
+  },
   toastTitle: {
     fontSize: 14,
     fontWeight: "600",
     color: "#000",
+    marginBottom: 2,
   },
-
   toastMsg: {
     fontSize: 13,
     fontWeight: "400",
-    color: "#010101",
-    marginTop: 3,
+    color: "#444",
   },
 });
+
+export default Toast;

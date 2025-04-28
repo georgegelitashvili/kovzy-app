@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo, useContext, useEffect } from "react";
-import { StyleSheet, View, Modal, Text, ScrollView } from "react-native";
+import { StyleSheet, View, Modal, Text } from "react-native";
 import OrdersModalAccept from "./OrdersModalAccept";
 import OrdersModalReject from "./OrdersModalReject";
 import OrdersModalStatus from "./OrdersModalStatus";
@@ -120,21 +120,19 @@ export default function OrdersModal({
     >
       <View style={styles.modal}>
         <View style={styles.modalContent}>
-          <ScrollView contentContainerStyle={styles.scrollContainer}>
-            {type === "accept" && (
-              <>
-                <Text style={styles.contentTitle}>
-                  {dictionary["orders.approvingWarning"]}
-                </Text>
-                <TimePicker
-                  onChange={(newTime) => setForDelivery(newTime)}
-                  showButton={false}
-                  backgroundColor={"white"}
-                />
-              </>
-            )}
-            {modalContent}
-          </ScrollView>
+          {type === "accept" && (
+            <View style={styles.headerContent}>
+              <Text style={styles.contentTitle}>
+                {dictionary["orders.approvingWarning"]}
+              </Text>
+              <TimePicker
+                onChange={(newTime) => setForDelivery(newTime)}
+                showButton={false}
+                backgroundColor={"white"}
+              />
+            </View>
+          )}
+          {modalContent}
         </View>
       </View>
     </Modal>
@@ -156,13 +154,12 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     elevation: 5,
   },
-  scrollContainer: {
-    paddingBottom: 20,
+  headerContent: {
+    marginBottom: 10,
   },
   contentTitle: {
     fontSize: 18,
-    marginTop: 20,
-    marginBottom: 20,
+    marginVertical: 10,
     textAlign: "center",
   },
 });
