@@ -1,28 +1,29 @@
 // useFetchLanguages.js
 import { useState, useEffect } from 'react';
-import axiosInstance from "../apiConfig/apiRequests";
+import axiosInstance from '../apiConfig/apiRequests';
 
+export const useFetchLanguages = (apiUrls) => {
+  const [languages, setLanguages] = useState([]);
 
-export const useFetchLanguages = (domain) => {
-    const [languages, setLanguages] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
-    const path = `https://${domain}/api/v1/admin/languages`;
+  useEffect(() => {
+    const fetchLanguages = async () => {
+      if (!apiUrls?.languages) {
+        return;
+      }
 
-    useEffect(() => {
-        const fetchLanguages = async () => {
-            try {
-                const response = await axiosInstance.post(path);
-                setLanguages(response.data.languages);
-            } catch (err) {
-                setError(err);
-            } finally {
-                setLoading(false);
-            }
-        };
+      try {
+        const response = await axiosInstance.post(apiUrls.languages);
+        if (response.data?.data) {
+          setLanguages(response.data.data);
+        }
+      } catch (error) {
+        console.error('Error fetching languages:', error);
+        setLanguages([]);
+      }
+    };
 
-        fetchLanguages();
-    }, [path]);
+    fetchLanguages();
+  }, [apiUrls]);
 
-    return { languages, loading, error };
+  return { languages };
 };

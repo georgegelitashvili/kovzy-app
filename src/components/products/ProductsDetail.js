@@ -168,11 +168,14 @@ export default function ProductsDetail({ navigation, route }) {
       <View style={styles.errorContainer}>
         <Text style={styles.errorText}>{error}</Text>
         <Button 
-          mode="contained" 
+          mode="text" 
           onPress={fetchData}
           style={styles.retryButton}
         >
-          {dictionary["general.retry"]}
+          <MaterialCommunityIcons
+            name="reload"
+            style={styles.leftIcon}
+          />
         </Button>
       </View>
     );

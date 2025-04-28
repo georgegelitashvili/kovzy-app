@@ -17,6 +17,7 @@ const OrderCard = ({
   onReject,
   loading
 }) => {
+  console.log("OrderCard", item);
   const deliveryPrice = parseFloat(item.delivery_price);
   const additionalFees = parseFloat(item.service_fee) / 100;
   const feeData = JSON.parse(item.fees_details || '{}');

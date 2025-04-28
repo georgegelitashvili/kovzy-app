@@ -30,15 +30,30 @@ export const AuthProvider = ({ isConnected, children }) => {
 
   const intervalRef = useRef(null);
   const { userLanguageChange, dictionary } = useContext(LanguageContext);
-  const { languages } = useFetchLanguages(domain);
 
-  const apiUrls = useMemo(() => ({
-    login: domain ? `https://${domain}/api/v1/admin/auth/login` : "",
-    logout: domain ? `https://${domain}/api/v1/admin/auth/logout` : "",
-    branchStatus: domain ? `https://${domain}/api/v1/admin/branchStatus` : "",
-    deliveronStatus: domain ? `https://${domain}/api/v1/admin/deliveronStatus` : "",
-    authUser: domain ? `https://${domain}/api/v1/admin/auth/authorized` : "",
-  }), [domain]);
+  const apiUrls = useMemo(() => {
+    if (!domain || domain === 'null' || domain === 'undefined' || domain === null) {
+      console.warn('Invalid domain detected:', domain);
+      return null;
+    }
+    
+    try {
+      const url = new URL(`https://${domain}`);
+      return {
+        login: `${url.origin}/api/v1/admin/auth/login`,
+        logout: `${url.origin}/api/v1/admin/auth/logout`,
+        branchStatus: `${url.origin}/api/v1/admin/branchStatus`,
+        deliveronStatus: `${url.origin}/api/v1/admin/deliveronStatus`,
+        authUser: `${url.origin}/api/v1/admin/auth/authorized`,
+        languages: `${url.origin}/api/v1/admin/languages`
+      };
+    } catch (error) {
+      console.error('Invalid domain URL:', error);
+      return null;
+    }
+  }, [domain]);
+
+  const { languages } = useFetchLanguages(apiUrls);
 
   const handleClick = useCallback(() => {
     setIsVisible(true);
@@ -47,20 +62,55 @@ export const AuthProvider = ({ isConnected, children }) => {
   const readData = async () => {
     try {
       const data = await getMultipleData(["domain", "branch", "branchNames"]);
-      const [domain, branchid, branchName] = data;
+      const [domainValue, branchidValue, branchNameValue] = data;
 
-      if (domain && branchid && branchName) {
-        setDomain(domain);
-        setBranchid(branchid);
-        setBranchName(branchName);
+      // Validate domain format
+      const isValidDomain = domainValue && 
+                           typeof domainValue === 'string' && 
+                           domainValue !== 'null' && 
+                           domainValue !== 'undefined' &&
+                           domainValue.includes('.');
+
+      if (isValidDomain && branchidValue && branchNameValue) {
+        console.log('Domain validation passed:', domainValue);
+        setDomain(domainValue);
+        setBranchid(branchidValue);
+        setBranchName(branchNameValue);
         setIsDataSet(true);
-
       } else {
-        setIsDataSet(false);
+        console.warn('Domain validation failed:', { 
+          domainValue, 
+          isValidDomain,
+          branchidValue, 
+          branchNameValue 
+        });
+        await cleanupData();
       }
     } catch (e) {
-      console.log(e.message);
-      // Handle error or set appropriate state
+      console.error('Error reading data:', e);
+      await cleanupData();
+    }
+  };
+
+  const cleanupData = async () => {
+    try {
+      await Promise.all([
+        deleteItem("token"),
+        deleteItem("credentials"),
+        deleteItem("user"),
+        deleteItem("rcml-lang"),
+        deleteItem("languages"),
+        removeData(["domain", "branch", "branchNames"])
+      ]);
+    } catch (error) {
+      console.error('Error cleaning up data:', error);
+    } finally {
+      setIsDataSet(false);
+      setDomain(null);
+      setBranchid(null);
+      setBranchName(null);
+      setUser(null);
+      setUserObject(null);
     }
   };
 
@@ -73,7 +123,10 @@ export const AuthProvider = ({ isConnected, children }) => {
   }, []);
 
   const fetchData = useCallback(async () => {
-    if (!domain || !branchid || !apiUrls.deliveronStatus || !apiUrls.branchStatus) return;
+    if (!domain || !branchid || !apiUrls?.deliveronStatus || !apiUrls?.branchStatus) {
+      console.warn('Missing required data for fetchData:', { domain, branchid });
+      return;
+    }
 
     try {
       const [deliveronResponse, branchResponse] = await Promise.all([
@@ -81,19 +134,22 @@ export const AuthProvider = ({ isConnected, children }) => {
         axiosInstance.post(apiUrls.branchStatus, { branchid }, { timeout: 5000 }),
       ]);
 
-      const newDeliveronStatus = deliveronResponse.data.data.status === 0;
-      const newBranchStatus = branchResponse.data.data === true;
-
-      console.log('ფილიალის სტატუსი:', newBranchStatus);
+      const newDeliveronStatus = deliveronResponse?.data?.data?.status === 0;
+      const newBranchStatus = branchResponse?.data?.data === true;
 
       setDeliveronEnabled(newDeliveronStatus);
       setBranchEnabled(newBranchStatus);
-
       setIsVisible(!newBranchStatus);
       setIsInitialFetch(false);
 
     } catch (error) {
-      console.error('შეცდომა მონაცემების მიღებისას:', error.message || error);
+      console.error('Error fetching status:', {
+        message: error.message,
+        domain,
+        branchid,
+        status: error.response?.status
+      });
+      
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
@@ -101,14 +157,22 @@ export const AuthProvider = ({ isConnected, children }) => {
       setBranchEnabled(false);
       setIsVisible(true);
       setIsInitialFetch(false);
+
+      // Handle 401 unauthorized error
+      if (error.response?.status === 401) {
+        setUser(null);
+        await deleteItem("token");
+        await deleteItem("credentials");
+        await deleteItem("user");
+      }
     }
-  }, [domain, branchid, apiUrls]);
+  }, [domain, branchid, apiUrls, deleteItem]);
 
   const loadUser = useCallback(async () => {
     setIsLoading(true);
     try {
       const userObj = await getSecureData('user');
-      if (userObj && apiUrls.authUser) {
+      if (userObj && apiUrls?.authUser) {
         const response = await axiosInstance.get(apiUrls.authUser);
         if (response.data.user) {
           setUser(userObj);
@@ -129,7 +193,7 @@ export const AuthProvider = ({ isConnected, children }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [apiUrls.authUser]);
+  }, [apiUrls?.authUser]);
 
   const startInterval = useCallback(() => {
     if (intervalRef.current) {
@@ -146,27 +210,56 @@ export const AuthProvider = ({ isConnected, children }) => {
   }, []);
 
   useEffect(() => {
-    const fetchData = async () => {
-      await new Promise((res) => setTimeout(res, 500)); // 500ms delay before fetching
+    const initializeData = async () => {
+      if (!isConnected) {
+        console.log('No internet connection, skipping initialization');
+        return;
+      }
+
       await readData();
     };
 
-    fetchData();
-  }, [domain]);
+    initializeData();
+  }, [isConnected]);
 
+  // Add a retry mechanism for language fetching
   useEffect(() => {
-    if (languages.length > 0) {
-      const defaultLanguage = languages.find(language => language.default === 1);
-      if (defaultLanguage) {
-        userLanguageChange(defaultLanguage.lang);
-        storeData('rcml-lang', defaultLanguage.lang);
-        storeData('languages', languages);
+    let retryCount = 0;
+    const MAX_RETRIES = 3;
+    const RETRY_DELAY = 2000;
+
+    const fetchLanguagesWithRetry = async () => {
+      if (!apiUrls) {
+        console.warn('No valid API URLs available, skipping language fetch');
+        return;
       }
-    }
-  }, [languages]);
+
+      try {
+        if (languages.length > 0) {
+          const defaultLanguage = languages.find(language => language.default === 1);
+          if (defaultLanguage) {
+            userLanguageChange(defaultLanguage.lang);
+            await storeData('rcml-lang', defaultLanguage.lang);
+            await storeData('languages', languages);
+          }
+        }
+      } catch (error) {
+        console.error('Error processing languages:', error);
+        if (retryCount < MAX_RETRIES) {
+          retryCount++;
+          console.log(`Retrying language fetch (${retryCount}/${MAX_RETRIES})...`);
+          setTimeout(fetchLanguagesWithRetry, RETRY_DELAY);
+        } else {
+          console.error('Max retries reached for language fetch');
+        }
+      }
+    };
+
+    fetchLanguagesWithRetry();
+  }, [languages, apiUrls, userLanguageChange]);
 
   useEffect(() => {
-    if (!apiUrls.deliveronStatus || !apiUrls.branchStatus) return;
+    if (!apiUrls?.deliveronStatus || !apiUrls?.branchStatus) return;
 
     fetchData();
     startInterval();
@@ -175,7 +268,7 @@ export const AuthProvider = ({ isConnected, children }) => {
       if (appState.match(/inactive|background/) && nextAppState === 'active') {
         fetchData();
         startInterval();
-        if (!user && isConnected && apiUrls.authUser) {
+        if (!user && isConnected && apiUrls?.authUser) {
           loadUser();
         }
       } else {
@@ -192,10 +285,10 @@ export const AuthProvider = ({ isConnected, children }) => {
   }, [appState, apiUrls, isConnected, user]);
 
   useEffect(() => {
-    if (!user && apiUrls.authUser && isConnected) {
+    if (!user && apiUrls?.authUser && isConnected) {
       loadUser();
     }
-  }, [user, apiUrls.authUser, isConnected]);
+  }, [user, apiUrls?.authUser, isConnected]);
 
   const contextValue = useMemo(() => ({
     domain,
