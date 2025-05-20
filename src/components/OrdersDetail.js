@@ -100,6 +100,7 @@ export default function OrdersDetail({ orderId }) {
                           <View key={pidx} style={styles.nestedBulletItem}>
                             <Text style={styles.bullet}>◦</Text>
                             <Text style={styles.option}>{pack.name}</Text>
+                            <Text style={styles.option}>({pack.quantity})</Text>
                           </View>
                         ))}
                       </View>
@@ -117,6 +118,7 @@ export default function OrdersDetail({ orderId }) {
                       <View key={pidx} style={styles.nestedBulletItem}>
                         <Text style={styles.bullet}>◦</Text>
                         <Text style={styles.option}>{pack.name}</Text>
+                        <Text style={styles.option}>({pack.quantity})</Text>
                       </View>
                     ))}
                   </View>
