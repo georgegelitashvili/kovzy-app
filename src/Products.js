@@ -15,8 +15,10 @@ import throttle from 'lodash.throttle';
 
 const width = Dimensions.get("window").width;
 
-const MemoizedProductCard = memo(({ item, isExcluded, checkedItems, onCheckboxPress, onButtonPress, onNavigate, dictionary }) => {
+const MemoizedProductCard = memo(({ item, isExcluded, isExcludedQr,isExcludedOnline,checkedItems, onCheckboxPress, onButtonPress, onNavigate, dictionary }) => {
   const buttonText = isExcluded ? dictionary["prod.enableProduct"] : dictionary["prod.disableProduct"];
+  const buttonTextQr = isExcludedQr ? dictionary["prod.enableProductQr"] : dictionary["prod.disableProductQr"];
+  const buttonTextOnline = isExcludedOnline ? dictionary["prod.enableProductOnline"] : dictionary["prod.disableProductOnline"];
 
   return (
     <Card key={item.id}>
@@ -47,10 +49,32 @@ const MemoizedProductCard = memo(({ item, isExcluded, checkedItems, onCheckboxPr
             styles.button,
             { backgroundColor: isExcluded ? "#2fa360" : "#f14c4c" }
           ]}
-          onPress={() => onButtonPress(item)}
+          onPress={() => onButtonPress(item, "")}
         >
           <Text style={{ color: "white", fontSize: 16, fontWeight: "500" }}>
             {buttonText}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.button,
+            { backgroundColor: isExcludedQr ? "#2fa360" : "#f14c4c" }
+          ]}
+          onPress={() => onButtonPress(item, "qr-menu")}
+        >
+          <Text style={{ color: "white", fontSize: 16, fontWeight: "500" }}>
+            {buttonTextQr}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.button,
+            { backgroundColor: isExcludedOnline ? "#2fa360" : "#f14c4c" }
+          ]}
+          onPress={() => onButtonPress(item, "online")}
+        >
+          <Text style={{ color: "white", fontSize: 16, fontWeight: "500" }}>
+            {buttonTextOnline}
           </Text>
         </TouchableOpacity>
       </Card.Actions>
@@ -98,8 +122,11 @@ export default function Products({ navigation }) {
 
       const updatedProducts = response.data.products.data.map(product => ({
         ...product,
-        isExcluded: newExcluded.includes(product.id)
+        isExcluded: newExcluded.some(item => item.productid === product.id && item.disabled_by === ""),
+        isExcludedQr: newExcluded.some(item => item.productid === product.id && item.disabled_by === "qr-menu"),
+        isExcludedOnline: newExcluded.some(item => item.productid === product.id && item.disabled_by === "online"),
       }));
+      
       setProducts(updatedProducts);
 
       setTotalPages(response.data.products.total / response.data.products.per_page);
@@ -167,22 +194,23 @@ export default function Products({ navigation }) {
     setPage(1);
   }, 500), [branchEnabled]);
 
-  const handleButtonPress = useCallback(async (item) => {
+  const handleButtonPress = useCallback(async (item,disabled_by) => {
     if (!domain || !branchid || !branchEnabled) return;
 
     try {
       const response = await axiosInstance.post(
         `https://${domain}/api/v1/admin/productActivity`,
-        { pid: item.id, branchid: branchid }
+        { pid: item.id, branchid: branchid, disabled_by: disabled_by }
       );
 
-      const isAlreadyDisabled = excluded.some((excludedItem) => excludedItem.productid === item.id);
+      const isAlreadyDisabled = excluded.some((excludedItem) => excludedItem.productid === item.id && excludedItem.disabled_by === disabled_by);
       
       if (isAlreadyDisabled) {
-        setExcluded(prevExcluded => prevExcluded.filter(id => id !== item.id));
+        setExcluded(prev => prev.filter(ex => !(ex.productid === item.id && ex.disabled_by === disabled_by)));
       } else {
-        setExcluded(prevExcluded => [...prevExcluded, item.id]);
+        setExcluded(prev => [...prev, { productid: item.id, disabled_by }]);
       }
+      
       
       onRefresh();
     } catch (error) {
@@ -218,11 +246,15 @@ export default function Products({ navigation }) {
   }, [navigation]);
 
   const renderItem = useCallback(({ item }) => {
-    const isExcluded = excluded.some((excludedItem) => excludedItem.productid === item.id);
+    const isExcluded = excluded.some((excludedItem) => excludedItem.productid === item.id && excludedItem.disabled_by === null);
+    const isExcludedQr = excluded.some((excludedItem) => excludedItem.productid === item.id && excludedItem.disabled_by === "qr-menu");
+    const isExcludedOnline = excluded.some((excludedItem) => excludedItem.productid === item.id && excludedItem.disabled_by === "online");
     return (
       <MemoizedProductCard
         item={item}
         isExcluded={isExcluded}
+        isExcludedQr={isExcludedQr}
+        isExcludedOnline={isExcludedOnline}
         checkedItems={checkedItems}
         onCheckboxPress={handleCheckboxPress}
         onButtonPress={handleButtonPress}
