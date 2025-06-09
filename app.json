@@ -13,7 +13,9 @@
       "backgroundColor": "#ffffff"
     },
     "updates": {
+      "checkAutomatically": "ON_LOAD",
       "fallbackToCacheTimeout": 0,
+      "enabled": true,
       "url": "https://u.expo.dev/7c64e824-e18a-4864-bfc6-5399fa7da11a"
     },
     "assetBundlePatterns": [
@@ -57,9 +59,9 @@
     },
     "runtimeVersion": {
       "policy": "appVersion"
-    },
-    "plugins": [
+    },    "plugins": [
       "expo-secure-store",
+      "expo-updates",
       [
         "expo-av",
         {
@@ -74,8 +76,7 @@
           "defaultChannel": "default",
           "enableBackgroundRemoteNotifications": true
         }
-      ],
-      "expo-font"
+      ]
     ]
   }
 }

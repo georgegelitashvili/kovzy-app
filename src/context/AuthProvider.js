@@ -8,7 +8,7 @@ import { useFetchLanguages } from "../components/UseFetchLanguages";
 import { LanguageContext } from "../components/Language";
 import Loader from "../components/generate/loader";
 import AppUpdates from "../components/AppUpdates";
-import { EventRegister } from 'react-native-event-listeners';
+import eventEmitter from "../utils/EventEmitter";
 
 export const AuthContext = createContext();
 
@@ -60,11 +60,10 @@ export const AuthProvider = ({ isConnected, children }) => {
     setLoginError(null);
     setError(null);
   }, []);
-
   const handleError = useCallback((error, type = 'UNKNOWN') => {
     const errorMessage = error?.message || dictionary?.['errors.UNKNOWN'];
     setError({ type, message: errorMessage });
-    EventRegister.emit('apiError', { type, message: errorMessage });
+    eventEmitter.emit('apiError', { type, message: errorMessage });
   }, [dictionary]);
 
   const cleanupAuth = useCallback(async () => {
@@ -291,13 +290,13 @@ export const AuthProvider = ({ isConnected, children }) => {
   }, [domain, branchid, apiUrls, deleteItem, branchEnabled]);
 
   useEffect(() => {
-    const sessionExpiredListener = EventRegister.addEventListener('sessionExpired', () => {
+    const sessionExpiredListener = eventEmitter.addEventListener('sessionExpired', () => {
       cleanupAuth();
       handleError({ message: dictionary?.['errors.SESSION_EXPIRED'] }, 'SESSION_EXPIRED');
     });
 
     return () => {
-      EventRegister.removeEventListener(sessionExpiredListener);
+      eventEmitter.removeEventListener(sessionExpiredListener);
     };
   }, [cleanupAuth, handleError, dictionary]);
 
@@ -426,7 +425,13 @@ export const AuthProvider = ({ isConnected, children }) => {
       ) : (
         children
       )}
-      {user && <AppUpdates onError={(error) => handleError(error, 'UPDATE_ERROR')} />}
+      {user && (
+        <AppUpdates 
+          onError={(error) => handleError(error, 'UPDATE_ERROR')}
+          showLogs={false}
+          playStoreUrl="https://play.google.com/store/apps/details?id=com.kovzy.app"
+        />
+      )}
       {!branchEnabled && user && isVisible && (
         <TouchableOpacity onPress={() => setIsVisible(true)}>
           <Toast

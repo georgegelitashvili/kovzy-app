@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { NavigationContainer } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
-import { EventRegister } from 'react-native-event-listeners';
+import eventEmitter from './utils/EventEmitter';
 import { AuthProvider } from './context/AuthProvider';
 import { LanguageProvider } from './components/Language';
 import RootNavigator from './RootNavigator';
@@ -16,9 +16,8 @@ export default function App() {
   const [toastConfig, setToastConfig] = useState(null);
   const [error, setError] = useState(null);
   const toastTimeoutRef = useRef(null);
-
   useEffect(() => {
-    const showToastListener = EventRegister.addEventListener('showToast', (config) => {
+    const showToastListener = eventEmitter.addEventListener('showToast', (config) => {
       if (toastTimeoutRef.current) {
         clearTimeout(toastTimeoutRef.current);
       }
@@ -28,7 +27,7 @@ export default function App() {
       }, 3000);
     });
 
-    const apiErrorListener = EventRegister.addEventListener('apiError', (error) => {
+    const apiErrorListener = eventEmitter.addEventListener('apiError', (error) => {
       if (toastTimeoutRef.current) {
         clearTimeout(toastTimeoutRef.current);
       }
@@ -43,7 +42,7 @@ export default function App() {
       }, 3000);
     });
 
-    const sessionExpiredListener = EventRegister.addEventListener('sessionExpired', () => {
+    const sessionExpiredListener = eventEmitter.addEventListener('sessionExpired', () => {
       setError({
         type: 'UNAUTHORIZED',
         message: 'Your session has expired. Please log in again.'
@@ -51,9 +50,9 @@ export default function App() {
     });
 
     return () => {
-      EventRegister.removeEventListener(showToastListener);
-      EventRegister.removeEventListener(apiErrorListener);
-      EventRegister.removeEventListener(sessionExpiredListener);
+      eventEmitter.removeEventListener(showToastListener);
+      eventEmitter.removeEventListener(apiErrorListener);
+      eventEmitter.removeEventListener(sessionExpiredListener);
       if (toastTimeoutRef.current) {
         clearTimeout(toastTimeoutRef.current);
       }

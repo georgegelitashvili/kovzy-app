@@ -1,7 +1,7 @@
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 import { removeData } from "../helpers/storage";
-import { EventRegister } from 'react-native-event-listeners';
+import eventEmitter from "../utils/EventEmitter";
 import { getSecureData } from '../helpers/storage';
 import NetInfo from '@react-native-community/netinfo';
 
@@ -105,9 +105,8 @@ const handleApiError = (error, dictionary) => {
 
   // Use translated message if available
   errorMessage = dictionary?.[`errors.${errorType}`] || errorMessage || dictionary?.['errors.UNKNOWN'] || 'An error occurred';
-
   // Show error toast
-  EventRegister.emit('showToast', {
+  eventEmitter.emit('showToast', {
     type: 'failed',
     title: dictionary ? dictionary["info.warning"] : 'Error',
     message: errorMessage
@@ -183,11 +182,10 @@ axiosInstance.interceptors.response.use(
     }
 
     // Handle specific error cases
-    if (error.response?.status === 401) {
-      try {
+    if (error.response?.status === 401) {      try {
         await SecureStore.deleteItemAsync('token');
         await SecureStore.deleteItemAsync('user');
-        EventRegister.emit('sessionExpired');
+        eventEmitter.emit('sessionExpired');
       } catch (e) {
         console.error('Error clearing auth data:', e);
       }
