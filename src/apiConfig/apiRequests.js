@@ -170,6 +170,30 @@ axiosInstance.interceptors.response.use(
       data: error.response?.data
     });
 
+    // Add detailed network error logging
+    if (!error.response && (error.code === 'ERR_NETWORK' || error.message.includes('Network Error'))) {
+      console.error('Detailed Network Error:', {
+        errorCode: error.code,
+        errorMessage: error.message,
+        config: {
+          url: error.config?.url,
+          method: error.config?.method,
+          timeout: error.config?.timeout,
+        },
+        timestamp: new Date().toISOString(),
+      });
+
+      // Check current network state
+      NetInfo.fetch().then(state => {
+        console.log('Network State:', {
+          isConnected: state.isConnected,
+          isInternetReachable: state.isInternetReachable,
+          type: state.type,
+          details: state.details,
+        });
+      });
+    }
+
     // Get current dictionary from the LanguageContext
     let dictionary = null;
     try {
@@ -182,7 +206,8 @@ axiosInstance.interceptors.response.use(
     }
 
     // Handle specific error cases
-    if (error.response?.status === 401) {      try {
+    if (error.response?.status === 401) {
+      try {
         await SecureStore.deleteItemAsync('token');
         await SecureStore.deleteItemAsync('user');
         eventEmitter.emit('sessionExpired');

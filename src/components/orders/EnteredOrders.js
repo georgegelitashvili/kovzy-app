@@ -4,7 +4,6 @@ import {
   Dimensions,
   View,
   Modal,
-  TouchableOpacity,
   Alert,
   AppState,
   FlatList,
@@ -12,29 +11,35 @@ import {
 
 import { Text, Button, Divider, Card } from "react-native-paper";
 import { FlatGrid } from "react-native-super-grid";
-import { MaterialCommunityIcons, SimpleLineIcons } from "@expo/vector-icons";
 import * as Updates from 'expo-updates';
 import { Audio } from 'expo-av';
+import NetInfo from '@react-native-community/netinfo';
 
 import { AuthContext, AuthProvider } from "../../context/AuthProvider";
 import Loader from "../generate/loader";
 import TimePicker from "../generate/TimePicker";
 import { String, LanguageContext } from "../Language";
 import axiosInstance from "../../apiConfig/apiRequests";
-import OrdersDetail from "../OrdersDetail";
 import OrdersModal from "../modal/OrdersModal";
-import printRows from "../../PrintRows";
 
 import NotificationSound from '../../utils/NotificationSound';
 import NotificationManager from '../../utils/NotificationManager';
+import ConnectionStatusBar from "../generate/ConnectionStatusBar";
 import { orderReducer, initialState } from '../../reducers/orderReducer';
 import OrderCard from "./OrderCard";
 import { handleDelaySet } from '../../utils/timeUtils';
 import { debounce } from 'lodash';
 
-const width = Dimensions.get("window").width;
-const numColumns = printRows(width);
-const cardSize = width / 2 - 15;
+// This will be replaced with a dynamic calculation based on screen size
+const initialWidth = Dimensions.get("window").width;
+const getColumnsByScreenSize = (screenWidth) => {
+  if (screenWidth < 600) return 1; // Mobile phones
+  if (screenWidth < 960) return 2; // Tablets
+  return 3; // Larger screens
+};
+
+const initialColumns = getColumnsByScreenSize(initialWidth);
+const getCardSize = (width, columns) => width / columns - (columns > 1 ? 15 : 30);
 
 let newOrderCount;
 const type = 0;
@@ -47,11 +52,12 @@ export const EnteredOrdersList = () => {
   const soundRef = useRef(null);
   const intervalRef = useRef(null);
   const [width, setWidth] = useState(Dimensions.get('window').width);
-  const [numColumns, setNumColumns] = useState(printRows(width));
-  const [cardSize, setCardSize] = useState(width / 2 - 15);
+  const [numColumns, setNumColumns] = useState(getColumnsByScreenSize(initialWidth));
+  const [cardSize, setCardSize] = useState(getCardSize(width, numColumns));
   const [retryCount, setRetryCount] = useState(0);
   const [isPickerVisible, setPickerVisible] = useState(false);
   const [appState, setAppState] = useState(AppState.currentState);
+  const [isConnected, setIsConnected] = useState(true);
   const [options, setOptions] = useState({
     url_unansweredOrders: "",
     url_deliveronRecheck: "",
@@ -102,10 +108,10 @@ export const EnteredOrdersList = () => {
   useEffect(() => {
     const updateLayout = () => {
       const newWidth = Dimensions.get('window').width;
-      const columns = printRows(newWidth);
+      const columns = getColumnsByScreenSize(newWidth);
       setWidth(newWidth);
       setNumColumns(columns);
-      setCardSize(newWidth / 2 - 15);
+      setCardSize(getCardSize(newWidth, columns));
     };
 
     const subscription = Dimensions.addEventListener('change', updateLayout);
@@ -259,13 +265,37 @@ export const EnteredOrdersList = () => {
     }
   }, [domain, branchid, apiOptions]);
 
+  // Monitor internet connectivity
+  useEffect(() => {
+    const unsubscribe = NetInfo.addEventListener(state => {
+      const connectionStatus = state.isConnected && state.isInternetReachable !== false;
+      setIsConnected(connectionStatus);
+      
+      if (connectionStatus && !isConnected) {
+        // Connection restored, restart interval
+        if (optionsIsLoaded) {
+          startInterval();
+        }
+      } else if (!connectionStatus && isConnected) {
+        // Connection lost, stop interval
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+        }
+      }
+    });
+    
+    return () => unsubscribe();
+  }, [isConnected, optionsIsLoaded]);
+
   useEffect(() => {
     if (optionsIsLoaded) {
       const subscribe = AppState.addEventListener('change', handleAppStateChange);
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
-      startInterval();
+      if (isConnected) {
+        startInterval();
+      }
       return () => {
         if (intervalRef.current) {
           clearInterval(intervalRef.current);
@@ -274,7 +304,7 @@ export const EnteredOrdersList = () => {
         subscribe.remove();
       };
     }
-  }, [optionsIsLoaded, languageId, appState]);
+  }, [optionsIsLoaded, languageId, appState, isConnected]);
 
   useEffect(() => {
     const initializeNotifications = async () => {
@@ -299,19 +329,34 @@ export const EnteredOrdersList = () => {
 
   const handleAcceptOrder = useCallback(async (itemId, itemTakeAway) => {
     try {
+      // Check internet connection first
+      const netInfo = await NetInfo.fetch();
+      if (!netInfo.isConnected || netInfo.isInternetReachable === false) {
+        dispatch({ type: 'SET_LOADING', payload: false });
+        Alert.alert(
+          dictionary["general.alerts"] || "Alert",
+          dictionary["connection.required"] || "Internet connection required to process orders",
+          [{ text: dictionary["okay"] || "OK" }]
+        );
+        return;
+      }
+
       dispatch({ type: 'SET_LOADING', payload: true });
-      
+
       if (itemTakeAway === 1) {
+        // Set both modal state and loading state in a single batch
         dispatch({
-          type: 'SET_MODAL_STATE',
+          type: 'BATCH_UPDATE',
           payload: {
-            visible: true,
-            modalType: 'accept',
-            itemId: itemId,
-            itemTakeAway: itemTakeAway
+            loading: false,
+            modalState: {
+              visible: true,
+              modalType: 'accept',
+              itemId: itemId,
+              itemTakeAway: itemTakeAway
+            }
           }
         });
-        dispatch({ type: 'SET_LOADING', payload: false });
         return;
       }
 
@@ -319,28 +364,36 @@ export const EnteredOrdersList = () => {
         orderId: itemId,
       });
 
+      // Prepare state updates to be dispatched together
+      const updates = { loading: false };
+
       if (response.data?.data?.original?.content.length !== 0) {
+        updates.deliveron = response.data.data;
+        updates.modalState = {
+          visible: true,
+          modalType: 'accept',
+          itemId: itemId,
+          itemTakeAway: itemTakeAway
+        };
+
+        // Dispatch all state updates in a single action
         dispatch({
-          type: 'SET_DELIVERON_DATA',
-          payload: response.data.data
-        });
-        dispatch({
-          type: 'SET_MODAL_STATE',
-          payload: {
-            visible: true,
-            modalType: 'accept',
-            itemId: itemId,
-            itemTakeAway: itemTakeAway
-          }
+          type: 'BATCH_UPDATE',
+          payload: updates
         });
       } else if (response.data?.data?.original?.content.length === 0) {
         dispatch({
-          type: 'SET_DELIVERON_DATA',
-          payload: []
+          type: 'BATCH_UPDATE',
+          payload: {
+            loading: false,
+            deliveron: []
+          }
         });
+
         Alert.alert("ALERT", dictionary["dv.empty"], [
           {
-            text: "okay", onPress: () => {
+            text: "okay",
+            onPress: () => {
               dispatch({
                 type: 'SET_DELIVERON_DATA',
                 payload: []
@@ -349,18 +402,31 @@ export const EnteredOrdersList = () => {
           },
         ]);
       }
-      dispatch({ type: 'SET_LOADING', payload: false });
     } catch (error) {
       console.log('Error in handleAcceptOrder:', error);
       dispatch({
-        type: 'SET_DELIVERON_DATA',
-        payload: []
+        type: 'BATCH_UPDATE',
+        payload: {
+          loading: false,
+          deliveron: []
+        }
       });
-      dispatch({ type: 'SET_LOADING', payload: false });
     }
-  }, [options.url_deliveronRecheck]);
+  }, [options.url_deliveronRecheck, dictionary]);
 
-  const handleRejectOrder = useCallback((id) => {
+  const handleRejectOrder = useCallback(async (id) => {
+    // Check internet connection first
+    const netInfo = await NetInfo.fetch();
+    if (!netInfo.isConnected || netInfo.isInternetReachable === false) {
+      dispatch({ type: 'SET_LOADING', payload: false });
+      Alert.alert(
+        dictionary["general.alerts"] || "Alert",
+        dictionary["connection.required"] || "Internet connection required to process orders",
+        [{ text: dictionary["okay"] || "OK" }]
+      );
+      return;
+    }
+    
     dispatch({ type: 'SET_LOADING', payload: true });
     
     dispatch({
@@ -408,7 +474,7 @@ export const EnteredOrdersList = () => {
 
   const renderOrderCard = useCallback(({ item }) => (
     <View style={{
-      width: width / 2 - 15,
+      width: width / numColumns - (numColumns > 1 ? 15 : 30),
       marginHorizontal: 5
     }}>
       <OrderCard
@@ -459,6 +525,7 @@ export const EnteredOrdersList = () => {
       {state.loadingOptions && <Loader />}
       <NotificationSound ref={NotificationSoundRef} />
       {state.loading && <Loader show={state.loading} />}
+      <ConnectionStatusBar dictionary={dictionary} />
 
       {state.visible && (
         <OrdersModal
@@ -498,7 +565,8 @@ export const EnteredOrdersList = () => {
       </Modal>
 
       <FlatList
-        numColumns={2}
+        key={`flat-list-${numColumns}`}
+        numColumns={numColumns}
         data={state.orders}
         renderItem={renderOrderCard}
         keyExtractor={keyExtractor}
