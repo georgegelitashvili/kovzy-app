@@ -8,7 +8,7 @@ import NetInfo from '@react-native-community/netinfo';
 const cache = new Map();
 const CACHE_DURATION = 5 * 60 * 1000;
 const RETRY_DELAY = 2000;  // Increased from 1000
-const MAX_RETRIES = 5;     // Increased from 3
+const MAX_RETRIES = 10;     // Increased from 3
 const INITIAL_TIMEOUT = 15000; // Increased from 10000
 
 const axiosInstance = axios.create({
