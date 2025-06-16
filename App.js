@@ -29,7 +29,7 @@ const ErrorFallback = () => (
 );
 
 // Enhanced ErrorBoundary using Sentry
-const ErrorBoundary = Sentry.withErrorBoundary(({ children }) => children, {
+const ErrorBoundary = Sentry.withErrorBoundary(({ children }) => <>{children}</>, {
   fallback: <ErrorFallback />,
 });
 

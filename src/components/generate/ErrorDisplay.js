@@ -1,13 +1,23 @@
 import React from 'react';
-import { View, Text, StyleSheet, Animated } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useContext } from 'react';
 import { LanguageContext } from '../Language';
 import { theme } from '../../core/theme';
+// Using text character instead of MaterialIcons to avoid rendering issues
 
-const ErrorDisplay = ({ error, style }) => {
+const IMPORTANT_ERROR_TYPES = [
+  'NETWORK_ERROR',
+  'SERVER_ERROR',
+  'SERVICE_UNAVAILABLE',
+  'FORBIDDEN'
+];
+
+const ErrorDisplay = ({ error, style, onDismiss }) => {
   const { dictionary } = useContext(LanguageContext);
   
+  // Don't render anything if there's no error or it's not important
   if (!error) return null;
+  if (error.type && !IMPORTANT_ERROR_TYPES.includes(error.type)) return null;
 
   const getErrorStyle = (errorType) => {
     switch (errorType) {
@@ -32,79 +42,93 @@ const ErrorDisplay = ({ error, style }) => {
   };
 
   const getErrorMessage = (error) => {
+    if (error.message) {
+      return error.message;
+    }
+
     if (dictionary && dictionary[`errors.${error.type}`]) {
       return dictionary[`errors.${error.type}`];
     }
-    return error.message || dictionary?.['errors.UNKNOWN'];
+
+    return dictionary?.['errors.UNKNOWN'] || 'An error occurred';
   };
 
+  const handleDismiss = () => {
+    if (onDismiss) onDismiss();
+  };
+  
   return (
     <View style={[styles.container, style]}>
-      <Text style={[styles.text, getErrorStyle(error.type)]}>
-        {getErrorMessage(error)}
-      </Text>
+      <View style={styles.toastContent}>
+        <Text style={[styles.text, getErrorStyle(error.type)]}>
+          {getErrorMessage(error)}
+        </Text>
+        <TouchableOpacity style={styles.closeButton} onPress={handleDismiss}>
+          <Text style={styles.closeIcon}>✕</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
+    position: 'absolute',
+    top: 50,
+    left: 20,
+    right: 20,
     padding: 12,
     marginVertical: 8,
     borderRadius: 8,
+    backgroundColor: '#ffffff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+    zIndex: 1024,
+    borderLeftWidth: 4,
+    borderLeftColor: '#d32f2f',
   },
-  text: {
+  toastContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },  text: {
     fontSize: 14,
-    textAlign: 'center',
+    flex: 1,
     fontWeight: '500',
+  },  closeButton: {
+    padding: 4,
+  },
+  closeIcon: {
+    fontSize: 16,
+    color: '#666',
+    fontWeight: 'bold',
   },
   networkError: {
     color: '#d32f2f',
-    backgroundColor: '#ffebee',
-    borderWidth: 1,
-    borderColor: '#ef9a9a',
   },
   authError: {
     color: '#f57c00',
-    backgroundColor: '#fff3e0',
-    borderWidth: 1,
-    borderColor: '#ffcc80',
   },
   validationError: {
     color: '#c2185b',
-    backgroundColor: '#fce4ec',
-    borderWidth: 1,
-    borderColor: '#f48fb1',
   },
   serverError: {
     color: '#c62828',
-    backgroundColor: '#ffebee',
-    borderWidth: 1,
-    borderColor: '#ef9a9a',
   },
   ngrokError: {
     color: '#4527a0',
-    backgroundColor: '#ede7f6',
-    borderWidth: 1,
-    borderColor: '#b39ddb',
   },
   forbiddenError: {
     color: '#d32f2f',
-    backgroundColor: '#ffebee',
-    borderWidth: 1,
-    borderColor: '#ef9a9a',
   },
   notFoundError: {
     color: '#455a64',
-    backgroundColor: '#eceff1',
-    borderWidth: 1,
-    borderColor: '#b0bec5',
   },
   defaultError: {
-    color: theme.colors.error,
-    backgroundColor: '#f5f5f5',
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
+    color: theme.colors?.error || '#F44336',
   },
 });
 

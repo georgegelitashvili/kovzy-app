@@ -125,7 +125,7 @@ export default function OrdersDetail({ orderId }) {
 
   return (
     <View style={styles.container}>
-      <ErrorDisplay error={error} />
+      {/* <ErrorDisplay error={error} /> */}
       <List.Section>
         <List.Accordion
           title={dictionary["orders.orderProducts"]}
