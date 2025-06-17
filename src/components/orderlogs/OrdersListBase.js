@@ -5,6 +5,7 @@ import {
   View,
   TouchableOpacity,
   ActivityIndicator,
+  FlatList
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { Text, Divider, Card } from "react-native-paper";
@@ -17,7 +18,6 @@ import { LanguageContext } from "../Language";
 import axiosInstance from "../../apiConfig/apiRequests";
 import OrdersDetail from "../OrdersDetail";
 import OrdersModal from "../modal/OrdersModalQr";
-import printRows from "../../PrintRows";
 import OrdersFilters from "./OrdersFilters";
 
 const initialWidth = Dimensions.get("window").width;
@@ -198,7 +198,7 @@ export const OrdersListBase = ({ orderType }) => {
         width: width / numColumns - (numColumns > 1 ? 15 : 30),
         marginHorizontal: 5
       }}>
-        <Card key={item.id} style={styles.card}>
+        <Card style={styles.card}>
           <TouchableOpacity onPress={() => toggleContent(item.id)}>
             <Card.Content style={styles.head}>
               <Text variant="headlineMedium" style={styles.header}>
@@ -329,14 +329,14 @@ export const OrdersListBase = ({ orderType }) => {
             PendingOrders={false}
           />
         ) : null}
-
+        
         <FlatGrid
           key={`flat-grid-${numColumns}`}
           adjustGridToStyles={true}
           itemDimension={cardSize}
           spacing={10}
           data={orders}
-          keyExtractor={(item) => `${item.id}-${item.created_at}`} 
+          keyExtractor={(item) => String(item.id)} 
           renderItem={renderItem}
           getItemLayout={getItemLayout}
           itemContainerStyle={{ justifyContent: 'space-between' }}

@@ -104,13 +104,17 @@ const handleApiError = (error, dictionary) => {
   }
 
   // Use translated message if available
-  errorMessage = dictionary?.[`errors.${errorType}`] || errorMessage || dictionary?.['errors.UNKNOWN'] || 'An error occurred';
-  // Show error toast
+  errorMessage = dictionary?.[`errors.${errorType}`] || errorMessage || dictionary?.['errors.UNKNOWN'] || 'An error occurred';  // Show error toast
   eventEmitter.emit('showToast', {
     type: 'failed',
     title: dictionary ? dictionary["info.warning"] : 'Error',
     message: errorMessage
   });
+  
+  // Also emit an error event for ErrorDisplay components
+  if (global.errorHandler) {
+    global.errorHandler.setError(errorType, errorMessage);
+  }
 
   return {
     type: errorType,

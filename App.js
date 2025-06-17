@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, Button, View, Text, Modal } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as Sentry from '@sentry/react-native';
@@ -9,6 +9,8 @@ import { useKeepAwake } from 'expo-keep-awake';
 
 import Main from './src/Main';
 import Toast from './src/components/generate/Toast';
+import ErrorWrapper from './src/components/generate/ErrorWrapper';
+import useErrorHandler from './src/hooks/useErrorHandler';
 
 // Sentry initialization
 Sentry.init({
@@ -37,6 +39,8 @@ function App() {
   const [isConnected, setIsConnected] = useState(true);
   const [showReloadButton, setShowReloadButton] = useState(false);
   const netInfo = useNetInfo();
+  const { error, setError, clearError, setApiError } = useErrorHandler();
+  const errorHandlerRef = useRef({ setError, clearError, setApiError });
 
   // Keep the screen awake
   useKeepAwake();
@@ -99,11 +103,17 @@ function App() {
     }
   };
 
+  // Make error handler available globally
+  useEffect(() => {
+    global.errorHandler = errorHandlerRef.current;
+  }, []);
 
   return (
     <SafeAreaProvider>
       <ErrorBoundary>
-        <Main isConnected={isConnected} />
+        <ErrorWrapper>
+          <Main isConnected={isConnected} />
+        </ErrorWrapper>
       </ErrorBoundary>
       {!isConnected && (
         <Toast

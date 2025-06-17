@@ -306,7 +306,7 @@ export const AcceptedOrdersList = () => {
       <FlatList
         data={[{}]} // Dummy data for FlatList to use ListHeaderComponent
         renderItem={null} // No actual items to render
-        keyExtractor={() => 'dummy'} // Static key for dummy data
+        keyExtractor={() => 'dummy-header-content-accepted'} // Fixed key for the single dummy item
         showsVerticalScrollIndicator={false}
         getItemLayout={getItemLayout}
         ListHeaderComponent={

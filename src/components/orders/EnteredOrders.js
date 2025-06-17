@@ -21,6 +21,8 @@ import TimePicker from "../generate/TimePicker";
 import { String, LanguageContext } from "../Language";
 import axiosInstance from "../../apiConfig/apiRequests";
 import OrdersModal from "../modal/OrdersModal";
+import ErrorDisplay from "../generate/ErrorDisplay";
+import useErrorHandler from "../../hooks/useErrorHandler";
 
 import NotificationSound from '../../utils/NotificationSound';
 import NotificationManager from '../../utils/NotificationManager';
@@ -58,6 +60,7 @@ export const EnteredOrdersList = () => {
   const [isPickerVisible, setPickerVisible] = useState(false);
   const [appState, setAppState] = useState(AppState.currentState);
   const [isConnected, setIsConnected] = useState(true);
+  const { error, setError, setApiError, clearError } = useErrorHandler();
   const [options, setOptions] = useState({
     url_unansweredOrders: "",
     url_deliveronRecheck: "",
@@ -519,12 +522,16 @@ export const EnteredOrdersList = () => {
       processedOrdersRef.current.clear();
     };
   }, []);
-
   return (
     <View style={styles.container}>
       {state.loadingOptions && <Loader />}
       <NotificationSound ref={NotificationSoundRef} />
       {state.loading && <Loader show={state.loading} />}
+      <ErrorDisplay 
+        error={error} 
+        onDismiss={clearError} 
+        style={styles.errorDisplay} 
+      />
       <ConnectionStatusBar dictionary={dictionary} />
 
       {state.visible && (
@@ -593,6 +600,11 @@ export const EnteredOrdersList = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  errorDisplay: {
+    zIndex: 1000, 
+    width: '92%',
+    alignSelf: 'center',
   },
   listContainer: {
     paddingHorizontal: 5,

@@ -404,7 +404,7 @@ export const EnteredOrdersList = () => {
         <FlatList
           data={[{}]} // Dummy data for the FlatList since we're using ListHeaderComponent for main content
           renderItem={null} // No items in the FlatList itself
-            keyExtractor={() => Math.random().toString()} // Static key for the dummy item
+            keyExtractor={() => 'dummy-header-content'} // Fixed key for the single dummy item
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={
             <View style={{ flexDirection: 'row', flexWrap: 'nowrap', flex: 1 }}>
@@ -419,7 +419,8 @@ export const EnteredOrdersList = () => {
                   takeAway={itemTakeAway}
                   PendingOrders={true}
                 />
-              )}              <FlatList
+              )}
+              <FlatList
                 key={`flat-list-${numColumns}`}
                 numColumns={numColumns}
                 spacing={10}
