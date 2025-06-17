@@ -14,14 +14,14 @@ export default function TabContent(props) {
     return (
       <View style={styles.tabBar}>
         {Object.keys(props.descriptors).map(key => {
-          const { options } = props.descriptors[key];
-          const label = options.tabBarLabel || options.title || key;
+          const { options, route } = props.descriptors[key];
+          const label = options.tabBarLabel || options.title || route.name;
           return (
             <TabBarItem
               key={key}
               label={label}
-              onPress={() => props.navigation.navigate(key)}
-              active={props.state.index === props.navigationState.routes.findIndex(route => route.key === key)}
+              onPress={() => props.navigation.navigate(route.name)}
+              active={props.state.index === props.navigationState.routes.findIndex(r => r.name === route.name)}
               {...props.descriptors[key]}
             />
           );
@@ -29,6 +29,7 @@ export default function TabContent(props) {
       </View>
     );
   };
+
 
   return (
     <Tab.Navigator

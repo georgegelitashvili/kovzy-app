@@ -27,10 +27,15 @@ import OrdersDetail from "../OrdersDetail";
 import OrdersModal from "../modal/OrdersModalQr";
 import printRows from "../../PrintRows";
 
-const width = Dimensions.get("window").width;
+const initialWidth = Dimensions.get("window").width;
+const getColumnsByScreenSize = (screenWidth) => {
+  if (screenWidth < 600) return 1; // Mobile phones
+  if (screenWidth < 960) return 2; // Tablets
+  return 3; // Larger screens
+};
 
-const numColumns = printRows(width);
-const cardSize = width / numColumns;
+const initialColumns = getColumnsByScreenSize(initialWidth);
+const getCardSize = (width, columns) => width / columns - (columns > 1 ? 15 : 30);
 
 export const AcceptedOrdersList = () => {
   const { domain, branchid, setUser, user, deleteItem, setIsDataSet } = useContext(AuthContext);
@@ -53,10 +58,9 @@ export const AcceptedOrdersList = () => {
   const [modalType, setModalType] = useState("");
   const [loading, setLoading] = useState(true);
   const [loadingOptions, setLoadingOptions] = useState(false);
-
   const [width, setWidth] = useState(Dimensions.get('window').width);
-  const [numColumns, setNumColumns] = useState(printRows(width));
-  const [cardSize, setCardSize] = useState(width / numColumns);
+  const [numColumns, setNumColumns] = useState(getColumnsByScreenSize(width));
+  const [cardSize, setCardSize] = useState(getCardSize(width, numColumns));
 
   const { dictionary, languageId } = useContext(LanguageContext);
 
@@ -85,15 +89,14 @@ export const AcceptedOrdersList = () => {
     setModalType(type);
     setVisible(true);
   };
-
   // Update layout on dimension change
   useEffect(() => {
     const updateLayout = () => {
       const newWidth = Dimensions.get('window').width;
-      const columns = printRows(newWidth);
+      const columns = getColumnsByScreenSize(newWidth);
       setWidth(newWidth);
       setNumColumns(columns);
-      setCardSize(newWidth / columns);
+      setCardSize(getCardSize(newWidth, columns));
     };
 
     const subscription = Dimensions.addEventListener('change', updateLayout);
@@ -165,7 +168,6 @@ export const AcceptedOrdersList = () => {
       setLoadingOptions(true);
     }
   }, [itemId]);
-
   const RenderEnteredOrdersList = ({ item }) => {
     const additionalFees = parseFloat(item.service_fee) / 100;
     const feeData = JSON.parse(item.fees_details || '{}');
@@ -178,7 +180,11 @@ export const AcceptedOrdersList = () => {
     }, []);
 
     return (
-      <Card key={item.id} style={styles.card}>
+      <View style={{
+        width: width / numColumns - (numColumns > 1 ? 15 : 30),
+        marginHorizontal: 5
+      }}>
+        <Card key={item.id} style={styles.card}>
         <TouchableOpacity onPress={() => toggleContent(item.id)}>
           <Card.Content style={styles.head}>
             <Text variant="headlineMedium" style={styles.header}>
@@ -189,9 +195,8 @@ export const AcceptedOrdersList = () => {
               {item.id}
             </Text>
             <Text style={styles.takeAway}>{item.take_away === 1 ? "(" + dictionary["orders.takeAway"] + ")" : ""}</Text>
-            <Text variant="headlineMedium" style={styles.header}>
-              <SimpleLineIcons
-                name={!isOpen.includes(item.id) ? "arrow-up" : "arrow-down"}
+            <Text variant="headlineMedium" style={styles.header}>            <SimpleLineIcons
+                name={isOpen.includes(item.id) ? "arrow-up" : "arrow-down"}
                 style={styles.rightIcon}
               />
             </Text>
@@ -281,8 +286,15 @@ export const AcceptedOrdersList = () => {
           </Card.Content>
         ) : null}
       </Card>
+      </View>
     );
   };
+
+  const getItemLayout = useCallback((data, index) => ({
+    length: cardSize,
+    offset: cardSize * index,
+    index,
+  }), [cardSize]);
 
   if (loading) {
     return <Loader show={loading} />;
@@ -294,8 +306,9 @@ export const AcceptedOrdersList = () => {
       <FlatList
         data={[{}]} // Dummy data for FlatList to use ListHeaderComponent
         renderItem={null} // No actual items to render
-        keyExtractor={() => 'dummy'} // Static key for dummy data
+        keyExtractor={() => 'dummy-header-content-accepted'} // Fixed key for the single dummy item
         showsVerticalScrollIndicator={false}
+        getItemLayout={getItemLayout}
         ListHeaderComponent={
           <View style={{ flexDirection: 'row', flexWrap: 'nowrap', flex: 1 }}>
             {visible ? (
@@ -308,15 +321,14 @@ export const AcceptedOrdersList = () => {
                 options={options}
                 PendingOrders={false}
               />
-            ) : null}
-            <FlatGrid
-              adjustGridToStyles={true}
-              itemDimension={cardSize}
+            ) : null}            <FlatList
+              key={`flat-list-${numColumns}`}
+              numColumns={numColumns}
+              getItemLayout={getItemLayout}
               spacing={10}
               data={orders}
               renderItem={({ item }) => <RenderEnteredOrdersList item={item} />}
               keyExtractor={(item) => (item && item.id ? item.id.toString() : '')}
-              itemContainerStyle={{ justifyContent: 'space-between' }}
               style={{ flex: 1 }}
               onEndReachedThreshold={0.5}
               removeClippedSubviews={true}

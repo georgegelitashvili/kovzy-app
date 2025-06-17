@@ -83,7 +83,7 @@ const OrderCard = ({
           </Text>
           <Text variant="headlineMedium" style={styles.header}>
             <SimpleLineIcons
-              name={isOpen ? "arrow-down" : "arrow-up"}
+              name={isOpen ? "arrow-up" : "arrow-down"}
               style={styles.rightIcon}
             />
           </Text>
@@ -91,23 +91,6 @@ const OrderCard = ({
       </TouchableOpacity>
 
       {isOpen && (
-        <Card.Content>
-          <OrderDetails
-            item={item}
-            dictionary={dictionary}
-            currency={currency}
-            deliveryPrice={deliveryPrice}
-            additionalFees={additionalFees}
-            feesDetails={feesDetails}
-          />
-
-          <Card.Actions>
-            {renderButtons()}
-          </Card.Actions>
-        </Card.Content>
-      )}
-
-      {!isOpen && (
         <Card.Content>
           <OrderDetails
             item={item}
@@ -152,7 +135,7 @@ const OrderDetails = ({ item, dictionary, currency, deliveryPrice, additionalFee
     )}
 
     {item.comment && (
-      <Text variant="titleSmall" style={styles.title} numberOfLines={2} ellipsizeMode="tail">
+      <Text variant="titleSmall" style={styles.title}>
         {dictionary["orders.comment"]}: {item.comment}
       </Text>
     )}
@@ -245,8 +228,8 @@ const styles = StyleSheet.create({
     fontSize: 25,
   },
   title: {
-    paddingVertical: 10,
-    lineHeight: 24,
+    paddingVertical: 8,
+    lineHeight: 20,
     fontSize: 14,
     flexWrap: 'wrap',
   },

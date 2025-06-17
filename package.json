@@ -40,7 +40,7 @@
     "expo": "53.0.11",
     "expo-application": "~6.1.4",
     "expo-asset": "~11.1.5",
-    "expo-av": "~15.1.5",
+    "expo-av": "~15.1.6",
     "expo-background-fetch": "~13.1.5",
     "expo-battery": "~9.1.4",
     "expo-constants": "~17.1.6",

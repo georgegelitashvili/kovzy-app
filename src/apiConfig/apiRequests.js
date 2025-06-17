@@ -8,7 +8,7 @@ import NetInfo from '@react-native-community/netinfo';
 const cache = new Map();
 const CACHE_DURATION = 5 * 60 * 1000;
 const RETRY_DELAY = 2000;  // Increased from 1000
-const MAX_RETRIES = 5;     // Increased from 3
+const MAX_RETRIES = 10;     // Increased from 3
 const INITIAL_TIMEOUT = 15000; // Increased from 10000
 
 const axiosInstance = axios.create({
@@ -104,13 +104,17 @@ const handleApiError = (error, dictionary) => {
   }
 
   // Use translated message if available
-  errorMessage = dictionary?.[`errors.${errorType}`] || errorMessage || dictionary?.['errors.UNKNOWN'] || 'An error occurred';
-  // Show error toast
+  errorMessage = dictionary?.[`errors.${errorType}`] || errorMessage || dictionary?.['errors.UNKNOWN'] || 'An error occurred';  // Show error toast
   eventEmitter.emit('showToast', {
     type: 'failed',
     title: dictionary ? dictionary["info.warning"] : 'Error',
     message: errorMessage
   });
+  
+  // Also emit an error event for ErrorDisplay components
+  if (global.errorHandler) {
+    global.errorHandler.setError(errorType, errorMessage);
+  }
 
   return {
     type: errorType,
@@ -170,6 +174,30 @@ axiosInstance.interceptors.response.use(
       data: error.response?.data
     });
 
+    // Add detailed network error logging
+    if (!error.response && (error.code === 'ERR_NETWORK' || error.message.includes('Network Error'))) {
+      console.error('Detailed Network Error:', {
+        errorCode: error.code,
+        errorMessage: error.message,
+        config: {
+          url: error.config?.url,
+          method: error.config?.method,
+          timeout: error.config?.timeout,
+        },
+        timestamp: new Date().toISOString(),
+      });
+
+      // Check current network state
+      NetInfo.fetch().then(state => {
+        console.log('Network State:', {
+          isConnected: state.isConnected,
+          isInternetReachable: state.isInternetReachable,
+          type: state.type,
+          details: state.details,
+        });
+      });
+    }
+
     // Get current dictionary from the LanguageContext
     let dictionary = null;
     try {
@@ -182,7 +210,8 @@ axiosInstance.interceptors.response.use(
     }
 
     // Handle specific error cases
-    if (error.response?.status === 401) {      try {
+    if (error.response?.status === 401) {
+      try {
         await SecureStore.deleteItemAsync('token');
         await SecureStore.deleteItemAsync('user');
         eventEmitter.emit('sessionExpired');
