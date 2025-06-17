@@ -27,10 +27,16 @@ import NotificationSound from '../../utils/NotificationSound';
 import NotificationManager from '../../utils/NotificationManager';
 
 
-const width = Dimensions.get("window").width;
-const numColumns = printRows(width);
-const cardSize = width / numColumns;
+const initialWidth = Dimensions.get("window").width;
+const getColumnsByScreenSize = (screenWidth) => {
+  if (screenWidth < 600) return 1; // Mobile phones
+  if (screenWidth < 960) return 2; // Tablets
+  return 3; // Larger screens
+};
 
+const initialColumns = getColumnsByScreenSize(initialWidth);
+const getCardSize = (width, columns) => width / columns - (columns > 1 ? 15 : 30);
+let newOrderCount;
 const type = 1;
 
 // render entered orders function
@@ -57,11 +63,10 @@ export const EnteredOrdersList = () => {
   const [isOpen, setOpenState] = useState([]);
   const [modalType, setModalType] = useState("");
   const [loading, setLoading] = useState(true);
-  const [loadingOptions, setLoadingOptions] = useState(false);
-  const [isPickerVisible, setPickerVisible] = useState(false);
+  const [loadingOptions, setLoadingOptions] = useState(false);  const [isPickerVisible, setPickerVisible] = useState(false);
   const [width, setWidth] = useState(Dimensions.get('window').width);
-  const [numColumns, setNumColumns] = useState(printRows(width));
-  const [cardSize, setCardSize] = useState(width / numColumns);
+  const [numColumns, setNumColumns] = useState(getColumnsByScreenSize(width));
+  const [cardSize, setCardSize] = useState(getCardSize(width, numColumns));
   const [previousOrderCount, setPreviousOrderCount] = useState(0);
 
   const [retryCount, setRetryCount] = useState(0);
@@ -117,14 +122,13 @@ export const EnteredOrdersList = () => {
       setIsNotificationReady(false);
     };
   }, [NotificationSoundRef]);
-
   useEffect(() => {
     const updateLayout = () => {
       const newWidth = Dimensions.get('window').width;
-      const columns = printRows(newWidth);
+      const columns = getColumnsByScreenSize(newWidth);
       setWidth(newWidth);
       setNumColumns(columns);
-      setCardSize(newWidth / columns);
+      setCardSize(getCardSize(newWidth, columns));
     };
 
     const subscription = Dimensions.addEventListener('change', updateLayout);
@@ -271,108 +275,118 @@ export const EnteredOrdersList = () => {
     }, []);
 
     return (
-      <Card key={item.id} style={styles.card}>
-        <TouchableOpacity onPress={() => toggleContent(item.id)}>
-          <Card.Content style={styles.head}>
-            <Text variant="headlineMedium" style={styles.header}>
-              <MaterialCommunityIcons
-                name="music-accidental-sharp"
-                style={styles.leftIcon}
-              />
-              {item.id}
-            </Text>
-            <Text style={styles.takeAway}>{item.take_away === 1 ? "(" + dictionary["orders.takeAway"] + ")" : ""}</Text>
-            <Text variant="headlineMedium" style={styles.header}>
-              <SimpleLineIcons
-                name={!isOpen.includes(item.id) ? "arrow-up" : "arrow-down"}
-                style={styles.rightIcon}
-              />
-            </Text>
-          </Card.Content>
-        </TouchableOpacity>
-        {!isOpen.includes(item.id) ? (
-          <Card.Content>
-            <Text variant="titleSmall" style={styles.title}>
-              {dictionary["orders.status"]}: {dictionary["orders.pending"]}
-            </Text>
-
-            <Text variant="titleSmall" style={styles.title} numberOfLines={2} ellipsizeMode="tail">
-              {dictionary["orders.fName"]}: {item.firstname} {item.lastname}
-            </Text>
-
-            <Text variant="titleSmall" style={styles.title}>
-              {dictionary["orders.phone"]}: {item.phone_number}
-            </Text>
-
-
-            {item.comment ? (
-              <Text variant="titleSmall" style={styles.title} numberOfLines={2} ellipsizeMode="tail">
-                {dictionary["orders.comment"]}: {item.comment}
+      <View style={{
+        width: width / numColumns - (numColumns > 1 ? 15 : 30),
+        marginHorizontal: 5
+      }}>
+        <Card key={item.id} style={styles.card}>
+          <TouchableOpacity onPress={() => toggleContent(item.id)}>
+            <Card.Content style={styles.head}>
+              <Text variant="headlineMedium" style={styles.header}>
+                <MaterialCommunityIcons
+                  name="music-accidental-sharp"
+                  style={styles.leftIcon}
+                />
+                {item.id}
               </Text>
-            ) : null}
+              <Text style={styles.takeAway}>{item.take_away === 1 ? "(" + dictionary["orders.takeAway"] + ")" : ""}</Text>
+              <Text variant="headlineMedium" style={styles.header}>              <SimpleLineIcons
+                  name={isOpen.includes(item.id) ? "arrow-up" : "arrow-down"}
+                  style={styles.rightIcon}
+                />
+              </Text>
+            </Card.Content>
+          </TouchableOpacity>
+          {!isOpen.includes(item.id) ? (
+            <Card.Content>
+              <Text variant="titleSmall" style={styles.title}>
+                {dictionary["orders.status"]}: {dictionary["orders.pending"]}
+              </Text>
 
-            <Text variant="titleSmall" style={styles.title} numberOfLines={2} ellipsizeMode="tail">
-              {dictionary["orders.paymentMethod"]}: {item.payment_type}
-            </Text>
+              <Text variant="titleSmall" style={styles.title} numberOfLines={2} ellipsizeMode="tail">
+                {dictionary["orders.fName"]}: {item.firstname} {item.lastname}
+              </Text>
 
-            <Divider />
-            <OrdersDetail orderId={item.id} />
-            <Divider />
+              <Text variant="titleSmall" style={styles.title}>
+                {dictionary["orders.phone"]}: {item.phone_number}
+              </Text>
 
-            <Text variant="titleMedium" style={styles.title}> {dictionary["orders.initialPrice"]}: {item.real_price} {currency}</Text>
 
-            <Text variant="titleMedium" style={styles.title}> {dictionary["orders.discountedPrice"]}: {item.price} {currency}</Text>
-
-            <Text variant="titleMedium" style={styles.title}> {dictionary["orders.table"]}: {item.table_number}</Text>
-
-            {feesDetails?.length > 0 && (
-              <View>
-                <Text variant="titleMedium" style={styles.title}>
-                  {dictionary["orders.additionalFees"]}: {additionalFees} {currency}
+              {item.comment ? (
+                <Text variant="titleSmall" style={styles.title}>
+                  {dictionary["orders.comment"]}: {item.comment}
                 </Text>
-                <View style={styles.feeDetailsContainer}>
-                  {feesDetails.map((fee, index) => (
-                    <Text key={index} style={styles.feeDetailText}>
-                      {fee} {currency}
-                    </Text>
-                  ))}
+              ) : null}
+
+              <Text variant="titleSmall" style={styles.title} numberOfLines={2} ellipsizeMode="tail">
+                {dictionary["orders.paymentMethod"]}: {item.payment_type}
+              </Text>
+
+              <Divider />
+              <OrdersDetail orderId={item.id} />
+              <Divider />
+
+              <Text variant="titleMedium" style={styles.title}> {dictionary["orders.initialPrice"]}: {item.real_price} {currency}</Text>
+
+              <Text variant="titleMedium" style={styles.title}> {dictionary["orders.discountedPrice"]}: {item.price} {currency}</Text>
+
+              <Text variant="titleMedium" style={styles.title}> {dictionary["orders.table"]}: {item.table_number}</Text>
+
+              {feesDetails?.length > 0 && (
+                <View>
+                  <Text variant="titleMedium" style={styles.title}>
+                    {dictionary["orders.additionalFees"]}: {additionalFees} {currency}
+                  </Text>
+                  <View style={styles.feeDetailsContainer}>
+                    {feesDetails.map((fee, index) => (
+                      <Text key={index} style={styles.feeDetailText}>
+                        {fee} {currency}
+                      </Text>
+                    ))}
+                  </View>
                 </View>
-              </View>
-            )}
+              )}
 
-            <Text variant="titleMedium" style={styles.title}>
-              {dictionary["orders.totalcost"]}: {item.total_cost} {currency}
-            </Text>
-            <Card.Actions>
-              <TouchableOpacity
-                style={styles.buttonAccept}
-                onPress={() => {
-                  setItemId(item.id);
-                  setItemTakeAway(item.take_away);
-                  showModal("accept");
-                }}
-              >
-                <MaterialCommunityIcons name="check-decagram-outline" size={30} color="white" />
-              </TouchableOpacity>
+              <Text variant="titleMedium" style={styles.title}>
+                {dictionary["orders.totalcost"]}: {item.total_cost} {currency}
+              </Text>
+              <Card.Actions>
+                <TouchableOpacity
+                  style={styles.buttonAccept}
+                  onPress={() => {
+                    setItemId(item.id);
+                    setItemTakeAway(item.take_away);
+                    showModal("accept");
+                  }}
+                >
+                  <MaterialCommunityIcons name="check-decagram-outline" size={30} color="white" />
+                </TouchableOpacity>
 
 
-              <TouchableOpacity
-                style={styles.buttonReject}
-                onPress={() => {
-                  setItemId(item.id);
-                  setItemTakeAway(null);
-                  showModal("reject");
-                }}
-              >
-                <MaterialCommunityIcons name="close-circle-outline" size={30} color="white" />
-              </TouchableOpacity>
-            </Card.Actions>
+                <TouchableOpacity
+                  style={styles.buttonReject}
+                  onPress={() => {
+                    setItemId(item.id);
+                    setItemTakeAway(null);
+                    showModal("reject");
+                  }}
+                >
+                  <MaterialCommunityIcons name="close-circle-outline" size={30} color="white" />
+                </TouchableOpacity>
+              </Card.Actions>
 
-          </Card.Content>
-        ) : null}
-      </Card>
+            </Card.Content>
+          ) : null}
+        </Card>
+      </View>
     )
   };
+
+  const getItemLayout = useCallback((data, index) => ({
+    length: cardSize,
+    offset: cardSize * index,
+    index,
+  }), [cardSize]);
 
   return (
     <View style={{ flex: 1, width: width }}>
@@ -390,7 +404,7 @@ export const EnteredOrdersList = () => {
         <FlatList
           data={[{}]} // Dummy data for the FlatList since we're using ListHeaderComponent for main content
           renderItem={null} // No items in the FlatList itself
-            keyExtractor={() => Math.random().toString()} // Static key for the dummy item
+            keyExtractor={() => 'dummy-header-content'} // Fixed key for the single dummy item
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={
             <View style={{ flexDirection: 'row', flexWrap: 'nowrap', flex: 1 }}>
@@ -406,18 +420,17 @@ export const EnteredOrdersList = () => {
                   PendingOrders={true}
                 />
               )}
-
-              <FlatGrid
-                adjustGridToStyles={true}
-                itemDimension={cardSize}
+              <FlatList
+                key={`flat-list-${numColumns}`}
+                numColumns={numColumns}
                 spacing={10}
                 data={orders}
                 renderItem={renderEnteredOrdersList}
                 keyExtractor={(item) => (item && item.id ? item.id.toString() : '')}
-                itemContainerStyle={{ justifyContent: 'space-between' }}
                 style={{ flex: 1 }}
                 onEndReachedThreshold={0.5}
                 removeClippedSubviews={true}
+                getItemLayout={getItemLayout}
               />
             </View>
           }
@@ -498,8 +511,8 @@ const styles = StyleSheet.create({
     marginHorizontal: 5,
   },
   title: {
-    paddingVertical: 10,
-    lineHeight: 24,
+    paddingVertical: 8,
+    lineHeight: 20,
     fontSize: 14,
     flexWrap: 'wrap',
   },

@@ -5,6 +5,7 @@ import {
   View,
   TouchableOpacity,
   ActivityIndicator,
+  FlatList
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { Text, Divider, Card } from "react-native-paper";
@@ -17,12 +18,17 @@ import { LanguageContext } from "../Language";
 import axiosInstance from "../../apiConfig/apiRequests";
 import OrdersDetail from "../OrdersDetail";
 import OrdersModal from "../modal/OrdersModalQr";
-import printRows from "../../PrintRows";
 import OrdersFilters from "./OrdersFilters";
 
-const width = Dimensions.get("window").width;
-const numColumns = printRows(width);
-const cardSize = width / numColumns;
+const initialWidth = Dimensions.get("window").width;
+const getColumnsByScreenSize = (screenWidth) => {
+  if (screenWidth < 600) return 1; // Mobile phones
+  if (screenWidth < 960) return 2; // Tablets
+  return 3; // Larger screens
+};
+
+const initialColumns = getColumnsByScreenSize(initialWidth);
+const getCardSize = (width, columns) => width / columns - (columns > 1 ? 15 : 30);
 
 export const OrdersListBase = ({ orderType }) => {
   const [filters, setFilters] = useState({
@@ -44,12 +50,15 @@ export const OrdersListBase = ({ orderType }) => {
   const [visible, setVisible] = useState(false);
   const [itemId, setItemId] = useState(null);
   const [isOpen, setOpenState] = useState([]);
-  const [modalType, setModalType] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [modalType, setModalType] = useState("");  const [loading, setLoading] = useState(true);
   const [loadingOptions, setLoadingOptions] = useState(false);
 
   const [loadingMore, setLoadingMore] = useState(false); // For infinite scroll
   const [hasMore, setHasMore] = useState(true); // To check if more data is available
+  
+  const [width, setWidth] = useState(Dimensions.get('window').width);
+  const [numColumns, setNumColumns] = useState(getColumnsByScreenSize(width));
+  const [cardSize, setCardSize] = useState(getCardSize(width, numColumns));
 
   const { dictionary, languageId } = useContext(LanguageContext);
 
@@ -148,7 +157,6 @@ export const OrdersListBase = ({ orderType }) => {
       return () => { };
     }, [options, branchid, languageId, filters])
   );
-
   useEffect(() => {
     if (domain && branchid) {
       apiOptions();
@@ -157,7 +165,20 @@ export const OrdersListBase = ({ orderType }) => {
       setOrders([]);
     }
   }, [domain, branchid, apiOptions]);
+  
+  // Update layout on dimension change
+  useEffect(() => {
+    const updateLayout = () => {
+      const newWidth = Dimensions.get('window').width;
+      const columns = getColumnsByScreenSize(newWidth);
+      setWidth(newWidth);
+      setNumColumns(columns);
+      setCardSize(getCardSize(newWidth, columns));
+    };
 
+    const subscription = Dimensions.addEventListener('change', updateLayout);
+    return () => subscription?.remove();
+  }, []);
   const RenderEnteredOrdersList = memo(({ item, toggleContent, isOpen, dictionary, currency, fees }) => {
     const trackLink = [JSON.parse(item.deliveron_data)]?.map(link => {
       return link.trackLink ?? null;
@@ -173,94 +194,98 @@ export const OrdersListBase = ({ orderType }) => {
     }, []);
 
     return (
-      <Card key={item.id} style={styles.card}>
-        <TouchableOpacity onPress={() => toggleContent(item.id)}>
-          <Card.Content style={styles.head}>
-            <Text variant="headlineMedium" style={styles.header}>
-              <MaterialCommunityIcons
-                name="music-accidental-sharp"
-                style={styles.leftIcon}
-              />
-              {item.id}
-            </Text>
-            <Text style={styles.takeAway}>
-              {item.take_away === 1 ? "(" + dictionary["orders.takeAway"] + ")" : ""}
-            </Text>
-            <Text variant="headlineMedium" style={styles.header}>
-              <SimpleLineIcons
-                name={!isOpen.includes(item.id) ? "arrow-up" : "arrow-down"}
-                style={styles.rightIcon}
-              />
-            </Text>
-          </Card.Content>
-        </TouchableOpacity>
+      <View style={{
+        width: width / numColumns - (numColumns > 1 ? 15 : 30),
+        marginHorizontal: 5
+      }}>
+        <Card style={styles.card}>
+          <TouchableOpacity onPress={() => toggleContent(item.id)}>
+            <Card.Content style={styles.head}>
+              <Text variant="headlineMedium" style={styles.header}>
+                <MaterialCommunityIcons
+                  name="music-accidental-sharp"
+                  style={styles.leftIcon}
+                />
+                {item.id}
+              </Text>
+              <Text style={styles.takeAway}>
+                {item.take_away === 1 ? "(" + dictionary["orders.takeAway"] + ")" : ""}
+              </Text>
+              <Text variant="headlineMedium" style={styles.header}>
+                <SimpleLineIcons
+                  name={isOpen.includes(item.id) ? "arrow-up" : "arrow-down"}
+                  style={styles.rightIcon}
+                />
+              </Text>
+            </Card.Content>
+          </TouchableOpacity>
 
-        {!isOpen.includes(item.id) ? (
-          <Card.Content>
-            <Text variant="titleSmall" style={styles.title}>
-              {dictionary["orders.status"]}: {item.status === 2 ? dictionary["filter.prepared"] : dictionary["filter.cancelled"]}
-            </Text>
-            <Text variant="titleSmall" style={styles.title} numberOfLines={2} ellipsizeMode="tail">
-              {dictionary["orders.fName"]}: {item.firstname} {item.lastname}
-            </Text>
-            <Text variant="titleSmall" style={styles.title}>
-              {dictionary["orders.phone"]}: {item.phone_number}
-            </Text>
-            {trackLink[0] && (
-              <TouchableOpacity onPress={() => openURLInBrowser(trackLink[0].toString())}>
-                <Text variant="titleSmall" style={styles.title}>
-                  {"Tracking link:"} <Text style={[styles.title, { color: '#3490dc' }]}>{trackLink[0]}</Text>
-                </Text>
-              </TouchableOpacity>
-            )}
-            {item.delivery_scheduled && (
-              <Text variant="titleSmall" style={styles.title} numberOfLines={2} ellipsizeMode="tail">
-                {dictionary["orders.scheduledDeliveryTime"]}: {item.delivery_scheduled}
+          {!isOpen.includes(item.id) ? (
+            <Card.Content>
+              <Text variant="titleSmall" style={styles.title}>
+                {dictionary["orders.status"]}: {item.status === 2 ? dictionary["filter.prepared"] : dictionary["filter.cancelled"]}
               </Text>
-            )}
-            {item.comment && (
               <Text variant="titleSmall" style={styles.title} numberOfLines={2} ellipsizeMode="tail">
-                {dictionary["orders.comment"]}: {item.comment}
+                {dictionary["orders.fName"]}: {item.firstname} {item.lastname}
               </Text>
-            )}
-            <Text variant="titleSmall" style={styles.title} numberOfLines={2} ellipsizeMode="tail">
-              {dictionary["orders.paymentMethod"]}: {item.payment_type}
-            </Text>
-            <Divider />
-            <OrdersDetail orderId={item.id} />
-            <Divider />
-            <Text variant="titleMedium" style={styles.title}>
-              {dictionary["orders.initialPrice"]}: {item.real_price} {currency}
-            </Text>
-            <Text variant="titleMedium" style={styles.title}>
-              {dictionary["orders.discountedPrice"]}: {item.price} {currency}
-            </Text>
-            <Text variant="titleMedium" style={styles.title}>
-              {dictionary["orders.table"]}: {item.table_number}
-            </Text>
-            {feesDetails?.length > 0 && (
-              <View>
-                <Text variant="titleMedium" style={styles.title}>
-                  {dictionary["orders.additionalFees"]}: {additionalFees} {currency}
+              <Text variant="titleSmall" style={styles.title}>
+                {dictionary["orders.phone"]}: {item.phone_number}
+              </Text>
+              {trackLink[0] && (
+                <TouchableOpacity onPress={() => openURLInBrowser(trackLink[0].toString())}>
+                  <Text variant="titleSmall" style={styles.title}>
+                    {"Tracking link:"} <Text style={[styles.title, { color: '#3490dc' }]}>{trackLink[0]}</Text>
+                  </Text>
+                </TouchableOpacity>
+              )}
+              {item.delivery_scheduled && (
+                <Text variant="titleSmall" style={styles.title} numberOfLines={2} ellipsizeMode="tail">
+                  {dictionary["orders.scheduledDeliveryTime"]}: {item.delivery_scheduled}
                 </Text>
-                <View style={styles.feeDetailsContainer}>
-                  {feesDetails.map((fee, index) => (
-                    <Text key={index} style={styles.feeDetailText}>
-                      {fee} {currency}
-                    </Text>
-                  ))}
+              )}
+              {item.comment && (
+                <Text variant="titleSmall" style={styles.title} numberOfLines={2} ellipsizeMode="tail">
+                  {dictionary["orders.comment"]}: {item.comment}
+                </Text>
+              )}
+              <Text variant="titleSmall" style={styles.title} numberOfLines={2} ellipsizeMode="tail">
+                {dictionary["orders.paymentMethod"]}: {item.payment_type}
+              </Text>
+              <Divider />
+              <OrdersDetail orderId={item.id} />
+              <Divider />
+              <Text variant="titleMedium" style={styles.title}>
+                {dictionary["orders.initialPrice"]}: {item.real_price} {currency}
+              </Text>
+              <Text variant="titleMedium" style={styles.title}>
+                {dictionary["orders.discountedPrice"]}: {item.price} {currency}
+              </Text>
+              <Text variant="titleMedium" style={styles.title}>
+                {dictionary["orders.table"]}: {item.table_number}
+              </Text>
+              {feesDetails?.length > 0 && (
+                <View>
+                  <Text variant="titleMedium" style={styles.title}>
+                    {dictionary["orders.additionalFees"]}: {additionalFees} {currency}
+                  </Text>
+                  <View style={styles.feeDetailsContainer}>
+                    {feesDetails.map((fee, index) => (
+                      <Text key={index} style={styles.feeDetailText}>
+                        {fee} {currency}
+                      </Text>
+                    ))}
+                  </View>
                 </View>
-              </View>
-            )}
-            <Text variant="titleMedium" style={styles.title}>
-              {dictionary["orders.totalcost"]}: {item.total_cost} {currency}
-            </Text>
-          </Card.Content>
-        ) : null}
-      </Card>
+              )}
+              <Text variant="titleMedium" style={styles.title}>
+                {dictionary["orders.totalcost"]}: {item.total_cost} {currency}
+              </Text>
+            </Card.Content>
+          ) : null}
+        </Card>
+      </View>
     );
   });
-
   const renderItem = useCallback(({ item }) => {
     return (
       <RenderEnteredOrdersList
@@ -272,7 +297,13 @@ export const OrdersListBase = ({ orderType }) => {
         fees={fees}
       />
     );
-  }, [toggleContent, isOpen, dictionary, currency, fees]);
+  }, [toggleContent, isOpen, dictionary, currency, fees, width, numColumns]);
+
+  const getItemLayout = useCallback((data, index) => ({
+    length: cardSize,
+    offset: cardSize * index,
+    index,
+  }), [cardSize]);
 
   if (loading) {
     return <Loader show={loading} />;
@@ -298,14 +329,16 @@ export const OrdersListBase = ({ orderType }) => {
             PendingOrders={false}
           />
         ) : null}
-
+        
         <FlatGrid
+          key={`flat-grid-${numColumns}`}
           adjustGridToStyles={true}
           itemDimension={cardSize}
           spacing={10}
           data={orders}
-          keyExtractor={(item) => `${item.id}-${item.created_at}`} 
+          keyExtractor={(item) => String(item.id)} 
           renderItem={renderItem}
+          getItemLayout={getItemLayout}
           itemContainerStyle={{ justifyContent: 'space-between' }}
           style={{ flex: 1, width: "100%" }}
           onEndReached={() => fetchAcceptedOrders()}

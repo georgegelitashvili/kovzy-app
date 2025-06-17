@@ -8,6 +8,8 @@ import { AuthContext } from "../../context/AuthProvider";
 import Loader from "../generate/loader";
 import { LanguageContext } from "../Language";
 import axiosInstance from "../../apiConfig/apiRequests";
+import ErrorDisplay from "../generate/ErrorDisplay";
+import useErrorHandler from "../../hooks/useErrorHandler";
 
 const width = Dimensions.get("window").width;
 
@@ -24,7 +26,7 @@ export default function ProductsDetail({ navigation, route }) {
   const [isOpen, setOpenState] = useState([]);
   const [value, setValue] = useState("");
   const [enabled, setEnabled] = useState("");
-  const [error, setError] = useState(null);
+  const { error, setError, setApiError, clearError } = useErrorHandler();
 
   useEffect(() => {
     const removeSubscription = NetInfo.addEventListener((state) => {
@@ -43,11 +45,10 @@ export default function ProductsDetail({ navigation, route }) {
   useEffect(() => {
     handleTogglePack();
   }, [value, customizableId, enabled]);
-
   const fetchData = async () => {
     if (!domain || !branchid) return;
     
-    setError(null);
+    clearError();
     try {
       const response = await axiosInstance.post(
         `https://${domain}/api/v1/admin/getCustomizablePack`,
@@ -62,28 +63,35 @@ export default function ProductsDetail({ navigation, route }) {
         setCustomizable(response.data.customizable);
       } else {
         setCustomizable([]);
-        setError('No customizable packs found');
+        setError('NOT_FOUND', 'No customizable packs found');
       }
     } catch (error) {
       console.error('Error fetching customizable packs:', error);
       setCustomizable([]);
       
       if (error.response?.status === 404) {
-        setError('No customizable packs available');
+        setError('NOT_FOUND', 'No customizable packs available');
       } else if (error.response?.status === 401) {
         setIsDataSet(false);
-        setError('Authentication failed. Please login again.');
+        setError('UNAUTHORIZED', 'Authentication failed. Please login again.');
       } else {
-        setError(`Failed to fetch data: ${error.response?.data?.error?.message || 'Unknown error'}`);
+        // If we get a formatted error from our API interceptor
+        if (error.type && error.message) {
+          setApiError(error);
+        } else {
+          setError('SERVER_ERROR', 
+            error.response?.data?.error?.message || 'Failed to fetch customizable packs');
+        }
       }
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleTogglePack = async () => {
+  };  const handleTogglePack = async () => {
     if (!domain || !branchid || !value) return;
-
+    
+    clearError();
+    setLoading(true);
+    
     try {
       const response = await axiosInstance.post(
         `https://${domain}/api/v1/admin/customizablePackActivity`,
@@ -98,10 +106,22 @@ export default function ProductsDetail({ navigation, route }) {
       setProductEnabled(response.data.data);
       fetchData(); // Refresh data after toggle
       setCustomizableId("");
-      setValue("");
     } catch (error) {
       console.error('Error toggling pack:', error);
-      return;
+      
+      // Handle formatted API errors
+      if (error.type && error.message) {
+        setApiError(error);
+      } else if (error.response?.status === 401) {
+        setError('UNAUTHORIZED', 'Authentication failed. Please login again.');
+        setIsDataSet(false);
+      } else {
+        setError('SERVER_ERROR', 
+          error.response?.data?.error?.message || 'Failed to update customizable pack');
+      }
+    } finally {
+      setLoading(false);
+      setValue("");
     }
   };
 
@@ -158,40 +178,28 @@ export default function ProductsDetail({ navigation, route }) {
       </Card>
     );
   };
-
   if (loading) {
     return <Loader />;
   }
 
-  if (error) {
-    return (
-      <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>{error}</Text>
-        <Button 
-          mode="text" 
-          onPress={fetchData}
-          style={styles.retryButton}
-        >
-          <MaterialCommunityIcons
-            name="reload"
-            style={styles.leftIcon}
-          />
-        </Button>
-      </View>
-    );
-  }
-
   return (
-    <FlatGrid
-      itemDimension={width}
-      data={customizable || []}
-      maxItemsPerRow={4}
-      renderItem={({ item }) => <RenderCustomizableList item={item} />}
-      adjustGridToStyles={true}
-      contentContainerStyle={{ justifyContent: "flex-start" }}
-      keyExtractor={(item) => item.id.toString()}
-      removeClippedSubviews={true}
-    />
+    <View style={styles.container}>
+      <ErrorDisplay 
+        error={error} 
+        onDismiss={clearError} 
+        style={styles.errorDisplay} 
+      />
+      <FlatGrid
+        itemDimension={width}
+        data={customizable || []}
+        maxItemsPerRow={4}
+        renderItem={({ item }) => <RenderCustomizableList item={item} />}
+        adjustGridToStyles={true}
+        contentContainerStyle={{ justifyContent: "flex-start" }}
+        keyExtractor={(item) => item.id.toString()}
+        removeClippedSubviews={true}
+      />
+    </View>
   );
 }
 
@@ -199,6 +207,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 12,
     justifyContent: "flex-start",
+  },
+  errorDisplay: {
+    zIndex: 1000,
+    width: '92%',
+    alignSelf: 'center',
   },
   card: {
     backgroundColor: "#fff",
@@ -235,19 +248,5 @@ const styles = StyleSheet.create({
   button: {
     fontSize: 10,
     padding: 0,
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  errorText: {
-    textAlign: 'center',
-    marginBottom: 20,
-    color: '#f14c4c',
-  },
-  retryButton: {
-    marginTop: 10,
   },
 });

@@ -208,29 +208,24 @@ export const AuthProvider = ({ isConnected, children }) => {
           axiosInstance.post(apiUrls.branchStatus, { branchid }),
         ]);
 
-        console.log('Status responses:', {
-          deliveron: deliveronResponse?.data,
-          branch: branchResponse?.data
-        });
+        // console.log('Status responses:', {
+        //   deliveron: deliveronResponse?.data,
+        //   branch: branchResponse?.data
+        // });
 
-        if (!deliveronResponse?.data?.data || !branchResponse?.data?.data) {
+        const deliveronData = deliveronResponse?.data?.data;
+        const branchData = branchResponse?.data?.data;
+
+        if ([deliveronData, branchData].some(item => item == null)) {
           console.warn('Invalid response data:', {
-            deliveronData: deliveronResponse?.data,
-            branchData: branchResponse?.data
+            deliveronData,
+            branchData
           });
           throw new Error('Invalid response data');
         }
 
         const newDeliveronStatus = deliveronResponse?.data?.data?.status === 0;
         const newBranchStatus = branchResponse?.data?.data === true;
-
-        if (newBranchStatus !== branchEnabled) {
-          console.log('Branch status changing:', {
-            from: branchEnabled,
-            to: newBranchStatus,
-            reason: 'API response'
-          });
-        }
 
         setDeliveronEnabled(newDeliveronStatus);
         setBranchEnabled(newBranchStatus);
@@ -264,6 +259,7 @@ export const AuthProvider = ({ isConnected, children }) => {
         }
 
         if (errorResponse?.branch?.data === false) {
+          console.warn('Branch is disabled, setting branchEnabled to false');
           setBranchEnabled(false);
           setIsVisible(true);
           setIsInitialFetch(false);

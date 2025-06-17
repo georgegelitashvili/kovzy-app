@@ -5,6 +5,8 @@ import { Audio } from 'expo-av';
 import { Feather } from '@expo/vector-icons'; // Import Feather icons
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
+import useErrorDisplay from '../../hooks/useErrorDisplay';
+import ErrorManager from '../../utils/ErrorManager';
 
 
 const musicList = [
@@ -23,6 +25,7 @@ const NotificationScreen = ({ navigation }) => {
     const [playingMusicId, setPlayingMusicId] = useState(null);
     const [selectedMusic, setSelectedMusic] = useState(null); // No default music initially
     const [pressedCardId, setPressedCardId] = useState(null); // State to track pressed card
+    const { errorDisplay, setError, clearError } = useErrorDisplay({ showInline: true, style: styles.errorDisplay });
 
     useEffect(() => {
         // Load saved music from AsyncStorage
@@ -35,9 +38,9 @@ const NotificationScreen = ({ navigation }) => {
                 } else {
                     setSelectedMusic('1');
                     setPlayingMusicId('1');
-                }
-            } catch (error) {
+                }            } catch (error) {
                 console.log('Error loading saved music:', error);
+                setError('STORAGE_ERROR', 'Failed to load notification preferences');
             }
         };
         loadSavedMusic();
@@ -98,16 +101,18 @@ const NotificationScreen = ({ navigation }) => {
 
 
     const onSelectMusic = async (id, title) => {
-        // Toggle selection state of music only if it's not already selected
-        setSelectedMusic((prevSelected) => (prevSelected === id ? prevSelected : id));
+        // Toggle selection state of music only if it's not already selected        setSelectedMusic((prevSelected) => (prevSelected === id ? prevSelected : id));
 
         // Save the selected music ID to AsyncStorage
         try {
             await AsyncStorage.setItem('selectedMusicId', id);
             // Save the selected music title to AsyncStorage
             await AsyncStorage.setItem('selectedMusicTitle', title);
+            // Clear any previous errors
+            clearError();
         } catch (error) {
             console.log('Error saving selected music:', error);
+            setError('STORAGE_ERROR', 'Failed to save notification preferences');
         }
     };
 
@@ -141,10 +146,10 @@ const NotificationScreen = ({ navigation }) => {
     const handlePressOut = () => {
         setPressedCardId(null);
     };
-    console.log(selectedMusic, playingMusicId);
-    return (
+    console.log(selectedMusic, playingMusicId);    return (
         <TouchableWithoutFeedback onPress={handleOutsidePress}>
             <View style={styles.container}>
+                {errorDisplay}
                 <FlatList
                     data={musicList}
                     keyExtractor={(item) => item.id}
@@ -216,12 +221,16 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         color: '#333333',
         flex: 1, // Allow title to take available space
-    },
-    checkboxContainer: {
+    },    checkboxContainer: {
         justifyContent: 'center',
         alignItems: 'center',
         height: 24, // Ensure container has enough height to show the icon
         width: 24, // Ensure container has enough width to show the icon
+    },
+    errorDisplay: {
+        zIndex: 1000,
+        width: '92%',
+        alignSelf: 'center',
     },
 });
 

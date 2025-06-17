@@ -21,7 +21,23 @@ export const initialState = {
 export const orderReducer = (state, action) => {
   switch (action.type) {
     case 'SET_ORDERS':
-      // When orders are set, initialize all of them as open
+      // Get new order IDs that aren't in the current orders
+      const currentOrderIds = new Set(state.orders.map(order => order.id));
+      const newOrderIds = action.payload.orders
+        .filter(order => !currentOrderIds.has(order.id))
+        .map(order => order.id);
+
+      // For initial load, open all orders by default
+      // For subsequent loads, keep existing open/closed states and only open new orders
+      let updatedIsOpen;
+      if (state.orders.length === 0) {
+        // First load - open all orders
+        updatedIsOpen = [...action.payload.orders.map(order => order.id)];
+      } else {
+        // Subsequent loads - keep current open/closed states and add new orders as open
+        updatedIsOpen = [...state.isOpen, ...newOrderIds];
+      }
+      
       return {
         ...state,
         orders: action.payload.orders,
@@ -29,14 +45,16 @@ export const orderReducer = (state, action) => {
         currency: action.payload.currency,
         scheduled: action.payload.scheduled,
         loading: false,
-        isOpen: action.payload.orders.map(order => order.id) // Initialize all orders as open
+        isOpen: updatedIsOpen
       };
     case 'TOGGLE_CONTENT':
       const isOpen = [...state.isOpen];
       const index = isOpen.indexOf(action.payload);
       if (index > -1) {
+        // If ID is in the array, the card is open, so remove it to close it
         isOpen.splice(index, 1);
       } else {
+        // If ID is not in the array, the card is closed, so add it to open it
         isOpen.push(action.payload);
       }
       return { ...state, isOpen };
@@ -63,6 +81,18 @@ export const orderReducer = (state, action) => {
       };
     case 'SET_LOADING':
       return { ...state, loading: action.payload };
+    case 'BATCH_UPDATE':
+      return {
+        ...state,
+        ...action.payload,
+        ...(action.payload.modalState && {
+          visible: action.payload.modalState.visible,
+          modalType: action.payload.modalState.modalType,
+          itemId: action.payload.modalState.itemId,
+          itemTakeAway: action.payload.modalState.itemTakeAway
+        }),
+        ...(action.payload.deliveron && { deliveron: action.payload.deliveron })
+        };
     case 'SET_LOADING_OPTIONS':
       return { ...state, loadingOptions: action.payload };
     case 'UPDATE_ORDER_COUNT':
