@@ -98,11 +98,11 @@ export default function ProductsDetail({ navigation, route }) {
         {
           product_id: id,
           customizable_id: customizableId,
-          customizable_pack_id: value,
-          branch_id: branchid
+          customizablePackid: value,
+          branch_id: branchid,
+          enabled: enabled,
         }
       );
-      
       setProductEnabled(response.data.data);
       fetchData(); // Refresh data after toggle
       setCustomizableId("");
@@ -160,15 +160,15 @@ export default function ProductsDetail({ navigation, route }) {
                 </Text>
                 <Button
                   textColor="white"
-                  buttonColor={child.is_enabled && child.enabled? "#f14c4c" : "#2fa360"}
+                  buttonColor={child.enabled? "#f14c4c" : "#2fa360"}
                   style={styles.button}
                   onPress={() => {
                     setCustomizableId(item.id);
                     setValue(child.id);
-                    setEnabled(child.is_enabled ? 0 : 1);
+                    setEnabled(child.enabled ? 0 : 1);
                   }}
                 >
-                  {child.is_enabled ? dictionary["prod.disableProduct"] : dictionary["prod.enableProduct"]}
+                  {child.enabled ? dictionary["prod.disableProduct"] : dictionary["prod.enableProduct"]}
                 </Button>
               </View>
               <Divider style={{ marginVertical: 9 }} />
