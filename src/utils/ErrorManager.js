@@ -1,51 +1,17 @@
 import eventEmitter from '../utils/EventEmitter';
-
-// ONLY these errors should be shown to users - any other error types will be completely ignored
-const USER_VISIBLE_ERROR_TYPES = [
-  'NETWORK_ERROR',     // Only show network connectivity issues
-  'NOT_FOUND'          // Only show when requested data is not found
-];
-
-// Regex patterns to detect technical errors that should never be shown to users
-const TECHNICAL_ERROR_PATTERNS = [
-  /failed to load/i,
-  /music/i,
-  /audio/i,
-  /sound/i,
-  /cannot read/i,
-  /undefined/i,
-  /null/i,
-  /function/i,
-  /error code/i,
-  /exception/i,
-  /stack/i,
-  /syntax/i,
-  /reference/i,
-  /type error/i
-];
+import { USER_VISIBLE_ERROR_TYPES, TECHNICAL_ERROR_PATTERNS, shouldShowError } from './ErrorConstants';
 
 /**
  * Error management utilities for the application
  */
-class ErrorManager {
-  /**
+class ErrorManager {  /**
    * Determines if an error should be shown to a user
    * @param {string} type The error type
    * @param {string} message The error message
    * @returns {boolean} Whether the error should be shown
    */
   static shouldShowError(type, message) {
-    // Only show whitelisted error types
-    if (!USER_VISIBLE_ERROR_TYPES.includes(type)) {
-      return false;
-    }
-    
-    // Check if the message contains technical details
-    if (message && TECHNICAL_ERROR_PATTERNS.some(pattern => pattern.test(message))) {
-      return false;
-    }
-    
-    return true;
+    return shouldShowError(type, message);
   }
 
   /**
@@ -66,12 +32,11 @@ class ErrorManager {
     // For user-safe errors, proceed with displaying them
     if (global.errorHandler) {
       global.errorHandler.setError(type, message);
-    } else {
-      // Fallback to toast if global error handler is not available
+    } else {      // Fallback to toast if global error handler is not available
       eventEmitter.emit('showToast', {
         type: 'failed',
         title: 'Error',
-        message
+        subtitle: message
       });
     }
   }

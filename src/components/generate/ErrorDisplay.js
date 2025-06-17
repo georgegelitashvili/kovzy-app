@@ -3,31 +3,8 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useContext } from 'react';
 import { LanguageContext } from '../Language';
 import { theme } from '../../core/theme';
+import { USER_VISIBLE_ERROR_TYPES, TECHNICAL_ERROR_PATTERNS } from '../../utils/ErrorConstants';
 // Using text character instead of MaterialIcons to avoid rendering issues
-
-// ONLY these errors should be shown to users - any other error types will be completely ignored
-const USER_VISIBLE_ERROR_TYPES = [
-  'NETWORK_ERROR',     // Only show network connectivity issues
-  'NOT_FOUND'          // Only show when requested data is not found
-];
-
-// Regex patterns to detect technical errors that should never be shown to users
-const TECHNICAL_ERROR_PATTERNS = [
-  /failed to load/i,
-  /music/i,
-  /audio/i,
-  /sound/i,
-  /cannot read/i,
-  /undefined/i,
-  /null/i,
-  /function/i,
-  /error code/i,
-  /exception/i,
-  /stack/i,
-  /syntax/i,
-  /reference/i,
-  /type error/i
-];
 
 const ErrorDisplay = ({ error, style, onDismiss }) => {
   const { dictionary } = useContext(LanguageContext);
@@ -134,8 +111,7 @@ const styles = StyleSheet.create({
   },
   notFoundError: {
     color: '#455a64',
-  },
-  defaultError: {
+  },  defaultError: {
     color: theme.colors?.error || '#F44336',
   },
 });

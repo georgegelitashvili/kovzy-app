@@ -20,7 +20,7 @@ Notifications.setNotificationHandler({
 });
 
 // Class to manage toast notifications
-class NotificationManager {
+class ToastNotificationManager {
   static listeners = [];
 
   static showToast({ type, title, subtitle, duration }) {
@@ -227,3 +227,4 @@ const notificationManager = {
 };
 
 export default notificationManager;
+export { ToastNotificationManager };

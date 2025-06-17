@@ -1,37 +1,12 @@
 import React, { useRef, useEffect, useState, useContext } from "react";
-import { View, Text, StyleSheet, Animated, useWindowDimensions, TouchableOpacity, StatusBar, Platform } from "react-native";
+import { View, Text, StyleSheet, Animated, useWindowDimensions, TouchableOpacity, StatusBar } from "react-native";
 import Icon from "react-native-vector-icons/Ionicons";
 import { LanguageContext } from '../Language';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-// ONLY show these error types in toast
-const USER_VISIBLE_ERROR_TYPES = [
-  'NETWORK_ERROR',     // Only show network connectivity issues
-  'NOT_FOUND'          // Only show when requested data is not found
-];
-
-// Regex patterns to detect technical errors that should never be shown to users
-const TECHNICAL_ERROR_PATTERNS = [
-  /failed to load/i,
-  /music/i,
-  /audio/i,
-  /sound/i,
-  /cannot read/i,
-  /undefined/i,
-  /null/i,
-  /function/i,
-  /error code/i,
-  /exception/i,
-  /stack/i,
-  /syntax/i,
-  /reference/i,
-  /type error/i,
-  /has been rejected/i,    // Catch rejected promises
-  /update/i                // Catch update-related errors
-];
+import { USER_VISIBLE_ERROR_TYPES, TECHNICAL_ERROR_PATTERNS } from '../../utils/ErrorConstants';
 
 const Toast = ({ type, title, subtitle, animate, addStyles, onDismiss }) => {
-  const [value, setValue] = useState(0);
+  const [toastDuration, setToastDuration] = useState(0);
   const { dictionary } = useContext(LanguageContext);
   const insets = useSafeAreaInsets();
   
@@ -68,15 +43,14 @@ const Toast = ({ type, title, subtitle, animate, addStyles, onDismiss }) => {
 
   useEffect(() => {
     if (animate) {
-      animateToast();
-      // Auto-dismiss after a delay
+      animateToast();      // Auto-dismiss after a delay
       if (type !== "failed") {
-        setValue(3000); // Shorter display time (3 seconds) for normal toasts
+        setToastDuration(3000); // Shorter display time (3 seconds) for normal toasts
       } else {
-        setValue(5000); // Longer (5 seconds) for error messages
+        setToastDuration(5000); // Longer (5 seconds) for error messages
       }
     } else {
-      setValue(0);
+      setToastDuration(0);
     }
   }, [animate]);
 
@@ -102,7 +76,7 @@ const Toast = ({ type, title, subtitle, animate, addStyles, onDismiss }) => {
       if (onDismiss) {
         setTimeout(onDismiss, 400);
       }
-    }, value);
+    }, toastDuration);
   };
 
   const getLocalizedMessage = (message, type) => {
