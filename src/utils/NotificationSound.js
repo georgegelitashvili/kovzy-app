@@ -1,5 +1,5 @@
 import React, { useEffect, useContext, useRef, useImperativeHandle, forwardRef } from 'react';
-import { View, AppState } from 'react-native';
+import { View, AppState, Alert } from 'react-native';
 import { Audio } from 'expo-av';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { String, LanguageContext } from "../components/Language";
