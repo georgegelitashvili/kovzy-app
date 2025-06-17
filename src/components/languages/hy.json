@@ -9,8 +9,7 @@
     "admin": "Ադմինիստրատոր",
     "edit": "Խմբագրել",
     "save": "Պահպանել",
-    "remove": "Ջնջել",
-    "close": "Փակել",
+    "remove": "Ջնջել",    "close": "Փակել",
     "finish": "Ավարտել:",
     "update": "Թարմացնել",
     "refund": "Վերադարձնել",
@@ -541,8 +540,8 @@
     "errors.NGROK_ERROR": "Ngrok կապի սխալ",
     "errors.UNKNOWN": "Տեղի ունեցավ անհայտ սխալ",
     "errors.LOGIN_ERROR": "Մուտքի սխալ",
-    "errors.LOGOUT_ERROR": "Ելքի սխալ",
-    "errors.SESSION_EXPIRED": "Ձեր սեսիան ավարտվել է։ Խնդրում ենք կրկին մուտք գործել։",
+    "errors.LOGOUT_ERROR": "Ելքի սխալ",    "errors.SESSION_EXPIRED": "Ձեր սեսիան ավարտվել է։ Խնդրում ենք կրկին մուտք գործել։",
     "errors.CLEANUP_ERROR": "Սեսիայի տվյալների մաքրման սխալ",
-    "errors.UPDATE_ERROR": "Թարմացումների ստուգման սխալ"
+    "errors.UPDATE_ERROR": "Թարմացումների ստուգման սխալ",
+    "errors.USER_FRIENDLY": "Տեղի ունեցավ սխալ։ Խնդրում ենք փորձել կրկին։"
 }

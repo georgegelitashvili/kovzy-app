@@ -1,8 +1,9 @@
 import React, { useEffect, useContext, useRef, useImperativeHandle, forwardRef } from 'react';
-import { Alert, View, AppState } from 'react-native';
+import { View, AppState } from 'react-native';
 import { Audio } from 'expo-av';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { String, LanguageContext } from "../components/Language";
+import * as Sentry from '@sentry/react-native';
 
 const musicList = [
     { id: '1', title: 'Plucky', source: require('../assets/audio/plucky.mp3') },
@@ -49,34 +50,59 @@ const NotificationSound = forwardRef((props, ref) => {
                     repeatIntervalRef.current = null;
                 }
             } catch (error) {
-                console.log('Error stopping sound:', error);
+                // Just log audio errors, don't show to user
+                console.log('Audio stop error (suppressed):', error);
+                Sentry.captureException(error);
             }
         }
     };
 
-    const onPlaySound = async (musicId) => {
-        const music = musicList.find((item) => item.id === musicId);
-        if (!music) return;
-
-        // Stop and unload previous sound if any
-        if (soundRef.current) {
+    useImperativeHandle(ref, () => ({
+        playSound: async (options = {}) => {
+            const { repeat = false, selectedSound = '1', volume = 1.0 } = options;
+            await onPlaySound(repeat, selectedSound, volume);
+        },
+        stopSound: async () => {
             await onStopPlaySound();
         }
+    }));
 
-        // Set audio mode to play in the background
-        await Audio.setAudioModeAsync({
-            staysActiveInBackground: true, // Allow the sound to play when app is in background
-        });
-
-        // Create and play new sound
-        const { sound: newSound } = await Audio.Sound.createAsync(music.source);
-        soundRef.current = newSound;
+    const onPlaySound = async (repeat = false, selectedSound = '1', volume = 1.0) => {
         try {
-            await newSound.playAsync();
-            // Loop sound until stopped
-            newSound.setIsLoopingAsync(true);  // Set looping
+            // Stop any existing sound first
+            await onStopPlaySound();
+
+            // Find the selected sound
+            const music = musicList.find(m => m.id === selectedSound) || musicList[0];
+
+            // Load and play sound
+            const { sound } = await Audio.Sound.createAsync(
+                music.source,
+                { volume, shouldPlay: true }
+            );
+
+            soundRef.current = sound;
+            
+            // Configure repeat if needed
+            if (repeat) {
+                // Set up a repeat interval that waits for the sound to finish before playing again
+                sound.setOnPlaybackStatusUpdate(async (status) => {
+                    if (status.didJustFinish) {
+                        try {
+                            // Replay the sound
+                            await sound.replayAsync();
+                        } catch (error) {
+                            // Silently log audio errors
+                            console.log('Audio replay error (suppressed):', error);
+                            Sentry.captureException(error);
+                        }
+                    }
+                });
+            }
         } catch (error) {
-            console.log('Error playing sound:', error);
+            // Just log audio errors, don't show to user
+            console.log('Audio play error (suppressed):', error);
+            Sentry.captureException(error);
         }
     };
 

@@ -499,7 +499,7 @@
     "errors.UNKNOWN": "An unknown error occurred",
     "errors.LOGIN_ERROR": "Login failed",
     "errors.LOGOUT_ERROR": "Error logging out",
-    "errors.SESSION_EXPIRED": "Your session has expired. Please log in again.",
-    "errors.CLEANUP_ERROR": "Error cleaning up session data",
-    "errors.UPDATE_ERROR": "Error checking for updates"
+    "errors.SESSION_EXPIRED": "Your session has expired. Please log in again.",    "errors.CLEANUP_ERROR": "Error cleaning up session data",
+    "errors.UPDATE_ERROR": "Error checking for updates",
+    "errors.USER_FRIENDLY": "Something went wrong. Please try again later."
 }
