@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { StyleSheet, Button, View, Text, Modal } from 'react-native';
+import { StyleSheet, Button, View, Text, Modal, StatusBar } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as Sentry from '@sentry/react-native';
 import * as Updates from 'expo-updates';
@@ -8,9 +8,10 @@ import { useNetInfo } from '@react-native-community/netinfo';
 import { useKeepAwake } from 'expo-keep-awake';
 
 import Main from './src/Main';
-import Toast from './src/components/generate/Toast';
+import { ToastManager } from './src/utils/NotificationManager';
 import ErrorWrapper from './src/components/generate/ErrorWrapper';
 import useErrorHandler from './src/hooks/useErrorHandler';
+import eventEmitter from './src/utils/EventEmitter';
 
 // Sentry initialization
 Sentry.init({
@@ -48,55 +49,40 @@ function App() {
   // Monitor network status
   useEffect(() => {
     setIsConnected(netInfo.isConnected);
+    
+    // Show network status toast only if it changes to disconnected
+    if (netInfo.isConnected === false) {
+      eventEmitter.emit('showToast', {
+        type: 'failed',
+        title: 'Connection Error',
+        subtitle: 'Oops, Looks like your device is not connected to the internet'
+      });
+    }
   }, [netInfo.isConnected]);
 
-  // Set up global error handling
+  // Update checker
   useEffect(() => {
-    const handleAppCrash = () => {
-      setShowReloadButton(true);
-      Sentry.captureException(new Error('App crashed')); // Capture the crash in Sentry
+    const checkForUpdates = async () => {
+      try {
+        const update = await Updates.checkForUpdateAsync();
+        if (update.isAvailable) {
+          await Updates.fetchUpdateAsync();
+          Updates.reloadAsync();
+        }
+      } catch (error) {
+        // Don't show update errors to user
+        console.error('Error checking for updates:', error);
+        Sentry.captureException(error);
+      }
     };
 
-    const previousHandler = ErrorUtils.getGlobalHandler();
-    ErrorUtils.setGlobalHandler((error, isFatal) => {
-      if (isFatal) {
-        handleAppCrash();
-      } else {
-        Sentry.captureException(error); // Capture non-fatal errors
-        Toast.show({
-          type: 'error',
-          text1: 'Error',
-          text2: 'Something went wrong, but the app is still running.',
-        });
-      }
-
-      if (previousHandler) {
-        previousHandler(error, isFatal);
-      }
-    });
-
-    return () => {
-      ErrorUtils.setGlobalHandler(previousHandler);
-    };
+    checkForUpdates();
   }, []);
 
-  // App reload handler
+  // Handle app reloading
   const handleReload = async () => {
     try {
-      if (!Updates.isEmbeddedLaunch) {
-        console.warn('App reloads are not supported in Expo Go. Please build a standalone app.');
-        return;
-      }
-
-      const update = await Updates.checkForUpdateAsync();
-      if (update.isAvailable) {
-        await Updates.fetchUpdateAsync();
-        Sentry.captureMessage('App Updated and Reloaded');
-        await Updates.reloadAsync();
-      } else {
-        Sentry.captureMessage('App Reload Triggered without Update');
-        await Updates.reloadAsync();
-      }
+      await Updates.reloadAsync();
     } catch (error) {
       Sentry.captureException(error);
       console.error('Failed to reload app:', error);
@@ -110,19 +96,18 @@ function App() {
 
   return (
     <SafeAreaProvider>
+      <StatusBar
+        backgroundColor="transparent"
+        barStyle="dark-content"
+        translucent
+      />
       <ErrorBoundary>
         <ErrorWrapper>
           <Main isConnected={isConnected} />
+          <ToastManager />
         </ErrorWrapper>
       </ErrorBoundary>
-      {!isConnected && (
-        <Toast
-          type="failed"
-          title="Connection Error"
-          subtitle="Oops, Looks like your device is not connected to the internet"
-          animate={false}
-        />
-      )}
+      
       {(!isConnected || showReloadButton) && (
         <Modal visible={true} transparent={true}>
           <View style={styles.modalContainer}>
@@ -148,6 +133,8 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     marginBottom: 15,
+    fontWeight: '600',
+    textAlign: 'center',
   },
   errorFallback: {
     flex: 1,
@@ -156,10 +143,10 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   errorFallbackText: {
-    fontSize: 16,
+    fontSize: 18,
+    marginBottom: 20,
     textAlign: 'center',
-    marginBottom: 10,
-  },
+  }
 });
 
 export default Sentry.wrap(App);

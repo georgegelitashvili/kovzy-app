@@ -11,6 +11,30 @@ const RETRY_DELAY = 2000;  // Increased from 1000
 const MAX_RETRIES = 10;     // Increased from 3
 const INITIAL_TIMEOUT = 15000; // Increased from 10000
 
+// ONLY these errors should be shown to users - all others will be hidden
+const USER_VISIBLE_ERROR_TYPES = [
+  'NETWORK_ERROR',     // Only show network connectivity issues
+  'NOT_FOUND'          // Only show when requested data is not found
+];
+
+// Regex patterns to detect technical errors that should never be shown to users
+const TECHNICAL_ERROR_PATTERNS = [
+  /failed to load/i,
+  /music/i,
+  /audio/i,
+  /sound/i,
+  /cannot read/i,
+  /undefined/i,
+  /null/i,
+  /function/i,
+  /error code/i,
+  /exception/i,
+  /stack/i,
+  /syntax/i,
+  /reference/i,
+  /type error/i
+];
+
 const axiosInstance = axios.create({
   timeout: INITIAL_TIMEOUT,
   headers: {
@@ -36,12 +60,28 @@ const checkInternetConnection = async () => {
   return netInfo.isConnected && netInfo.isInternetReachable;
 };
 
+// Determines if an error should be shown to a user
+const shouldShowError = (errorType, errorMessage) => {
+  // Only show whitelisted error types
+  if (!USER_VISIBLE_ERROR_TYPES.includes(errorType)) {
+    return false;
+  }
+  
+  // Check if the message contains technical details
+  if (errorMessage && TECHNICAL_ERROR_PATTERNS.some(pattern => pattern.test(errorMessage))) {
+    return false;
+  }
+  
+  return true;
+};
+
 const handleApiError = (error, dictionary) => {
   let errorType = 'UNKNOWN';
   let errorMessage = '';
   let statusCode = error.response?.status;
+  let showToUser = false;
 
-  // Add detailed network error logging
+  // Add detailed network error logging (only for internal use)
   if (!error.response && (error.code === 'ERR_NETWORK' || error.message.includes('Network Error'))) {
     console.error('Detailed Network Error:', {
       errorCode: error.code,
@@ -54,18 +94,10 @@ const handleApiError = (error, dictionary) => {
       timestamp: new Date().toISOString(),
     });
 
-    // Check current network state
-    NetInfo.fetch().then(state => {
-      console.log('Network State:', {
-        isConnected: state.isConnected,
-        isInternetReachable: state.isInternetReachable,
-        type: state.type,
-        details: state.details,
-      });
-    });
-
+    // Network errors are the only ones we want to show to users
     errorType = 'NETWORK_ERROR';
     errorMessage = dictionary?.['errors.NETWORK_ERROR'] || 'ქსელთან კავშირის პრობლემა';
+    showToUser = true;
   } else if (!error.response && error.code === 'ECONNABORTED') {
     errorType = 'REQUEST_TIMEOUT';
     errorMessage = dictionary?.['errors.REQUEST_TIMEOUT'] || 'მოთხოვნის დრო ამოიწურა';
@@ -82,6 +114,7 @@ const handleApiError = (error, dictionary) => {
         break;
       case 404:
         errorType = 'NOT_FOUND';
+        showToUser = true; // NOT_FOUND is okay to show
         break;
       case 422:
         errorType = 'VALIDATION_ERROR';
@@ -104,23 +137,42 @@ const handleApiError = (error, dictionary) => {
   }
 
   // Use translated message if available
-  errorMessage = dictionary?.[`errors.${errorType}`] || errorMessage || dictionary?.['errors.UNKNOWN'] || 'An error occurred';  // Show error toast
-  eventEmitter.emit('showToast', {
-    type: 'failed',
-    title: dictionary ? dictionary["info.warning"] : 'Error',
-    message: errorMessage
-  });
+  const translatedMessage = dictionary?.[`errors.${errorType}`];
+  errorMessage = translatedMessage || errorMessage;
   
-  // Also emit an error event for ErrorDisplay components
-  if (global.errorHandler) {
-    global.errorHandler.setError(errorType, errorMessage);
+  // Double-check if this error should be shown
+  showToUser = shouldShowError(errorType, errorMessage);
+  
+  // Always log all errors for debugging
+  console.error('API Error (will' + (showToUser ? '' : ' not') + ' be shown to user):', {
+    type: errorType,
+    message: errorMessage,
+    statusCode,
+    url: error.config?.url,
+    response: error.response?.data
+  });
+
+  // Only show errors to the user if they are explicitly allowed
+  if (showToUser) {
+    // Show error toast for user-visible errors
+    eventEmitter.emit('showToast', {
+      type: 'failed',
+      title: dictionary ? dictionary["info.warning"] : 'Error',
+      message: errorMessage
+    });
+    
+    // Also emit an error event for ErrorDisplay components
+    if (global.errorHandler) {
+      global.errorHandler.setError(errorType, errorMessage);
+    }
   }
 
   return {
     type: errorType,
     message: errorMessage,
     statusCode,
-    originalError: error
+    originalError: error,
+    showToUser
   };
 };
 
@@ -165,39 +217,6 @@ axiosInstance.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
     
-    // Log detailed error information
-    console.error('API Error:', {
-      url: originalRequest?.url,
-      method: originalRequest?.method,
-      status: error.response?.status,
-      message: error.message,
-      data: error.response?.data
-    });
-
-    // Add detailed network error logging
-    if (!error.response && (error.code === 'ERR_NETWORK' || error.message.includes('Network Error'))) {
-      console.error('Detailed Network Error:', {
-        errorCode: error.code,
-        errorMessage: error.message,
-        config: {
-          url: error.config?.url,
-          method: error.config?.method,
-          timeout: error.config?.timeout,
-        },
-        timestamp: new Date().toISOString(),
-      });
-
-      // Check current network state
-      NetInfo.fetch().then(state => {
-        console.log('Network State:', {
-          isConnected: state.isConnected,
-          isInternetReachable: state.isInternetReachable,
-          type: state.type,
-          details: state.details,
-        });
-      });
-    }
-
     // Get current dictionary from the LanguageContext
     let dictionary = null;
     try {

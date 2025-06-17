@@ -15,6 +15,11 @@ class EventEmitter {
     this.events[eventName][id] = callback;
     return id;
   }
+  
+  // Alias for addEventListener (for compatibility with other event emitters)
+  addListener(eventName, callback) {
+    return this.addEventListener(eventName, callback);
+  }
 
   // Remove an event handler
   removeEventListener(listenerId) {
@@ -26,6 +31,11 @@ class EventEmitter {
         delete this.events[eventName][listenerId];
       }
     });
+  }
+  
+  // Alias for removeEventListener (for compatibility)
+  remove(listenerId) {
+    return this.removeEventListener(listenerId);
   }
 
   // Emit an event with optional data

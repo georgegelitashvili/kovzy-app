@@ -5,35 +5,56 @@ import { LanguageContext } from '../Language';
 import { theme } from '../../core/theme';
 // Using text character instead of MaterialIcons to avoid rendering issues
 
-const IMPORTANT_ERROR_TYPES = [
-  'NETWORK_ERROR',
-  'SERVER_ERROR',
-  'SERVICE_UNAVAILABLE',
-  'FORBIDDEN'
+// ONLY these errors should be shown to users - any other error types will be completely ignored
+const USER_VISIBLE_ERROR_TYPES = [
+  'NETWORK_ERROR',     // Only show network connectivity issues
+  'NOT_FOUND'          // Only show when requested data is not found
+];
+
+// Regex patterns to detect technical errors that should never be shown to users
+const TECHNICAL_ERROR_PATTERNS = [
+  /failed to load/i,
+  /music/i,
+  /audio/i,
+  /sound/i,
+  /cannot read/i,
+  /undefined/i,
+  /null/i,
+  /function/i,
+  /error code/i,
+  /exception/i,
+  /stack/i,
+  /syntax/i,
+  /reference/i,
+  /type error/i
 ];
 
 const ErrorDisplay = ({ error, style, onDismiss }) => {
   const { dictionary } = useContext(LanguageContext);
   
-  // Don't render anything if there's no error or it's not important
+  // Don't render anything if there's no error
   if (!error) return null;
-  if (error.type && !IMPORTANT_ERROR_TYPES.includes(error.type)) return null;
+
+  // Only show errors that are explicitly whitelisted for user visibility
+  if (!USER_VISIBLE_ERROR_TYPES.includes(error.type)) {
+    console.log('Suppressing error display for error type:', error.type);
+    return null; // Don't show the error at all
+  }
+
+  // Check if the error message contains technical details that should be hidden
+  const containsTechnicalDetails = TECHNICAL_ERROR_PATTERNS.some(pattern => 
+    pattern.test(error.message || '')
+  );
+  
+  if (containsTechnicalDetails) {
+    console.log('Suppressing error with technical details:', error.message);
+    return null; // Don't show errors with technical details
+  }
 
   const getErrorStyle = (errorType) => {
     switch (errorType) {
       case 'NETWORK_ERROR':
         return styles.networkError;
-      case 'UNAUTHORIZED':
-        return styles.authError;
-      case 'VALIDATION_ERROR':
-        return styles.validationError;
-      case 'SERVER_ERROR':
-      case 'SERVICE_UNAVAILABLE':
-        return styles.serverError;
-      case 'NGROK_ERROR':
-        return styles.ngrokError;
-      case 'FORBIDDEN':
-        return styles.forbiddenError;
       case 'NOT_FOUND':
         return styles.notFoundError;
       default:
@@ -50,7 +71,7 @@ const ErrorDisplay = ({ error, style, onDismiss }) => {
       return dictionary[`errors.${error.type}`];
     }
 
-    return dictionary?.['errors.UNKNOWN'] || 'An error occurred';
+    return dictionary?.['errors.UNKNOWN'] || 'Something went wrong. Please try again later.';
   };
 
   const handleDismiss = () => {
@@ -94,11 +115,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-  },  text: {
+  },  
+  text: {
     fontSize: 14,
     flex: 1,
     fontWeight: '500',
-  },  closeButton: {
+  },  
+  closeButton: {
     padding: 4,
   },
   closeIcon: {
@@ -107,21 +130,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   networkError: {
-    color: '#d32f2f',
-  },
-  authError: {
-    color: '#f57c00',
-  },
-  validationError: {
-    color: '#c2185b',
-  },
-  serverError: {
-    color: '#c62828',
-  },
-  ngrokError: {
-    color: '#4527a0',
-  },
-  forbiddenError: {
     color: '#d32f2f',
   },
   notFoundError: {
