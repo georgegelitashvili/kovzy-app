@@ -169,8 +169,8 @@ export default function OrdersDetail({ orderId }) {
                     {cust.packs.map((pack, pidx) => (
                       <View key={pidx} style={styles.nestedBulletItem}>
                         <Text style={styles.bullet}>◦</Text>
-                        <Text style={styles.option}>{pack.name}</Text>
-                        <Text style={styles.option}>({pack.quantity})</Text>
+                        <Text style={styles.option}>{pack.name} (x{pack.quantity})</Text>
+                        <Text></Text>
                       </View>
                     ))}
                   </View>
