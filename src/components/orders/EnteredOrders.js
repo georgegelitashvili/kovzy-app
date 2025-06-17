@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useContext, useRef, useReducer } from "react";
+import React, { useState, useEffect, useCallback, useContext, useRef, useReducer, useMemo } from "react";
 import {
   StyleSheet,
   Dimensions,
@@ -32,10 +32,17 @@ import OrderCard from "./OrderCard";
 import { handleDelaySet } from '../../utils/timeUtils';
 import { debounce } from 'lodash';
 
-const width = Dimensions.get("window").width;
-const numColumns = printRows(width);
-const cardSize = width / 2 - 15;
+const calculateColumns = (width) => {
+  const minCardWidth = 300; // Minimum width you want for each card
+  const maxColumns = Math.floor(width / minCardWidth);
+  return Math.max(1, maxColumns); // Ensure at least 1 column
+};
 
+const calculateCardSize = (width, columns) => {
+  const marginBetweenCards = 10;
+  const totalMargin = marginBetweenCards * (columns + 1);
+  return (width - totalMargin) / columns;
+};
 let newOrderCount;
 const type = 0;
 
@@ -46,9 +53,6 @@ export const EnteredOrdersList = () => {
   const NotificationSoundRef = useRef(null);
   const soundRef = useRef(null);
   const intervalRef = useRef(null);
-  const [width, setWidth] = useState(Dimensions.get('window').width);
-  const [numColumns, setNumColumns] = useState(printRows(width));
-  const [cardSize, setCardSize] = useState(width / 2 - 15);
   const [retryCount, setRetryCount] = useState(0);
   const [isPickerVisible, setPickerVisible] = useState(false);
   const [appState, setAppState] = useState(AppState.currentState);
@@ -63,14 +67,40 @@ export const EnteredOrdersList = () => {
   const processedOrdersRef = useRef(new Set());
   const lastOrdersRef = useRef(new Set());
   const isInitialFetchRef = useRef(true);
+  const [layoutKey, setLayoutKey] = useState(0);
+
+  // Corrected layout refs
+  const width = useRef(Dimensions.get('window').width);
+  const numColumns = useRef(calculateColumns(width.current));
+  const cardSize = useRef(calculateCardSize(width.current, numColumns.current));
 
   const MAX_RETRIES = 15;
   const RETRY_DELAY = 5000;
   const FETCH_INTERVAL = 3000;
   const DEBOUNCE_DELAY = 300;
 
+  const updateLayout = useCallback(() => {
+    const newWidth = Dimensions.get('window').width;
+    const newColumns = calculateColumns(newWidth);
+    const newCardSize = calculateCardSize(newWidth, newColumns);
+
+    // Only update if layout actually changed
+    if (newColumns !== numColumns.current || newWidth !== width.current) {
+      width.current = newWidth;
+      numColumns.current = newColumns;
+      cardSize.current = newCardSize;
+      setLayoutKey(prev => prev + 1);
+    }
+  }, []);
+
   useEffect(() => {
-    // Initialize notification sound
+    const subscription = Dimensions.addEventListener('change', updateLayout);
+    updateLayout(); // Initial calculation
+    return () => subscription?.remove();
+  }, [updateLayout]);
+
+  // Initialize notification sound
+  useEffect(() => {
     NotificationSoundRef.current = {
       orderReceived: async () => {
         try {
@@ -97,19 +127,6 @@ export const EnteredOrdersList = () => {
         NotificationSoundRef.current = null;
       }
     };
-  }, []);
-
-  useEffect(() => {
-    const updateLayout = () => {
-      const newWidth = Dimensions.get('window').width;
-      const columns = printRows(newWidth);
-      setWidth(newWidth);
-      setNumColumns(columns);
-      setCardSize(newWidth / 2 - 15);
-    };
-
-    const subscription = Dimensions.addEventListener('change', updateLayout);
-    return () => subscription?.remove();
   }, []);
 
   const apiOptions = useCallback(() => {
@@ -207,13 +224,13 @@ export const EnteredOrdersList = () => {
         console.log(`Retrying... Attempt ${retryCount + 1} of ${MAX_RETRIES}`);
         setRetryCount(prev => prev + 1);
         if (intervalRef.current) {
-          clearInterval(intervalRef.current);
+        clearInterval(intervalRef.current);
         }
         setTimeout(startInterval, RETRY_DELAY);
       } else {
         console.log('Max retries reached, reloading app');
         if (intervalRef.current) {
-          clearInterval(intervalRef.current);
+        clearInterval(intervalRef.current);
         }
         handleReload();
       }
@@ -231,7 +248,7 @@ export const EnteredOrdersList = () => {
 
   const startInterval = useCallback(() => {
     if (intervalRef.current) {
-      clearInterval(intervalRef.current);
+    clearInterval(intervalRef.current);
     }
     
     intervalRef.current = setInterval(debouncedFetch, FETCH_INTERVAL);
@@ -244,7 +261,7 @@ export const EnteredOrdersList = () => {
       startInterval();
     } else {
       if (intervalRef.current) {
-        clearInterval(intervalRef.current);
+      clearInterval(intervalRef.current);
       }
     }
     setAppState(nextAppState);
@@ -268,7 +285,7 @@ export const EnteredOrdersList = () => {
       startInterval();
       return () => {
         if (intervalRef.current) {
-          clearInterval(intervalRef.current);
+        clearInterval(intervalRef.current);
         }
         dispatch({ type: 'UPDATE_ORDER_COUNT', payload: 0 });
         subscribe.remove();
@@ -408,8 +425,10 @@ export const EnteredOrdersList = () => {
 
   const renderOrderCard = useCallback(({ item }) => (
     <View style={{
-      width: width / 2 - 15,
-      marginHorizontal: 5
+      width: cardSize.current,
+      margin: 5,
+      minWidth: 300,
+      maxWidth: 400
     }}>
       <OrderCard
         key={item.id}
@@ -426,33 +445,11 @@ export const EnteredOrdersList = () => {
         loading={state.loading}
       />
     </View>
-  ), [state.currency, state.isOpen, state.fees, state.scheduled, state.loading, dictionary, handleToggleContent, handleAcceptOrder, handleDelayOrder, handleRejectOrder, width]);
+  ), [state.currency, state.isOpen, state.fees, state.scheduled, state.loading, dictionary, handleToggleContent, handleAcceptOrder, handleDelayOrder, handleRejectOrder]);
 
   const keyExtractor = useCallback((item) => item.id.toString(), []);
 
-  const getItemLayout = useCallback((data, index) => ({
-    length: cardSize,
-    offset: cardSize * index,
-    index,
-  }), [cardSize]);
-
-  const getItem = (data, index) => data[index];
-  const getItemCount = (data) => data.length;
-
-  // Reset processed orders when component unmounts or app goes to background
-  useEffect(() => {
-    const handleAppStateChange = (nextAppState) => {
-      if (nextAppState === 'background') {
-        processedOrdersRef.current.clear();
-      }
-    };
-
-    const subscription = AppState.addEventListener('change', handleAppStateChange);
-    return () => {
-      subscription.remove();
-      processedOrdersRef.current.clear();
-    };
-  }, []);
+  const listKey = useMemo(() => `list-${layoutKey}-${numColumns.current}`, [layoutKey]);
 
   return (
     <View style={styles.container}>
@@ -498,18 +495,20 @@ export const EnteredOrdersList = () => {
       </Modal>
 
       <FlatList
-        numColumns={2}
+        key={listKey}
+        numColumns={numColumns.current}
         data={state.orders}
         renderItem={renderOrderCard}
         keyExtractor={keyExtractor}
-        getItemLayout={getItemLayout}
         removeClippedSubviews={true}
         maxToRenderPerBatch={10}
         windowSize={21}
         initialNumToRender={10}
         onEndReachedThreshold={0.5}
-        onEndReached={debouncedFetch}
-        contentContainerStyle={styles.listContainer}
+        contentContainerStyle={[
+          styles.listContainer,
+          { paddingHorizontal: 5 }
+        ]}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text>{dictionary["orders.noOrders"]}</Text>
@@ -527,7 +526,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   listContainer: {
-    paddingHorizontal: 5,
+    padding: 5,
     paddingBottom: 20,
   },
   emptyContainer: {
