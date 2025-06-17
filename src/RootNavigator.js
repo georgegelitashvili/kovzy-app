@@ -13,26 +13,9 @@ const Drawer = createDrawerNavigator();
 const RootNavigator = () => {
   const { user, isLoading, branchEnabled } = useContext(AuthContext);
   const { dictionary } = useContext(LanguageContext);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    if (!branchEnabled && user?.token) {
-      setError({ type: 'SERVICE_UNAVAILABLE', message: dictionary?.["orders.branchEnabled"] });
-    } else {
-      setError(null);
-    }
-  }, [branchEnabled, user, dictionary]);
 
   if (isLoading) {
     return <Loader text={dictionary?.["loading"]} />;
-  }
-
-  if (error) {
-    return (
-      <View style={styles.errorContainer}>
-        <ErrorDisplay error={error} />
-      </View>
-    );
   }
 
   if (!user?.token) {

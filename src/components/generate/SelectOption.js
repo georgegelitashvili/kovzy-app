@@ -13,7 +13,7 @@ export default function SelectOption({ errorText, description, placeholder = "",
             placeholder={{ label: placeholder }}
             style={pickerSelectStyles}
             items={items.map(item => ({
-              label: item.name || item.label || item.companyName || item.type || "Default Label",
+              label: `${item.name || item.label || item.companyName || item.type || "Default Label"} ${item.dividedCost ? item.dividedCost.clientCost : (item.price_before_accept || '')}`,
               value: item.id || item.value || item.companyId || item.type
             }))}
             {...props}
