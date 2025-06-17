@@ -79,35 +79,10 @@ export const EnteredOrdersList = () => {
   const isInitialFetchRef = useRef(true);
   const [layoutKey, setLayoutKey] = useState(0);
 
-  // Corrected layout refs
-  const width = useRef(Dimensions.get('window').width);
-  const numColumns = useRef(calculateColumns(width.current));
-  const cardSize = useRef(calculateCardSize(width.current, numColumns.current));
-
   const MAX_RETRIES = 15;
   const RETRY_DELAY = 5000;
   const FETCH_INTERVAL = 3000;
   const DEBOUNCE_DELAY = 300;
-
-  const updateLayout = useCallback(() => {
-    const newWidth = Dimensions.get('window').width;
-    const newColumns = calculateColumns(newWidth);
-    const newCardSize = calculateCardSize(newWidth, newColumns);
-
-    // Only update if layout actually changed
-    if (newColumns !== numColumns.current || newWidth !== width.current) {
-      width.current = newWidth;
-      numColumns.current = newColumns;
-      cardSize.current = newCardSize;
-      setLayoutKey(prev => prev + 1);
-    }
-  }, []);
-
-  useEffect(() => {
-    const subscription = Dimensions.addEventListener('change', updateLayout);
-    updateLayout(); // Initial calculation
-    return () => subscription?.remove();
-  }, [updateLayout]);
 
   // Initialize notification sound
   useEffect(() => {
