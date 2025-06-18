@@ -119,6 +119,7 @@ export const AcceptedOrdersList = () => {
     const subscription = Dimensions.addEventListener('change', updateLayout);
     return () => subscription?.remove();
   }, []);
+
   const fetchAcceptedOrders = useCallback(async () => {
     setOptionsIsLoaded(true);
     try {
@@ -290,7 +291,7 @@ export const AcceptedOrdersList = () => {
               </Text>
 
               <Divider />
-              {!isOpen.includes(item.id) && <OrdersDetail orderId={item.id} />}
+                <OrdersDetail orderId={item.id} />
               <Divider />
 
               <Text variant="titleMedium" style={styles.title}> {dictionary["orders.initialPrice"]}: {item.real_price} {currency}</Text>
@@ -377,7 +378,8 @@ export const AcceptedOrdersList = () => {
         getItemLayout={getItemLayout}
         itemDimension={cardSize}
         data={orders}
-        spacing={10}        renderItem={({ item }) => <RenderEnteredOrdersList item={item} />}
+        spacing={10}
+        renderItem={({ item }) => <RenderEnteredOrdersList item={item} />}
         keyExtractor={useCallback((item) => (item && item.id ? item.id.toString() : ''), [])}
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingBottom: 20 }}
