@@ -9,7 +9,7 @@ export const TabBarItem = ({ label, onPress, active, ...props }) => {
       testID={`tab-${label}`}
     >
       <Text style={[styles.label, active && styles.activeLabel]}>
-        {label}
+        {typeof label === 'string' ? label : String(label)}
       </Text>
     </TouchableOpacity>
   );

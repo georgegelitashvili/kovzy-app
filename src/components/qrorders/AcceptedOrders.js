@@ -56,8 +56,8 @@ export const AcceptedOrdersList = () => {
   const [itemId, setItemId] = useState(null);
   const [isOpen, setOpenState] = useState([]);
   const [modalType, setModalType] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [loadingOptions, setLoadingOptions] = useState(false);
+  const [loading, setLoading] = useState(true);  const [loadingOptions, setLoadingOptions] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [width, setWidth] = useState(Dimensions.get('window').width);
   const [numColumns, setNumColumns] = useState(getColumnsByScreenSize(width));
   const [cardSize, setCardSize] = useState(getCardSize(width, numColumns));
@@ -193,9 +193,12 @@ export const AcceptedOrdersList = () => {
                 style={styles.leftIcon}
               />
               {item.id}
-            </Text>
-            <Text style={styles.takeAway}>{item.take_away === 1 ? "(" + dictionary["orders.takeAway"] + ")" : ""}</Text>
-            <Text variant="headlineMedium" style={styles.header}>            <SimpleLineIcons
+              </Text>
+              <Text style={styles.takeAway}>
+                {item.take_away === 1 ? "(" + dictionary["orders.takeAway"] + ")" : ""}
+              </Text>
+            <Text variant="headlineMedium" style={styles.header}>
+              <SimpleLineIcons
                 name={isOpen.includes(item.id) ? "arrow-up" : "arrow-down"}
                 style={styles.rightIcon}
               />
@@ -321,7 +324,8 @@ export const AcceptedOrdersList = () => {
                 options={options}
                 PendingOrders={false}
               />
-            ) : null}            <FlatList
+            ) : null}
+            <FlatList
               key={`flat-list-${numColumns}`}
               numColumns={numColumns}
               getItemLayout={getItemLayout}

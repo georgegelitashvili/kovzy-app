@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useContext } from "react";
+import React, { useState, useEffect, useCallback, useContext, memo } from "react";
 import { StyleSheet, View } from "react-native";
 import { List, Text } from "react-native-paper";
 import { Entypo } from "@expo/vector-icons";
@@ -13,7 +13,7 @@ const orderDetailsCache = new Map();
 // Set cache expiry time (5 minutes)
 const CACHE_EXPIRY_TIME = 5 * 60 * 1000;
 
-export default function OrdersDetail({ orderId }) {
+function OrdersDetail({ orderId }) {
   const [expanded, setExpanded] = useState(true);
   const [orderCart, setOrderCart] = useState([]);
   const [isFetching, setIsFetching] = useState(false);
@@ -22,6 +22,7 @@ export default function OrdersDetail({ orderId }) {
   const [optionsIsLoaded, setOptionsIsLoaded] = useState(false);
   const { dictionary, userLanguage } = useContext(LanguageContext);
   const [error, setError] = useState(null);
+  const [hasAttemptedFetch, setHasAttemptedFetch] = useState(false);
 
   // Set API options based on domain
   const apiOptions = useCallback(() => {
@@ -53,7 +54,7 @@ export default function OrdersDetail({ orderId }) {
 
   // Fetch order details
   const fetchOrdersDetail = useCallback(async () => {
-    if (!optionsIsLoaded || isFetching) return;
+    if (!optionsIsLoaded || isFetching || !orderId) return;
     
     // Create a cache key using orderId and language
     const cacheKey = `${orderId}_${userLanguage}`;
@@ -62,6 +63,7 @@ export default function OrdersDetail({ orderId }) {
     const cachedData = getFromCache(cacheKey);
     if (cachedData) {
       setOrderCart(cachedData);
+      setHasAttemptedFetch(true);
       return;
     }
     
@@ -92,17 +94,23 @@ export default function OrdersDetail({ orderId }) {
       }
     } finally {
       setIsFetching(false);
+      setHasAttemptedFetch(true);
     }
   }, [options, orderId, userLanguage, optionsIsLoaded, getFromCache, addToCache, isFetching]);
 
-  // Load API options and fetch order details
+  // Load API options once
   useEffect(() => {
-    apiOptions();
-  }, [apiOptions]);
+    if (!optionsIsLoaded && domain) {
+      apiOptions();
+    }
+  }, [apiOptions, domain, optionsIsLoaded]);
 
+  // Fetch order details only once when component mounts or dependencies change
   useEffect(() => {
-    fetchOrdersDetail();
-  }, [fetchOrdersDetail]);
+    if (optionsIsLoaded && !hasAttemptedFetch) {
+      fetchOrdersDetail();
+    }
+  }, [fetchOrdersDetail, optionsIsLoaded, hasAttemptedFetch]);
 
   // Handle the accordion expand/collapse
   const handlePress = () => setExpanded(!expanded);
@@ -112,6 +120,7 @@ export default function OrdersDetail({ orderId }) {
     // Remove from cache to force a fresh fetch
     const cacheKey = `${orderId}_${userLanguage}`;
     orderDetailsCache.delete(cacheKey);
+    setHasAttemptedFetch(false);
     fetchOrdersDetail();
   }, [orderId, userLanguage, fetchOrdersDetail]);
 
@@ -170,7 +179,6 @@ export default function OrdersDetail({ orderId }) {
                       <View key={pidx} style={styles.nestedBulletItem}>
                         <Text style={styles.bullet}>◦</Text>
                         <Text style={styles.option}>{pack.name} (x{pack.quantity})</Text>
-                        <Text></Text>
                       </View>
                     ))}
                   </View>
@@ -222,3 +230,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 });
+
+// Export a memoized version of the component to prevent unnecessary renders
+export default memo(OrdersDetail, (prevProps, nextProps) => prevProps.orderId === nextProps.orderId);
