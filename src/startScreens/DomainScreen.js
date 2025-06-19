@@ -9,7 +9,7 @@ import { storeData, getData } from '../helpers/storage';
 import { LanguageContext } from "../components/Language";
 
 export const DomainScreen = ({ navigation }) => {
-  const { domain, setDomain, intervalId } = useContext(AuthContext);
+  const { domain, setDomain, readDomain, intervalId } = useContext(AuthContext);
   const [inputDomain, setInputDomain] = useState({ value: domain || '', error: '' });
   const { dictionary } = useContext(LanguageContext);
 
@@ -28,8 +28,10 @@ export const DomainScreen = ({ navigation }) => {
       setInputDomain({ ...inputDomain, error: domainError });
       return;
     }
+    
     setDomain(inputDomain.value.trim());
-    storeData("domain", inputDomain.value.trim());
+    await storeData("domain", inputDomain.value.trim());
+    await readDomain();
 
     navigation.navigate("Branch");
   };

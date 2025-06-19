@@ -1,16 +1,18 @@
 import React, { useState, useEffect, useContext, useCallback } from "react";
+import { StyleSheet } from "react-native";
 import { Text, Button } from "react-native-paper";
 import Background from "../components/generate/Background";
 import Logo from "../components/generate/Logo";
 import SelectOption from "../components/generate/SelectOption";
-import { storeData } from "../helpers/storage";
+import Toast from '../components/generate/Toast';
+import { getData, storeData, removeData } from "../helpers/storage";
 import Loader from "../components/generate/loader";
 import { AuthContext } from "../context/AuthProvider";
 import axiosInstance from "../apiConfig/apiRequests";
 import { LanguageContext } from "../components/Language";
 
 export const BranchScreen = ({ navigation }) => {
-  const { setIsDataSet, domain, branchid, setBranchid, intervalId, deleteItem } = useContext(AuthContext);
+  const { setIsDataSet, domain, branchid, setBranchid, intervalId, readRestData, error, setError, clearErrors } = useContext(AuthContext);
   const [branches, setBranches] = useState([]);
   const [branch, setBranch] = useState([]);
   const [selected, setSelected] = useState(branchid);
@@ -88,19 +90,27 @@ export const BranchScreen = ({ navigation }) => {
   }, [options, userLanguage]);
 
   useEffect(() => {
-    if (selected !== null) {
-      const selectedBranch = branches.find((branch) => branch.value === selected);
-      if (selectedBranch) {
-        deleteItem("branchNames");
-        const item = branch.find(item => item.id === selectedBranch.value);
+    const saveSelection = async () => {
+      if (selected !== null) {
+        await removeData("branchNames");
 
-        storeData("branchNames", item);
+        console.log("Selected branch ID:", selected);
+        console.log("Branch data:", branch);
+        const item = branch.find(item => item.id === selected);
+        if (item) {
+          console.log("Branch item:", item);
+          await storeData("branchNames", item);
+          await readRestData();
+        }
+
+        await storeData("branch", selected);
+        setIsDataSet(data => !data);
+        setBranchid(selected);
+        clearInterval(intervalId);
       }
-      storeData("branch", selected);
-      setIsDataSet((data) => !data);
-      setBranchid(selected);
-      clearInterval(intervalId);
-    }
+    };
+
+    saveSelection();
   }, [domain, selected, userLanguage]);
 
   if (isLoading) {
@@ -110,6 +120,7 @@ export const BranchScreen = ({ navigation }) => {
   return (
     <Background>
       <Logo />
+
       <SelectOption
         value={selected}
         onValueChange={(value) => {
@@ -126,6 +137,7 @@ export const BranchScreen = ({ navigation }) => {
         mode="contained"
         textColor="white"
         buttonColor="#000"
+        style={styles.button}
         onPress={onCheckPressed}
       >
         {dictionary['save']}
@@ -134,3 +146,8 @@ export const BranchScreen = ({ navigation }) => {
   );
 };
 
+const styles = StyleSheet.create({
+  button: {
+    marginTop: 17,
+  },
+});
