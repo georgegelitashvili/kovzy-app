@@ -110,7 +110,7 @@ const NotificationSound = forwardRef((props, ref) => {
         try {
             const savedMusicId = await AsyncStorage.getItem('selectedMusicId');
             if (savedMusicId) {
-                await onPlaySound(savedMusicId);
+                await onPlaySound(true, savedMusicId);
             } else {
                 await onPlaySound('1');
             }
