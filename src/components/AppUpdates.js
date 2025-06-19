@@ -20,10 +20,14 @@ const useInAppUpdates = ({
             return;
         }
 
-        const channel = Constants.expoConfig?.extra?.eas?.projectId
-            ? (Constants.manifest2?.extra?.expoClient?.updates?.channel || "production")
-            : "production";
-        showLogs && console.log(`Checking for updates on channel: ${channel}`);
+        let channel = "production";
+        try {
+            if (Constants?.manifest2?.extra?.expoClient?.updates?.channel) {
+                channel = Constants.manifest2.extra.expoClient.updates.channel;
+            }
+        } catch (e) {
+            showLogs && console.log("Failed to get update channel. Using default 'production'.");
+        }
 
         // Create a promise that resolves after a timeout to avoid blocking
         const timeoutPromise = new Promise(resolve => {

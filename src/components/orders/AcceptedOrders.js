@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, createContext, useContext } from "react";
+import React, { useState, useEffect, useCallback, createContext, useContext, memo, useMemo } from "react";
 import {
   StyleSheet,
   Dimensions,
@@ -120,7 +120,7 @@ export const AcceptedOrdersList = () => {
     return () => subscription?.remove();
   }, []);
 
-  const fetchAcceptedOrders = async () => {
+  const fetchAcceptedOrders = useCallback(async () => {
     setOptionsIsLoaded(true);
     try {
       if (!user || !options.url_getAcceptedOrders) {
@@ -149,7 +149,7 @@ export const AcceptedOrdersList = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user, options.url_getAcceptedOrders, page, languageId, branchid, intervalId]);
 
   const onChangeModalState = useCallback((newState) => {
     setVisible(newState);
@@ -168,14 +168,13 @@ export const AcceptedOrdersList = () => {
       setOrders([]);
     }
   }, [domain, branchid, apiOptions]);
+  // Optimize useFocusEffect to prevent excessive API calls
+  const fetchOrdersCallback = React.useCallback(() => {
+    fetchAcceptedOrders();
+    return () => {};
+  }, [fetchAcceptedOrders]);
 
-  useFocusEffect(
-    React.useCallback(() => {
-      fetchAcceptedOrders();
-
-      return () => { };
-    }, [options, page, branchid, languageId])
-  );
+  useFocusEffect(fetchOrdersCallback);
 
   useEffect(() => {
     if (itemId) {
@@ -207,7 +206,9 @@ export const AcceptedOrdersList = () => {
       Alert.alert(`Don't know how to open this URL: ${url}`);
     }
   };
-  const RenderEnteredOrdersList = ({ item }) => {
+
+  // Memoize the order item renderer to prevent unnecessary re-renders
+  const RenderEnteredOrdersList = React.memo(({ item }) => {
     const trackLink = [JSON.parse(item.deliveron_data)]?.map(link => {
       return link.trackLink ?? null;
     });
@@ -290,7 +291,7 @@ export const AcceptedOrdersList = () => {
               </Text>
 
               <Divider />
-              <OrdersDetail orderId={item.id} />
+                <OrdersDetail orderId={item.id} />
               <Divider />
 
               <Text variant="titleMedium" style={styles.title}> {dictionary["orders.initialPrice"]}: {item.real_price} {currency}</Text>
@@ -344,8 +345,7 @@ export const AcceptedOrdersList = () => {
           ) : null}
         </Card>
       </View>
-    );
-  };
+    );  }, (prevProps, nextProps) => prevProps.item.id === nextProps.item.id);
 
   const getItemLayout = useCallback((data, index) => ({
     length: cardSize,
@@ -380,7 +380,7 @@ export const AcceptedOrdersList = () => {
         data={orders}
         spacing={10}
         renderItem={({ item }) => <RenderEnteredOrdersList item={item} />}
-        keyExtractor={(item) => (item && item.id ? item.id.toString() : '')}
+        keyExtractor={useCallback((item) => (item && item.id ? item.id.toString() : ''), [])}
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingBottom: 20 }}
         refreshControl={
