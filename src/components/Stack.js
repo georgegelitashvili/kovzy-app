@@ -16,7 +16,7 @@ import NotificationScreen from './settings/NotificationScreen';
 
 const Stack = createStackNavigator();
 
-const Header = ({ options, navigation, route }) => {
+const Header = ({ options, navigation, route, showDrawer }) => {
   const theme = useTheme();
   const headerStyle = options?.headerStyle;
   const title = options?.headerTitle ?? options?.title ?? route?.name;
@@ -24,12 +24,15 @@ const Header = ({ options, navigation, route }) => {
   return (
     <Appbar.Header
       theme={{ colors: { primary: theme.colors.surface } }}
-      style={{ marginTop: headerStyle?.marginTop, backgroundColor: 'white' }}>
-      {navigation?.canGoBack() ? (
+      style={{ marginTop: headerStyle?.marginTop, backgroundColor: 'white' }}
+    >
+      {navigation?.canGoBack() && (
         <Appbar.BackAction onPress={navigation.goBack} />
-      ) : (
+      )}
+      {!navigation?.canGoBack() && showDrawer && (
         <Appbar.Action icon="menu" onPress={() => navigation.toggleDrawer()} />
       )}
+
       <Appbar.Content
         title={title}
         titleStyle={{ fontSize: headerStyle?.fontSize, fontWeight: 'bold' }}
@@ -47,9 +50,8 @@ export const AuthNavigator = () => {
         headerMode: 'screen',
         header: (props) => {
           const { key, ...otherProps } = props;
-          return <Header {...otherProps} />;
+          return <Header {...otherProps} showDrawer={route.name !== 'Domain'} />;
         },
-        ...route.params?.options,
         ...route.params?.options, // Pass route params as options
       })}
     >
@@ -57,7 +59,8 @@ export const AuthNavigator = () => {
         name="Domain"
         options={{
           headerTitle: dictionary["domains.addDomain"],
-          unmountOnBlur: true
+          unmountOnBlur: true,
+          headerLeft: () => null
         }}
         component={DomainScreen}
       />

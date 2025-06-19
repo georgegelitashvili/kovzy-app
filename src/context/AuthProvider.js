@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { AppState, TouchableOpacity } from 'react-native';
 import axiosInstance from "../apiConfig/apiRequests";
 import * as SecureStore from 'expo-secure-store';
-import { storeData, getSecureData, removeData, getMultipleData } from "../helpers/storage";
+import { storeData, getData, getSecureData, removeData, getMultipleData } from "../helpers/storage";
 import Toast from '../components/generate/Toast';
 import { useFetchLanguages } from "../components/UseFetchLanguages";
 import { LanguageContext } from "../components/Language";
@@ -32,17 +32,61 @@ export const AuthProvider = ({ isConnected, children }) => {
   const intervalRef = useRef(null);
   const { userLanguageChange, dictionary } = useContext(LanguageContext);
 
-  const readData = async () => {
+  // Get domain data from storage
+  const readDomain = useCallback(async () => {
     try {
-      const [domainValue, branchValue, branchNames] = await getMultipleData(['domain', 'branch', 'branchNames']);
-      if (domainValue) setDomain(domainValue);
-      if (branchValue) setBranchid(branchValue);
-      if (branchNames) setBranchName(branchNames);
+      const domainValue = await getData('domain');
+      console.log('→ Domain read from storage:', domainValue);
+
+      if (!domainValue || domainValue === 'null' || domainValue === 'undefined') {
+        console.warn('❌ Domain is missing or invalid:', domainValue);
+        return false; // process stops
+      }
+
+      console.log('✅ Domain loaded:', domainValue);
+      setDomain(domainValue);
+      return true; // continue
     } catch (error) {
-      console.error('Error reading data:', error);
-      handleError(error, 'READ_DATA_ERROR');
+      console.error('❌ Error loading domain:', error);
+      handleError(error, 'READ_DOMAIN_ERROR');
+      return false;
     }
-  };
+  }, [handleError]);
+
+  const readRestData = useCallback(async () => {
+    try {
+      const [branchValue, branchNames] = await getMultipleData(['branch', 'branchNames']);
+
+      if (branchValue) {
+        setBranchid(branchValue);
+        console.log('✅ Branch ID loaded:', branchValue);
+      }
+
+      if (branchNames) {
+        setBranchName(branchNames);
+        console.log('✅ Branch Name loaded:', branchNames);
+      }
+    } catch (error) {
+      console.error('❌ Error loading branch data:', error);
+      handleError(error, 'READ_BRANCH_DATA_ERROR');
+    }
+  }, [handleError]);
+
+  // 3. ინიციალიზაციის useEffect
+  useEffect(() => {
+    const initializeData = async () => {
+      console.log('→ Starting initialization...');
+
+      const hasDomain = await readDomain();
+      if (hasDomain) {
+        await readRestData();
+      } else {
+        console.warn('⛔ Initialization stopped: no domain');
+      }
+    };
+
+    initializeData();
+  }, [domain]);
 
   const startInterval = () => {
     stopInterval();
@@ -60,6 +104,7 @@ export const AuthProvider = ({ isConnected, children }) => {
     setLoginError(null);
     setError(null);
   }, []);
+
   const handleError = useCallback((error, type = 'UNKNOWN') => {
     const errorMessage = error?.message || dictionary?.['errors.UNKNOWN'];
     setError({ type, message: errorMessage });
@@ -67,26 +112,28 @@ export const AuthProvider = ({ isConnected, children }) => {
   }, [dictionary]);
 
   const cleanupAuth = useCallback(async () => {
-    try {
-      await Promise.all([
-        deleteItem("token"),
-        deleteItem("credentials"),
-        deleteItem("user"),
-        deleteItem("rcml-lang"),
-        deleteItem("languages"),
-        removeData(["domain", "branch", "branchNames"])
-      ]);
-      setDomain(null);
-      setBranchid(null);
-      setBranchName(null);
-      setIsDataSet(false);
-      setUser(null);
-      setUserObject(null);
-      clearErrors();
-    } catch (error) {
-      console.error('Error cleaning up auth data:', error);
-      handleError(error, 'CLEANUP_ERROR');
+    const itemsToDelete = ["token", "credentials", "user", "rcml-lang", "languages"];
+    for (const item of itemsToDelete) {
+      try {
+        await deleteItem(item);
+      } catch (error) {
+        console.error(`Failed to delete ${item}:`, error);
+      }
     }
+
+    try {
+      await removeData(["domain", "branch", "branchNames"]);
+    } catch (error) {
+      console.error('Failed to removeData:', error);
+    }
+
+    setDomain(null);
+    setBranchid(null);
+    setBranchName(null);
+    setIsDataSet(false);
+    setUser(null);
+    setUserObject(null);
+    clearErrors();
   }, [clearErrors, handleError]);
 
   const apiUrls = useMemo(() => {
@@ -147,17 +194,26 @@ export const AuthProvider = ({ isConnected, children }) => {
   }, [apiUrls, dictionary, handleError, clearErrors]);
 
   const logout = useCallback(async () => {
+    console.log('Logout started');
     setIsLoading(true);
     try {
       if (apiUrls?.logout) {
+        console.log('Calling logout API...');
         await axiosInstance.post(apiUrls.logout);
+        console.log('Logout API success');
       }
+      console.log('Calling cleanupAuth...');
       await cleanupAuth();
+      console.log('cleanupAuth done');
     } catch (error) {
       console.error('Error logging out:', error);
       handleError(error, 'LOGOUT_ERROR');
+      console.log('Calling cleanupAuth after error...');
+      await cleanupAuth();
+      console.log('cleanupAuth done after error');
     } finally {
       setIsLoading(false);
+      console.log('Logout finished');
     }
   }, [apiUrls, cleanupAuth, handleError]);
 
@@ -311,7 +367,7 @@ export const AuthProvider = ({ isConnected, children }) => {
 
   useEffect(() => {
     let retryCount = 0;
-    const MAX_RETRIES = 5;
+    const MAX_RETRIES = 10;
     const RETRY_DELAY = 2000;
 
     const fetchLanguagesWithRetry = async () => {
@@ -383,6 +439,7 @@ export const AuthProvider = ({ isConnected, children }) => {
     setUser,
     loginError,
     error,
+    setError,
     clearErrors,
     isLoading,
     setIsLoading,
@@ -394,6 +451,8 @@ export const AuthProvider = ({ isConnected, children }) => {
     setBranchEnabled,
     deliveronEnabled,
     setDeliveronEnabled,
+    readDomain,
+    readRestData,
     login,
     logout,
     deleteItem,

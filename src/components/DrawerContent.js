@@ -47,6 +47,10 @@ export default function DrawerContent(props) {
   };
 
   useEffect(() => {
+    console.log('🚨 BranchName updated in component:', branchName);
+  }, [branchName]);
+
+  useEffect(() => {
     fetchUnansweredOrders();
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
