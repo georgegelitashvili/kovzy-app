@@ -599,7 +599,7 @@ export const EnteredOrdersList = () => {
           </View>
         }
         refreshing={state.loading}
-        onRefresh={debouncedFetch}
+        // onRefresh={debouncedFetch}
       />
     </View>
   );
