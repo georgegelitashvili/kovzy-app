@@ -465,6 +465,11 @@ export const AuthProvider = ({ isConnected, children }) => {
 
   return (
     <AuthContext.Provider value={contextValue}>
+      <AppUpdates
+        showLogs={true}
+        playStoreUrl="https://play.google.com/store/apps/details?id=com.kovzy.app"
+        onError={(err) => handleError(err, 'UPDATE_ERROR')}
+      />
       {error && (
         <TouchableOpacity onPress={() => clearErrors()}>
           <Toast
@@ -479,13 +484,6 @@ export const AuthProvider = ({ isConnected, children }) => {
         <Loader text={dictionary?.["loading"]} />
       ) : (
         children
-      )}
-      {user && (
-        <AppUpdates 
-          onError={(error) => handleError(error, 'UPDATE_ERROR')}
-          showLogs={false}
-          playStoreUrl="https://play.google.com/store/apps/details?id=com.kovzy.app"
-        />
       )}
       {!branchEnabled && user && isVisible && (
         <TouchableOpacity onPress={() => setIsVisible(true)}>
