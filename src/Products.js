@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext, useCallback, useMemo, memo } from "react";
-import { StyleSheet, View, TouchableOpacity, Dimensions, RefreshControl, Alert } from "react-native";
+import { StyleSheet, View, TouchableOpacity, Dimensions, RefreshControl, useWindowDimensions } from "react-native";
 import NetInfo from "@react-native-community/netinfo";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Text, Button, Card, Checkbox } from "react-native-paper";
@@ -13,15 +13,13 @@ import { LanguageContext } from "./components/Language";
 import axiosInstance from "./apiConfig/apiRequests";
 import throttle from 'lodash.throttle';
 
-const width = Dimensions.get("window").width;
-
-const MemoizedProductCard = memo(({ item, isExcluded, isExcludedQr,isExcludedOnline,checkedItems, onCheckboxPress, onButtonPress, onNavigate, dictionary }) => {
+const MemoizedProductCard = memo(({ item, isExcluded, isExcludedQr, isExcludedOnline, checkedItems, onCheckboxPress, onButtonPress, onNavigate, dictionary }) => {
   const buttonText = isExcluded ? dictionary["prod.enableProduct"] : dictionary["prod.disableProduct"];
   const buttonTextQr = isExcludedQr ? dictionary["prod.enableProductQr"] : dictionary["prod.disableProductQr"];
   const buttonTextOnline = isExcludedOnline ? dictionary["prod.enableProductOnline"] : dictionary["prod.disableProductOnline"];
 
   return (
-    <Card key={item.id}>
+    <Card key={item.id} style={styles.card}>
       <Card.Content style={styles.cardContent}>
         <Text variant="titleMedium" style={styles.title}>
           {item.name}
@@ -34,12 +32,12 @@ const MemoizedProductCard = memo(({ item, isExcluded, isExcludedQr,isExcludedOnl
         />
       </Card.Content>
 
-      <Card.Actions>
+      <Card.Actions style={styles.cardActions}>
         <TouchableOpacity
           style={[styles.button, { backgroundColor: "#3490dc" }]}
           onPress={() => onNavigate(item.id)}
         >
-          <Text style={{ color: "white", fontSize: 16, fontWeight: "500" }}>
+          <Text style={styles.buttonText}>
             {dictionary["prod.ingredients"]}
           </Text>
         </TouchableOpacity>
@@ -51,7 +49,7 @@ const MemoizedProductCard = memo(({ item, isExcluded, isExcludedQr,isExcludedOnl
           ]}
           onPress={() => onButtonPress(item, "")}
         >
-          <Text style={{ color: "white", fontSize: 16, fontWeight: "500" }}>
+          <Text style={styles.buttonText}>
             {buttonText}
           </Text>
         </TouchableOpacity>
@@ -62,7 +60,7 @@ const MemoizedProductCard = memo(({ item, isExcluded, isExcludedQr,isExcludedOnl
           ]}
           onPress={() => onButtonPress(item, "qr-menu")}
         >
-          <Text style={{ color: "white", fontSize: 16, fontWeight: "500" }}>
+          <Text style={styles.buttonText}>
             {buttonTextQr}
           </Text>
         </TouchableOpacity>
@@ -73,7 +71,7 @@ const MemoizedProductCard = memo(({ item, isExcluded, isExcludedQr,isExcludedOnl
           ]}
           onPress={() => onButtonPress(item, "online")}
         >
-          <Text style={{ color: "white", fontSize: 16, fontWeight: "500" }}>
+          <Text style={styles.buttonText}>
             {buttonTextOnline}
           </Text>
         </TouchableOpacity>
@@ -83,6 +81,7 @@ const MemoizedProductCard = memo(({ item, isExcluded, isExcludedQr,isExcludedOnl
 });
 
 export default function Products({ navigation }) {
+  const { width } = useWindowDimensions();
   const { setIsDataSet, domain, branchid, user, intervalId, branchEnabled } = useContext(AuthContext);
   const isFocused = useIsFocused();
   const { dictionary, userLanguage } = useContext(LanguageContext);
@@ -100,6 +99,9 @@ export default function Products({ navigation }) {
   const [showFilter, setShowFilter] = useState(false);
   const [checkedItems, setCheckedItems] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Calculate button width based on screen size
+  const buttonWidth = Math.max(80, (width - 30) / 3); // Minimum 80px, but distribute space evenly
 
   const fetchData = useCallback(async () => {
     if (!user || !domain || !branchid || !branchEnabled) return;
@@ -194,7 +196,7 @@ export default function Products({ navigation }) {
     setPage(1);
   }, 500), [branchEnabled]);
 
-  const handleButtonPress = useCallback(async (item,disabled_by) => {
+  const handleButtonPress = useCallback(async (item, disabled_by) => {
     if (!domain || !branchid || !branchEnabled) return;
 
     try {
@@ -210,7 +212,6 @@ export default function Products({ navigation }) {
       } else {
         setExcluded(prev => [...prev, { productid: item.id, disabled_by }]);
       }
-      
       
       onRefresh();
     } catch (error) {
@@ -246,7 +247,7 @@ export default function Products({ navigation }) {
   }, [navigation]);
 
   const renderItem = useCallback(({ item }) => {
-    const isExcluded = excluded.some((excludedItem) => excludedItem.productid === item.id && excludedItem.disabled_by === null);
+    const isExcluded = excluded.some((excludedItem) => excludedItem.productid === item.id && excludedItem.disabled_by === "");
     const isExcludedQr = excluded.some((excludedItem) => excludedItem.productid === item.id && excludedItem.disabled_by === "qr-menu");
     const isExcludedOnline = excluded.some((excludedItem) => excludedItem.productid === item.id && excludedItem.disabled_by === "online");
     return (
@@ -275,42 +276,53 @@ export default function Products({ navigation }) {
   return (
     <>
       <View style={styles.buttonContainer}>
-        <Button
-          style={styles.filterButton}
-          icon={() => (
-            <MaterialCommunityIcons name={showFilter ? "close" : "filter"} size={24} color="white" />
-          )}
-          mode='contained'
-          size={35}
-          onPress={() => setShowFilter(prev => !prev)}
-        >
-          {dictionary["filters"]}
-        </Button>
-        <Button
-          style={styles.searchButton}
-          icon={() => (
-            <MaterialCommunityIcons name={showSearch ? "close" : "magnify"} size={24} color="white" />
-          )}
-          mode='contained'
-          size={35}
-          onPress={() => setShowSearch(prev => !prev)}
-        >
-          {dictionary["search"]}
-        </Button>
-        <Button
-          style={styles.markButton}
-          icon={() => (
-            <MaterialCommunityIcons name={"dip-switch"} size={24} color="white" />
-          )}
-          mode='contained'
-          size={35}
-          onPress={checkboxPressed}
-        >
-          On/Off
-        </Button>
+        <View style={[styles.buttonWrapper, { width: buttonWidth }]}>
+          <Button
+            style={styles.filterButton}
+            icon={() => (
+              <MaterialCommunityIcons name={showFilter ? "close" : "filter"} size={20} color="white" />
+            )}
+            mode='contained'
+            compact
+            labelStyle={styles.buttonLabel}
+            onPress={() => setShowFilter(prev => !prev)}
+          >
+            {dictionary["filters"]}
+          </Button>
+        </View>
+        
+        <View style={[styles.buttonWrapper, { width: buttonWidth }]}>
+          <Button
+            style={styles.searchButton}
+            icon={() => (
+              <MaterialCommunityIcons name={showSearch ? "close" : "magnify"} size={20} color="white" />
+            )}
+            mode='contained'
+            compact
+            labelStyle={styles.buttonLabel}
+            onPress={() => setShowSearch(prev => !prev)}
+          >
+            {dictionary["search"]}
+          </Button>
+        </View>
+        
+        <View style={[styles.buttonWrapper, { width: buttonWidth }]}>
+          <Button
+            style={styles.markButton}
+            icon={() => (
+              <MaterialCommunityIcons name={"dip-switch"} size={20} color="white" />
+            )}
+            mode='contained'
+            compact
+            labelStyle={styles.buttonLabel}
+            onPress={checkboxPressed}
+          >
+            On/Off
+          </Button>
+        </View>
       </View>
 
-      <View style={{ paddingLeft: 10, paddingRight: 10 }}>
+      <View style={{ paddingHorizontal: 10 }}>
         {showSearch && (
           <TextField
             placeholder="Search..."
@@ -410,20 +422,30 @@ const styles = StyleSheet.create({
     marginTop: 25,
     padding: 1,
     paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 18, // Rounded corners like Paper's Button
-    shadowColor: "#000", // Add shadow for elevation
+    paddingHorizontal: 10,
+    borderRadius: 18,
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 3,
-    elevation: 3, // Elevation for Android
+    elevation: 3,
     justifyContent: "center",
     alignItems: "center",
+  },
+  buttonText: {
+    color: "white",
+    fontSize: 14,
+    fontWeight: "500",
   },
   cardContent: {
     flexDirection: "row",
     alignItems: "flex-start",
     justifyContent: "space-between",
+  },
+  cardActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
   },
   paginationContainer: {
     flexDirection: "row",
@@ -447,24 +469,31 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
   checkbox: {
-    transform: [{ scale: 2 }],
-    fontSize: 17,
+    transform: [{ scale: 1.5 }],
   },
   buttonContainer: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     marginTop: 10,
     marginBottom: 10,
+    paddingHorizontal: 5,
   },
-  searchButton: {
-    marginLeft: 5,
-    backgroundColor: '#3490dc'
+  buttonWrapper: {
+    marginHorizontal: 2,
+  },
+  buttonLabel: {
+    fontSize: 12,
   },
   filterButton: {
-    marginLeft: 5,
-    backgroundColor: '#3490dc'
+    backgroundColor: '#3490dc',
+    paddingHorizontal: 4,
+  },
+  searchButton: {
+    backgroundColor: '#3490dc',
+    paddingHorizontal: 4,
   },
   markButton: {
-    marginLeft: 5,
-    backgroundColor: '#3490dc'
+    backgroundColor: '#3490dc',
+    paddingHorizontal: 4,
   },
 });
