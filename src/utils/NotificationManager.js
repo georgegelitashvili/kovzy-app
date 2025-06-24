@@ -2,10 +2,10 @@ import { useEffect, useState, useRef } from 'react';
 import { Alert, View, AppState, Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import * as TaskManager from 'expo-task-manager';
-import * as BackgroundFetch from 'expo-background-fetch';
+import * as BackgroundTask from 'expo-background-task';
 import Constants from 'expo-constants';
 import * as Application from 'expo-application';
-import axiosInstance from '../apiConfig/apiRequests'; // Adjust this import based on your project structure
+import axiosInstance from '../apiConfig/apiRequests';
 import eventEmitter from './EventEmitter';
 import Toast from '../components/generate/Toast';
 
@@ -178,8 +178,7 @@ const notificationManager = {
 
     async registerBackgroundTask({ fetchUrl, type, branchid, languageId }) {
         TaskManager.defineTask(BACKGROUND_NOTIFICATION_TASK, async () => {
-            console.log(`Background fetch started`);
-
+            console.log('Background task started');
             try {
                 const response = await axiosInstance.post(fetchUrl, {
                     type: type,
@@ -187,30 +186,30 @@ const notificationManager = {
                     branchid: branchid,
                     Languageid: languageId,
                     postponeOrder: false,
+                    only_check: true,
                 });
 
-                const orderCount = Object.keys(response.data.data).length;
-                console.log(`Background fetch completed`);
-                if (orderCount > 0) {
-                    console.log(`Found ${orderCount} new orders`);
-                    if (this.soundRef?.current) {
-                        await this.soundRef.current.orderReceived();
+                //response.data?.hasNewOrders
+                const hasNewOrders = true;
+                if (hasNewOrders) {
+                    console.log('New orders detected');
+                    if (notificationManager.soundRef?.current) {
+                        await notificationManager.soundRef.current.orderReceived();
                     } else {
                         console.warn('soundRef is not set');
                     }
-                    return BackgroundFetch.BackgroundFetchResult.NewData;
+                    return BackgroundTask.BackgroundTaskResult.NewData;
                 }
-
-                console.log('No new orders found');
-                return BackgroundFetch.BackgroundFetchResult.NoData;
+                console.log('No new orders');
+                return BackgroundTask.BackgroundTaskResult.NoData;
             } catch (error) {
-                console.error('Error during background fetch:', error);
-                return BackgroundFetch.BackgroundFetchResult.Failed;
+                console.error('Background task error:', error);
+                return BackgroundTask.BackgroundTaskResult.Failed;
             }
         });
 
-        await BackgroundFetch.registerTaskAsync(BACKGROUND_NOTIFICATION_TASK, {
-            minimumInterval: 3,
+        await BackgroundTask.registerTaskAsync(BACKGROUND_NOTIFICATION_TASK, {
+            minimumInterval: 60,
             stopOnTerminate: false,
             startOnBoot: true,
         });
@@ -218,7 +217,7 @@ const notificationManager = {
 
     async unregisterBackgroundTask() {
         try {
-            await BackgroundFetch.unregisterTaskAsync(BACKGROUND_NOTIFICATION_TASK);
+            await BackgroundTask.unregisterTaskAsync(BACKGROUND_NOTIFICATION_TASK);
             console.log('Background task unregistered.');
         } catch (error) {
             console.error('Error unregistering background task:', error);

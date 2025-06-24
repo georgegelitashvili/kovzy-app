@@ -59,7 +59,8 @@
     },
     "runtimeVersion": {
       "policy": "appVersion"
-    },    "plugins": [
+    },
+    "plugins": [
       "expo-secure-store",
       "expo-updates",
       [
@@ -76,7 +77,8 @@
           "defaultChannel": "default",
           "enableBackgroundRemoteNotifications": true
         }
-      ]
+      ],
+      "expo-background-task"
     ]
   }
 }

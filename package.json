@@ -14,7 +14,7 @@
       "reactNativeDirectoryCheck": {
         "listUnknownPackages": false,
         "exclude": [
-          "expo-background-fetch"
+          "expo-background-task"
         ]
       }
     }
@@ -41,9 +41,10 @@
     "expo-application": "~6.1.4",
     "expo-asset": "~11.1.5",
     "expo-av": "~15.1.6",
-    "expo-background-fetch": "~13.1.5",
+    "expo-background-task": "^0.2.7",
     "expo-battery": "~9.1.4",
     "expo-constants": "~17.1.6",
+    "expo-dev-client": "~5.2.1",
     "expo-font": "~13.3.1",
     "expo-intent-launcher": "~12.1.5",
     "expo-keep-awake": "~14.1.4",
