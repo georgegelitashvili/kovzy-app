@@ -31,11 +31,15 @@ export function LanguageProvider({ children }) {
     const updateLanguageId = async () => {
       try {
         const languages = await getData('languages');
+        console.log('Languages loaded:', languages);
+        console.log('Current user language:', userLanguage);
         if (languages) {
           const language = languages.find(lang => lang.lang === userLanguage);
           if (language) {
-            console.log('Updating language ID for:', userLanguage);
+            console.log('Updating language ID for:', userLanguage, '->', language.id);
             setLanguageId(language.id);
+          } else {
+            console.warn('Language not found in list:', userLanguage);
           }
         }
       } catch (error) {
@@ -45,7 +49,7 @@ export function LanguageProvider({ children }) {
 
     updateLanguageId();
   }, [userLanguage]);
-
+  
   const userLanguageChange = async (selected) => {
     try {
       if (!languageList[selected]) {

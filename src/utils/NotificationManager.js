@@ -2,10 +2,10 @@ import { useEffect, useState, useRef } from 'react';
 import { Alert, View, AppState, Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import * as TaskManager from 'expo-task-manager';
-import * as BackgroundFetch from 'expo-background-fetch';
+import * as BackgroundTask from 'expo-background-task';
 import Constants from 'expo-constants';
 import * as Application from 'expo-application';
-import axiosInstance from '../apiConfig/apiRequests'; // Adjust this import based on your project structure
+import axiosInstance from '../apiConfig/apiRequests';
 import eventEmitter from './EventEmitter';
 import Toast from '../components/generate/Toast';
 
@@ -92,7 +92,7 @@ export const ToastManager = () => {
 
 const notificationManager = {
     soundRef: null,
-    async initialize(options, type, branchid, languageId, soundRef) {
+    async initialize(options, branchid, languageId, soundRef) {
         try {
             this.soundRef = soundRef;
             // Register notifications
@@ -101,15 +101,6 @@ const notificationManager = {
                 await this.savePushTokenToBackend(token, options, branchid);
                 console.log('Push notifications initialized.');
             }
-
-            // Register dynamic background task
-            await this.registerBackgroundTask({
-                fetchUrl: options.url_unansweredOrders,
-                type,
-                branchid,
-                languageId,
-                notificationSoundRef: this.soundRef
-            });
         } catch (error) {
             console.error('Error initializing NotificationManager:', error);
             throw error;
@@ -173,55 +164,6 @@ const notificationManager = {
         } catch (error) {
             console.error('Error saving push token to backend:', error);
             throw error;
-        }
-    },
-
-    async registerBackgroundTask({ fetchUrl, type, branchid, languageId }) {
-        TaskManager.defineTask(BACKGROUND_NOTIFICATION_TASK, async () => {
-            console.log(`Background fetch started`);
-
-            try {
-                const response = await axiosInstance.post(fetchUrl, {
-                    type: type,
-                    page: 1,
-                    branchid: branchid,
-                    Languageid: languageId,
-                    postponeOrder: false,
-                });
-
-                const orderCount = Object.keys(response.data.data).length;
-                console.log(`Background fetch completed`);
-                if (orderCount > 0) {
-                    console.log(`Found ${orderCount} new orders`);
-                    if (this.soundRef?.current) {
-                        await this.soundRef.current.orderReceived();
-                    } else {
-                        console.warn('soundRef is not set');
-                    }
-                    return BackgroundFetch.BackgroundFetchResult.NewData;
-                }
-
-                console.log('No new orders found');
-                return BackgroundFetch.BackgroundFetchResult.NoData;
-            } catch (error) {
-                console.error('Error during background fetch:', error);
-                return BackgroundFetch.BackgroundFetchResult.Failed;
-            }
-        });
-
-        await BackgroundFetch.registerTaskAsync(BACKGROUND_NOTIFICATION_TASK, {
-            minimumInterval: 3,
-            stopOnTerminate: false,
-            startOnBoot: true,
-        });
-    },
-
-    async unregisterBackgroundTask() {
-        try {
-            await BackgroundFetch.unregisterTaskAsync(BACKGROUND_NOTIFICATION_TASK);
-            console.log('Background task unregistered.');
-        } catch (error) {
-            console.error('Error unregistering background task:', error);
         }
     },
 };

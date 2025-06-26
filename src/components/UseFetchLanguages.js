@@ -13,8 +13,8 @@ export const useFetchLanguages = (apiUrls) => {
 
       try {
         const response = await axiosInstance.post(apiUrls.languages);
-        if (response.data?.data) {
-          setLanguages(response.data.data);
+        if (response.data?.languages) {
+          setLanguages(response.data.languages);
         }
       } catch (error) {
         console.error('Error fetching languages:', error);

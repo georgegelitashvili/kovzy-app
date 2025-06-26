@@ -359,7 +359,12 @@ export const AuthProvider = ({ isConnected, children }) => {
         return;
       }
 
-      await readData();
+      const hasDomain = await readDomain();
+      if (hasDomain) {
+        await readRestData();
+      } else {
+        console.warn('⛔ Initialization stopped: no domain');
+      }
     };
 
     initializeData();
