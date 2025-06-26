@@ -235,6 +235,8 @@ export const EnteredOrdersList = () => {
     }
   }, [user, options.url_unansweredOrders, branchid, languageId, dictionary, retryCount]);
 
+
+
   const debouncedFetch = useCallback(
     debounce(() => {
       if (optionsIsLoaded && user && options.url_unansweredOrders) {
@@ -251,6 +253,16 @@ export const EnteredOrdersList = () => {
     
     intervalRef.current = setInterval(debouncedFetch, FETCH_INTERVAL);
   }, [optionsIsLoaded]);
+
+  
+  const initializeNotifications = async () => {
+    try {
+      await NotificationManager.initialize(options, branchid, NotificationSoundRef);
+    } catch (error) {
+      console.error('Error initializing NotificationManager:', error);
+    }
+  };
+
 
   const handleAppStateChange = useCallback((nextAppState) => {
     if (appState.match(/inactive|background/) && nextAppState === "active") {
@@ -315,16 +327,9 @@ export const EnteredOrdersList = () => {
     }
   }, [optionsIsLoaded, languageId, appState, isConnected]);
 
+  // Initialize notifications
   useEffect(() => {
-    const initializeNotifications = async () => {
-      if (!optionsIsLoaded) return;
-      try {
-        await NotificationManager.initialize(options, type, branchid, languageId, NotificationSoundRef);
-      } catch (error) {
-        console.error('Error initializing NotificationManager:', error);
-      }
-    };
-
+    if (!optionsIsLoaded) return;
     initializeNotifications();
   }, [optionsIsLoaded]);
 

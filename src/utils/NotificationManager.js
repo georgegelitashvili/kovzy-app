@@ -92,7 +92,7 @@ export const ToastManager = () => {
 
 const notificationManager = {
     soundRef: null,
-    async initialize(options, type, branchid, languageId, soundRef) {
+    async initialize(options, branchid, languageId, soundRef) {
         try {
             this.soundRef = soundRef;
             // Register notifications
@@ -101,15 +101,6 @@ const notificationManager = {
                 await this.savePushTokenToBackend(token, options, branchid);
                 console.log('Push notifications initialized.');
             }
-
-            // Register dynamic background task
-            await this.registerBackgroundTask({
-                fetchUrl: options.url_unansweredOrders,
-                type,
-                branchid,
-                languageId,
-                notificationSoundRef: this.soundRef
-            });
         } catch (error) {
             console.error('Error initializing NotificationManager:', error);
             throw error;
@@ -173,54 +164,6 @@ const notificationManager = {
         } catch (error) {
             console.error('Error saving push token to backend:', error);
             throw error;
-        }
-    },
-
-    async registerBackgroundTask({ fetchUrl, type, branchid, languageId }) {
-        TaskManager.defineTask(BACKGROUND_NOTIFICATION_TASK, async () => {
-            console.log('Background task started');
-            try {
-                const response = await axiosInstance.post(fetchUrl, {
-                    type: type,
-                    page: 1,
-                    branchid: branchid,
-                    Languageid: languageId,
-                    postponeOrder: false,
-                    only_check: true,
-                });
-
-                //response.data?.hasNewOrders
-                const hasNewOrders = true;
-                if (hasNewOrders) {
-                    console.log('New orders detected');
-                    if (notificationManager.soundRef?.current) {
-                        await notificationManager.soundRef.current.orderReceived();
-                    } else {
-                        console.warn('soundRef is not set');
-                    }
-                    return BackgroundTask.BackgroundTaskResult.NewData;
-                }
-                console.log('No new orders');
-                return BackgroundTask.BackgroundTaskResult.NoData;
-            } catch (error) {
-                console.error('Background task error:', error);
-                return BackgroundTask.BackgroundTaskResult.Failed;
-            }
-        });
-
-        await BackgroundTask.registerTaskAsync(BACKGROUND_NOTIFICATION_TASK, {
-            minimumInterval: 60,
-            stopOnTerminate: false,
-            startOnBoot: true,
-        });
-    },
-
-    async unregisterBackgroundTask() {
-        try {
-            await BackgroundTask.unregisterTaskAsync(BACKGROUND_NOTIFICATION_TASK);
-            console.log('Background task unregistered.');
-        } catch (error) {
-            console.error('Error unregistering background task:', error);
         }
     },
 };
