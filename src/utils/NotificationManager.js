@@ -1,8 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { Alert, View, AppState, Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
-import * as TaskManager from 'expo-task-manager';
-import * as BackgroundTask from 'expo-background-task';
 import Constants from 'expo-constants';
 import * as Application from 'expo-application';
 import axiosInstance from '../apiConfig/apiRequests';

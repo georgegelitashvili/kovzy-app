@@ -135,6 +135,14 @@ export const EnteredOrdersList = () => {
     return () => subscription?.remove();
   }, []);
 
+  const initializeNotifications = async () => {
+    try {
+      await NotificationManager.initialize(options, branchid, NotificationSoundRef);
+    } catch (error) {
+      console.error('Error initializing NotificationManager:', error);
+    }
+  };
+
   const fetchEnteredOrders = async () => {
     if (!user || !options.url_unansweredOrders) {
       return null;
@@ -237,18 +245,6 @@ export const EnteredOrdersList = () => {
   // Notifications
   // ****************************
   useEffect(() => {
-    const initializeNotifications = async () => {
-      try {
-        if (!optionsIsLoaded) {
-          console.log('Options not loaded yet, skipping initialization.');
-          return;
-        }
-        await NotificationManager.initialize(options, type, branchid, languageId, NotificationSoundRef);
-      } catch (error) {
-        console.error('Error initializing NotificationManager:', error);
-      }
-    };
-
     initializeNotifications();
   }, [optionsIsLoaded]);
 
