@@ -1,5 +1,5 @@
 import React, { useContext } from "react";
-import { StyleSheet, View, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, TouchableOpacity, useWindowDimensions } from 'react-native';
 import { Text, Card, Divider } from 'react-native-paper';
 import { MaterialCommunityIcons, SimpleLineIcons } from '@expo/vector-icons';
 import OrdersDetail from '../OrdersDetail';
@@ -17,6 +17,7 @@ const OrderCard = ({
   onReject,
   loading
 }) => {
+  const { width, height } = useWindowDimensions();
   const deliveryPrice = parseFloat(item.delivery_price);
   const additionalFees = parseFloat(item.service_fee) / 100;
   const feeData = JSON.parse(item.fees_details || '{}');
@@ -31,37 +32,71 @@ const OrderCard = ({
   const { dictionary, languageId } = useContext(LanguageContext);
   const isScheduled = item.take_away ? scheduled.scheduled_takeaway : scheduled.scheduled_delivery;
 
+  // Calculate responsive button dimensions
+  const isSmallScreen = width < 400;
+  const isMediumScreen = width >= 400 && width < 600;
+  const isLargeScreen = width >= 600;
+
+  const buttonWidth = isSmallScreen ? 70 : isMediumScreen ? 80 : 85;
+  const buttonHeight = isSmallScreen ? 40 : isMediumScreen ? 42 : 45;
+  const iconSize = isSmallScreen ? 24 : isMediumScreen ? 26 : 30;
+  const buttonMargin = isSmallScreen ? 3 : isMediumScreen ? 4 : 5;
+
   const renderButtons = () => {
     const isTakeAway = item.take_away === 1;
     const hasDeliveryScheduled = item.delivery_scheduled && item.delivery_scheduled.length > 0;
     const showDelayButton = isTakeAway && hasDeliveryScheduled;
 
     return (
-      <View style={styles.buttonContainer}>
+      <View style={[styles.buttonContainer, { paddingHorizontal: buttonMargin }]}>
         <TouchableOpacity
-          style={[styles.buttonAccept, loading && styles.buttonDisabled]}
+          style={[
+            styles.buttonAccept, 
+            { 
+              width: buttonWidth, 
+              height: buttonHeight,
+              marginHorizontal: buttonMargin 
+            },
+            loading && styles.buttonDisabled
+          ]}
           onPress={() => !loading && onAccept(item.id, item.take_away)}
           disabled={loading}
         >
-          <MaterialCommunityIcons name="check-decagram-outline" size={30} color="white" />
+          <MaterialCommunityIcons name="check-decagram-outline" size={iconSize} color="white" />
         </TouchableOpacity>
 
         {item.delivery_scheduled !== null && isScheduled && (
           <TouchableOpacity
-            style={[styles.buttonDelay, loading && styles.buttonDisabled]}
+            style={[
+              styles.buttonDelay, 
+              { 
+                width: buttonWidth, 
+                height: buttonHeight,
+                marginHorizontal: buttonMargin 
+              },
+              loading && styles.buttonDisabled
+            ]}
             onPress={() => !loading && onDelay(item.id, item.delivery_scheduled)}
             disabled={loading}
           >
-            <MaterialCommunityIcons name="bell-ring-outline" size={30} color="white" />
+            <MaterialCommunityIcons name="bell-ring-outline" size={iconSize} color="white" />
           </TouchableOpacity>
         )}
 
         <TouchableOpacity
-          style={[styles.buttonReject, loading && styles.buttonDisabled]}
+          style={[
+            styles.buttonReject, 
+            { 
+              width: buttonWidth, 
+              height: buttonHeight,
+              marginHorizontal: buttonMargin 
+            },
+            loading && styles.buttonDisabled
+          ]}
           onPress={() => !loading && onReject(item.id)}
           disabled={loading}
         >
-          <MaterialCommunityIcons name="close-circle-outline" size={30} color="white" />
+          <MaterialCommunityIcons name="close-circle-outline" size={iconSize} color="white" />
         </TouchableOpacity>
       </View>
     );
@@ -110,77 +145,84 @@ const OrderCard = ({
   );
 };
 
-const OrderDetails = ({ item, dictionary, currency, deliveryPrice, additionalFees, feesDetails }) => (
-  <>
-    <Text variant="titleSmall" style={styles.title}>
-      {dictionary["orders.status"]}: {dictionary["orders.pending"]}
-    </Text>
-
-    <Text variant="titleSmall" style={styles.title} numberOfLines={2} ellipsizeMode="tail">
-      {dictionary["orders.fName"]}: {item.firstname} {item.lastname}
-    </Text>
-
-    <Text variant="titleSmall" style={styles.title}>
-      {dictionary["orders.phone"]}: {item.phone_number}
-    </Text>
-
-    <Text variant="titleSmall" style={styles.title} ellipsizeMode="tail">
-      {dictionary["orders.address"]}: {item.address}
-    </Text>
-
-    {item.delivery_scheduled && (
-      <Text variant="titleSmall" style={styles.title} numberOfLines={2} ellipsizeMode="tail">
-        {dictionary["orders.scheduledDeliveryTime"]}: {item.delivery_scheduled}
+const OrderDetails = ({ item, dictionary, currency, deliveryPrice, additionalFees, feesDetails }) => {
+  const { width } = useWindowDimensions();
+  const isSmallScreen = width < 400;
+  const textSize = isSmallScreen ? 13 : 14;
+  
+  return (
+    <>
+      <Text variant="titleSmall" style={[styles.title, { fontSize: textSize }]}>
+        {dictionary["orders.status"]}: {dictionary["orders.pending"]}
       </Text>
-    )}
 
-    {item.comment && (
-      <Text variant="titleSmall" style={styles.title}>
-        {dictionary["orders.comment"]}: {item.comment}
+      <Text variant="titleSmall" style={[styles.title, { fontSize: textSize }]} numberOfLines={2} ellipsizeMode="tail">
+        {dictionary["orders.fName"]}: {item.firstname} {item.lastname}
       </Text>
-    )}
 
-    <Text variant="titleSmall" style={styles.title} numberOfLines={2} ellipsizeMode="tail">
-      {dictionary["orders.paymentMethod"]}: {item.payment_type}
-    </Text>
+      <Text variant="titleSmall" style={[styles.title, { fontSize: textSize }]}>
+        {dictionary["orders.phone"]}: {item.phone_number}
+      </Text>
 
-    <Divider />
-    <OrdersDetail orderId={item.id} />
-    <Divider />
+      <Text variant="titleSmall" style={[styles.title, { fontSize: textSize }]} ellipsizeMode="tail">
+        {dictionary["orders.address"]}: {item.address}
+      </Text>
 
-    <PriceDetails
-      item={item}
-      dictionary={dictionary}
-      currency={currency}
-      deliveryPrice={deliveryPrice}
-      additionalFees={additionalFees}
-      feesDetails={feesDetails}
-    />
-  </>
-);
+      {item.delivery_scheduled && (
+        <Text variant="titleSmall" style={[styles.title, { fontSize: textSize }]} numberOfLines={2} ellipsizeMode="tail">
+          {dictionary["orders.scheduledDeliveryTime"]}: {item.delivery_scheduled}
+        </Text>
+      )}
 
-const PriceDetails = ({ item, dictionary, currency, deliveryPrice, additionalFees, feesDetails }) => (
+      {item.comment && (
+        <Text variant="titleSmall" style={[styles.title, { fontSize: textSize }]}>
+          {dictionary["orders.comment"]}: {item.comment}
+        </Text>
+      )}
+
+      <Text variant="titleSmall" style={[styles.title, { fontSize: textSize }]} numberOfLines={2} ellipsizeMode="tail">
+        {dictionary["orders.paymentMethod"]}: {item.payment_type}
+      </Text>
+
+      <Divider />
+      <OrdersDetail orderId={item.id} />
+      <Divider />
+
+      <PriceDetails
+        item={item}
+        dictionary={dictionary}
+        currency={currency}
+        deliveryPrice={deliveryPrice}
+        additionalFees={additionalFees}
+        feesDetails={feesDetails}
+        textSize={textSize}
+      />
+    </>
+  );
+};
+
+const PriceDetails = ({ item, dictionary, currency, deliveryPrice, additionalFees, feesDetails, textSize }) => (
   <>
-    <Text variant="titleMedium" style={styles.title}>
+    <Text variant="titleMedium" style={[styles.title, { fontSize: textSize + 1 }]}>
       {dictionary["orders.initialPrice"]}: {item.real_price} {currency}
     </Text>
 
-    <Text variant="titleMedium" style={styles.title}>
+    <Text variant="titleMedium" style={[styles.title, { fontSize: textSize + 1 }]}>
       {dictionary["orders.discountedPrice"]}: {item.price} {currency}
     </Text>
 
-    <Text variant="titleMedium" style={styles.title}>
+    <Text variant="titleMedium" style={[styles.title, { fontSize: textSize + 1 }]}>
       {dictionary["orders.deliveryPrice"]}: {deliveryPrice} {currency}
     </Text>
 
     {feesDetails?.length > 0 && (
       <View>
-        <Text variant="titleMedium" style={styles.title}>
+        <Text variant="titleMedium" style={[styles.title, { fontSize: textSize + 1 }]}>
           {dictionary["orders.additionalFees"]}: {additionalFees} {currency}
         </Text>
         <View style={styles.feeDetailsContainer}>
           {feesDetails.map((fee, index) => (
-            <Text key={index} style={styles.feeDetailText}>
+            <Text key={index} style={[styles.feeDetailText, { fontSize: textSize }]}>
               {fee} {currency}
             </Text>
           ))}
@@ -188,7 +230,7 @@ const PriceDetails = ({ item, dictionary, currency, deliveryPrice, additionalFee
       </View>
     )}
 
-    <Text variant="titleMedium" style={styles.title}>
+    <Text variant="titleMedium" style={[styles.title, { fontSize: textSize + 1 }]}>
       {dictionary["orders.totalcost"]}: {item.total_cost} {currency}
     </Text>
   </>
@@ -211,13 +253,17 @@ const styles = StyleSheet.create({
   head: {
     flexDirection: "row",
     justifyContent: "space-between",
+    alignItems: "center",
   },
   header: {
     paddingVertical: 10,
+    fontSize: 18,
   },
   takeAway: {
     paddingVertical: 20,
     fontSize: 15,
+    flex: 1,
+    textAlign: 'center',
   },
   leftIcon: {
     marginRight: 3,
@@ -245,40 +291,31 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     alignItems: 'center',
     marginTop: 10,
-    paddingHorizontal: 10,
+    flexWrap: 'wrap',
   },
   buttonAccept: {
-    width: 85,
-    height: 45,
     borderRadius: 21,
     borderWidth: 1,
     borderColor: "#2fa360",
     backgroundColor: "#2fa360",
     justifyContent: "center",
     alignItems: "center",
-    marginHorizontal: 5,
   },
   buttonDelay: {
-    width: 85,
-    height: 45,
     borderRadius: 21,
     borderWidth: 1,
     borderColor: "#3490dc",
     backgroundColor: "#3490dc",
     justifyContent: "center",
     alignItems: "center",
-    marginHorizontal: 5,
   },
   buttonReject: {
-    width: 85,
-    height: 45,
     borderRadius: 21,
     borderWidth: 1,
     borderColor: "#f14c4c",
     backgroundColor: "#f14c4c",
     justifyContent: "center",
     alignItems: "center",
-    marginHorizontal: 5,
   },
   buttonText: {
     fontSize: 18,
