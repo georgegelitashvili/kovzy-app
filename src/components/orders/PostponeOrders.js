@@ -293,7 +293,7 @@ export const PostponeOrders = () => {
                             ) : null}
 
                             {item.comment ? (
-                                <Text variant="titleSmall" style={styles.title} numberOfLines={2} ellipsizeMode="tail">
+                                <Text variant="titleSmall" style={styles.title}>
                                     {dictionary["orders.comment"]}: {item.comment}
                                 </Text>
                             ) : null}
