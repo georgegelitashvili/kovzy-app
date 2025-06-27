@@ -1,13 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, FlatList, StyleSheet, TouchableOpacity, TouchableWithoutFeedback, Platform } from 'react-native';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { View, FlatList, StyleSheet, TouchableOpacity, TouchableWithoutFeedback } from 'react-native';
 import { Card, Text } from 'react-native-paper';
 import { Audio } from 'expo-av';
-import { Feather } from '@expo/vector-icons'; // Import Feather icons
+import { Feather } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import useErrorDisplay from '../../hooks/useErrorDisplay';
-import ErrorManager from '../../utils/ErrorManager';
-
 
 const musicList = [
     { id: '1', title: 'Plucky', source: require('../../assets/audio/plucky.mp3') },
@@ -20,15 +18,14 @@ const musicList = [
     { id: '8', title: 'Relax tone', source: require('../../assets/audio/relax-message-tone.mp3') },
 ];
 
-const NotificationScreen = ({ navigation }) => {
-    const [sound, setSound] = useState(null);
+const NotificationScreen = () => {
+    const soundRef = useRef(null);
     const [playingMusicId, setPlayingMusicId] = useState(null);
-    const [selectedMusic, setSelectedMusic] = useState(null); // No default music initially
-    const [pressedCardId, setPressedCardId] = useState(null); // State to track pressed card
+    const [selectedMusic, setSelectedMusic] = useState(null);
+    const [pressedCardId, setPressedCardId] = useState(null);
     const { errorDisplay, setError, clearError } = useErrorDisplay({ showInline: true, style: styles.errorDisplay });
 
     useEffect(() => {
-        // Load saved music from AsyncStorage
         const loadSavedMusic = async () => {
             try {
                 const savedMusicId = await AsyncStorage.getItem('selectedMusicId');
@@ -38,7 +35,8 @@ const NotificationScreen = ({ navigation }) => {
                 } else {
                     setSelectedMusic('1');
                     setPlayingMusicId('1');
-                }            } catch (error) {
+                }
+            } catch (error) {
                 console.log('Error loading saved music:', error);
                 setError('STORAGE_ERROR', 'Failed to load notification preferences');
             }
@@ -46,49 +44,54 @@ const NotificationScreen = ({ navigation }) => {
         loadSavedMusic();
     }, []);
 
+    useEffect(() => {
+        return () => {
+            if (soundRef.current) {
+                soundRef.current.unloadAsync().catch(() => { });
+                soundRef.current = null;
+            }
+        };
+    }, []);
+
     useFocusEffect(
         useCallback(() => {
             return () => {
-                // Stop the music when the screen loses focus
-                if (sound) {
-                    sound.stopAsync();
+                if (soundRef.current) {
+                    soundRef.current.getStatusAsync()
+                        .then(status => {
+                            if (status.isLoaded) {
+                                soundRef.current.stopAsync().catch(() => { });
+                            }
+                        })
+                        .catch(() => { });
                     setPlayingMusicId(null);
                 }
             };
-        }, [sound])
+        }, [])
     );
 
-    useEffect(() => {
-        return sound
-            ? () => {
-                sound.unloadAsync(); // Cleanup sound resource
-            }
-            : undefined;
-    }, [sound]);
-
     const onPlaySound = async (musicId, source) => {
-        // Stop the current playing sound if it's different from the new one
-        if (sound && playingMusicId !== musicId) {
-            await sound.stopAsync();
-            await sound.unloadAsync();
-            setSound(null); // Reset the sound state
-        }
-
-        // If the music is already playing and it's the same one, stop it
-        if (playingMusicId === musicId) {
-            await sound.stopAsync();
-            setPlayingMusicId(null);
-            return;
-        }
-
-        // Load the new sound and play it
-        const { sound: newSound } = await Audio.Sound.createAsync(source);
-        setSound(newSound);
-        setPlayingMusicId(musicId);
-
         try {
+            if (soundRef.current) {
+                const status = await soundRef.current.getStatusAsync();
+                if (status.isLoaded) {
+                    await soundRef.current.stopAsync();
+                    await soundRef.current.unloadAsync();
+                }
+                soundRef.current = null;
+            }
+
+            if (playingMusicId === musicId) {
+                setPlayingMusicId(null);
+                return;
+            }
+
+            const { sound: newSound } = await Audio.Sound.createAsync(source);
+            soundRef.current = newSound;
+            setPlayingMusicId(musicId);
+
             await newSound.playAsync();
-            // Add a listener to stop playing when the audio is done
+
             newSound.setOnPlaybackStatusUpdate((status) => {
                 if (status.didJustFinish) {
                     setPlayingMusicId(null);
@@ -96,19 +99,15 @@ const NotificationScreen = ({ navigation }) => {
             });
         } catch (error) {
             console.log('Error playing sound:', error);
+            setError('AUDIO_ERROR', 'Failed to play the sound');
         }
     };
 
-
     const onSelectMusic = async (id, title) => {
-        // Toggle selection state of music only if it's not already selected        setSelectedMusic((prevSelected) => (prevSelected === id ? prevSelected : id));
-
-        // Save the selected music ID to AsyncStorage
+        setSelectedMusic(id);
         try {
             await AsyncStorage.setItem('selectedMusicId', id);
-            // Save the selected music title to AsyncStorage
             await AsyncStorage.setItem('selectedMusicTitle', title);
-            // Clear any previous errors
             clearError();
         } catch (error) {
             console.log('Error saving selected music:', error);
@@ -116,26 +115,22 @@ const NotificationScreen = ({ navigation }) => {
         }
     };
 
-
     const handleCardPress = (item) => {
-        // Select music
         onSelectMusic(item.id, item.title);
-        // Play or stop sound based on current playback
-        if (playingMusicId === item.id) {
-            // If the same music is clicked, stop it
-            onPlaySound(item.id, item.source);
-        } else {
-            // If a different music is clicked, stop the previous one and play the new one
-            onPlaySound(item.id, item.source);
-        }
+        onPlaySound(item.id, item.source);
     };
 
-
-    const handleOutsidePress = () => {
-        // Stop music when clicking outside the card
-        if (sound) {
-            sound.stopAsync();
-            setPlayingMusicId(null);
+    const handleOutsidePress = async () => {
+        if (soundRef.current) {
+            try {
+                const status = await soundRef.current.getStatusAsync();
+                if (status.isLoaded) {
+                    await soundRef.current.stopAsync();
+                }
+                setPlayingMusicId(null);
+            } catch (error) {
+                console.log('Error stopping sound on outside press:', error);
+            }
         }
     };
 
@@ -146,7 +141,8 @@ const NotificationScreen = ({ navigation }) => {
     const handlePressOut = () => {
         setPressedCardId(null);
     };
-    console.log(selectedMusic, playingMusicId);    return (
+
+    return (
         <TouchableWithoutFeedback onPress={handleOutsidePress}>
             <View style={styles.container}>
                 {errorDisplay}
@@ -168,11 +164,11 @@ const NotificationScreen = ({ navigation }) => {
                                 <Card.Content style={styles.cardContent}>
                                     <View style={styles.titleContainer}>
                                         <Text style={styles.title}>{item.title}</Text>
-                                        <TouchableOpacity style={styles.checkboxContainer}>
+                                        <View style={styles.checkboxContainer}>
                                             {selectedMusic === item.id && (
                                                 <Feather name="check" size={24} color="#007AFF" />
                                             )}
-                                        </TouchableOpacity>
+                                        </View>
                                     </View>
                                 </Card.Content>
                             </Card>
@@ -188,24 +184,24 @@ const NotificationScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F5F5F5', // Light background color for a cleaner look
+        backgroundColor: '#F5F5F5',
     },
     list: {
         paddingHorizontal: 15,
         paddingVertical: 10,
     },
     card: {
-        marginBottom: 10, // Space between cards
-        borderRadius: 8, // Rounded corners for each card
-        elevation: 2, // Less intense shadow on Android
-        shadowColor: '#000', // Shadow color
-        shadowOffset: { width: 0, height: 1 }, // Shadow offset
-        shadowOpacity: 0.1, // Less intense shadow
-        shadowRadius: 2, // Less intense shadow blur
+        marginBottom: 10,
+        borderRadius: 8,
+        elevation: 2,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 2,
     },
     cardPressed: {
-        elevation: 1, // Reduced shadow on press
-        shadowOpacity: 0.05, // Even less intense shadow on press
+        elevation: 1,
+        shadowOpacity: 0.05,
     },
     cardContent: {
         paddingVertical: 10,
@@ -213,19 +209,20 @@ const styles = StyleSheet.create({
     },
     titleContainer: {
         flexDirection: 'row',
-        alignItems: 'center', // Align items vertically
-        justifyContent: 'space-between', // Space between title and checkbox
+        alignItems: 'center',
+        justifyContent: 'space-between',
     },
     title: {
         fontSize: 16,
         fontWeight: 'bold',
         color: '#333333',
-        flex: 1, // Allow title to take available space
-    },    checkboxContainer: {
+        flex: 1,
+    },
+    checkboxContainer: {
         justifyContent: 'center',
         alignItems: 'center',
-        height: 24, // Ensure container has enough height to show the icon
-        width: 24, // Ensure container has enough width to show the icon
+        height: 24,
+        width: 24,
     },
     errorDisplay: {
         zIndex: 1000,
