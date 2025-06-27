@@ -199,20 +199,52 @@ export default function Products({ navigation }) {
   const handleButtonPress = useCallback(async (item, disabled_by) => {
     if (!domain || !branchid || !branchEnabled) return;
 
+    
+
     try {
       const response = await axiosInstance.post(
         `https://${domain}/api/v1/admin/productActivity`,
         { pid: item.id, branchid: branchid, disabled_by: disabled_by }
       );
 
-      const isAlreadyDisabled = excluded.some((excludedItem) => excludedItem.productid === item.id && excludedItem.disabled_by === disabled_by);
+  
+
+
+      const responseData = response.data.data || response.data;
+      const isNowDisabled = responseData && responseData[item.id] === false;
+
       
-      if (isAlreadyDisabled) {
-        setExcluded(prev => prev.filter(ex => !(ex.productid === item.id && ex.disabled_by === disabled_by)));
+      if (isNowDisabled) {
+        
+        setExcluded(prev => {
+         
+          const filtered = prev.filter(ex => {
+            if (disabled_by === "") {
+
+              return !(ex.productid === item.id && (ex.disabled_by === "" || ex.disabled_by === null));
+            } else {
+
+              return !(ex.productid === item.id && ex.disabled_by === disabled_by);
+            }
+          });
+
+          const disabledByValue = disabled_by === "" ? null : disabled_by;
+          return [...filtered, { productid: item.id, disabled_by: disabledByValue }];
+        });
       } else {
-        setExcluded(prev => [...prev, { productid: item.id, disabled_by }]);
+       
+        setExcluded(prev => {
+          if (disabled_by === "") {
+
+            return prev.filter(ex => !(ex.productid === item.id && (ex.disabled_by === "" || ex.disabled_by === null)));
+          } else {
+
+            return prev.filter(ex => !(ex.productid === item.id && ex.disabled_by === disabled_by));
+          }
+        });
       }
       
+
       onRefresh();
     } catch (error) {
       console.error('Error updating product activity:', error);
@@ -221,10 +253,13 @@ export default function Products({ navigation }) {
 
   const handleCheckboxPress = useCallback((id) => {
     if (!branchEnabled) return;
+
     setCheckedItems((prevState) => {
       if (prevState.includes(id)) {
+
         return prevState.filter((item) => item !== id);
       } else {
+     
         return [...prevState, id];
       }
     });
@@ -232,13 +267,18 @@ export default function Products({ navigation }) {
 
   const checkboxPressed = useCallback(() => {
     if (!branchEnabled) return;
+
     if (checkedItems.length > 0) {
+
       checkedItems.forEach(id => {
         const item = products.find(item => item.id === id);
         if (item) {
-          handleButtonPress(item);
+
+          handleButtonPress(item, ""); // Pass empty string for regular disable/enable
         }
       });
+    } else {
+      console.log('No items checked');
     }
   }, [branchEnabled, checkedItems, products, handleButtonPress]);
 
@@ -247,7 +287,7 @@ export default function Products({ navigation }) {
   }, [navigation]);
 
   const renderItem = useCallback(({ item }) => {
-    const isExcluded = excluded.some((excludedItem) => excludedItem.productid === item.id && excludedItem.disabled_by === "");
+    const isExcluded = excluded.some((excludedItem) => excludedItem.productid === item.id && (excludedItem.disabled_by === "" || excludedItem.disabled_by === null));
     const isExcludedQr = excluded.some((excludedItem) => excludedItem.productid === item.id && excludedItem.disabled_by === "qr-menu");
     const isExcludedOnline = excluded.some((excludedItem) => excludedItem.productid === item.id && excludedItem.disabled_by === "online");
     return (
