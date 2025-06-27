@@ -7,16 +7,30 @@ import {
   Keyboard,
   TouchableWithoutFeedback,
   Alert,
+  useWindowDimensions,
 } from "react-native";
 import axiosInstance from "../../apiConfig/apiRequests";
 import { String, LanguageContext } from "../Language";
 
 export default function OrdersModalContent(props) {
+  const { width, height } = useWindowDimensions();
   const [orderData, setOrderData] = useState({});
   const [acceptData, setAcceptData] = useState({});
   const [selected, setSelected] = useState(props.items ? props.items[0]?.value : null);
   const [loading, setLoading] = useState(false);
   const { dictionary } = useContext(LanguageContext);
+
+  // Calculate responsive dimensions
+  const isSmallScreen = width < 400;
+  const isMediumScreen = width >= 400 && width < 600;
+  const isLargeScreen = width >= 600;
+  const isLandscape = width > height;
+
+  const contentPadding = isSmallScreen ? 15 : isMediumScreen ? 18 : 20;
+  const buttonPadding = isSmallScreen ? 5 : isMediumScreen ? 6 : 7;
+  const buttonMargin = isSmallScreen ? 8 : isMediumScreen ? 9 : 10;
+  const titleFontSize = isSmallScreen ? 16 : isMediumScreen ? 17 : 18;
+  const inputFontSize = isSmallScreen ? 13 : 14;
 
   // console.log(props.forDelivery);
   const acceptOrder = async () => {
@@ -68,14 +82,20 @@ export default function OrdersModalContent(props) {
   return (
     <>
       <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
-        <View style={styles.content}>
+        <View style={[styles.content, { padding: contentPadding }]}>
           {loading ? <Loader /> : null}
 
           <View style={styles.buttonModal}>
             <Button
               mode="contained"
               textColor="white"
-              style={styles.buttonAccept}
+              style={[
+                styles.buttonAccept, 
+                { 
+                  padding: buttonPadding,
+                  marginRight: buttonMargin 
+                }
+              ]}
               onPress={acceptOrder}
             >
               {dictionary["orders.approve"]}
@@ -83,7 +103,10 @@ export default function OrdersModalContent(props) {
             <Button
               mode="contained"
               textColor="white"
-              style={styles.buttonClose}
+              style={[
+                styles.buttonClose, 
+                { padding: buttonPadding }
+              ]}
               onPress={props.hideModal}
             >
               {dictionary["close"]}
@@ -98,34 +121,34 @@ export default function OrdersModalContent(props) {
 const styles = StyleSheet.create({
   content: {
     width: "100%",
-    padding: 20,
   },
   contentTitle: {
     width: "100%",
-    fontSize: 18,
     marginTop: 20,
     marginBottom: 20,
+    fontWeight: "500",
   },
   contentInput: {
     width: "100%",
     marginBottom: 25,
     paddingLeft: 1,
-    fontSize: 14,
   },
   buttonModal: {
     flexDirection: "row",
     justifyContent: "space-around",
-    paddingTop: 20
+    paddingTop: 20,
+    flexWrap: "wrap",
   },
   buttonAccept: {
-    padding: 7,
     justifyContent: "space-between",
     backgroundColor: "#2fa360",
-    marginRight: 10,
+    borderRadius: 8,
+    minWidth: 100,
   },
   buttonClose: {
-    padding: 7,
     justifyContent: "space-between",
     backgroundColor: "#6c757d",
+    borderRadius: 8,
+    minWidth: 100,
   },
 });

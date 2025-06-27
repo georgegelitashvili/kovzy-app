@@ -8,17 +8,31 @@ import {
   Keyboard,
   TouchableWithoutFeedback,
   Alert,
+  useWindowDimensions,
 } from "react-native";
 import axiosInstance from "../../apiConfig/apiRequests";
 import { String, LanguageContext } from "../Language";
 
 export default function OrdersModalContent(props) {
+  const { width, height } = useWindowDimensions();
   const [orderData, setOrderData] = useState({});
   const [acceptData, setAcceptData] = useState({});
   const [deliveron, setDeliveron] = useState({ data: [], error: "" });
   const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(false);
   const { dictionary } = useContext(LanguageContext);
+
+  // Calculate responsive dimensions
+  const isSmallScreen = width < 400;
+  const isMediumScreen = width >= 400 && width < 600;
+  const isLargeScreen = width >= 600;
+  const isLandscape = width > height;
+
+  const contentPadding = isSmallScreen ? 15 : isMediumScreen ? 18 : 20;
+  const buttonPadding = isSmallScreen ? 5 : isMediumScreen ? 6 : 7;
+  const buttonMargin = isSmallScreen ? 8 : isMediumScreen ? 9 : 10;
+  const titleFontSize = isSmallScreen ? 16 : isMediumScreen ? 17 : 18;
+  const inputFontSize = isSmallScreen ? 13 : 14;
 
   useEffect(() => {    
     if (props.takeAway === 1) {
@@ -147,7 +161,7 @@ export default function OrdersModalContent(props) {
   return (
     <>
       <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
-        <View style={styles.content}>
+        <View style={[styles.content, { padding: contentPadding }]}>
           {loading && <Loader />}
 
           {props.deliveron?.status !== -2 && props.takeAway !== 1 ? (
@@ -197,34 +211,34 @@ export default function OrdersModalContent(props) {
 const styles = StyleSheet.create({
   content: {
     width: "100%",
-    padding: 20,
   },
   contentTitle: {
     width: "100%",
-    fontSize: 18,
     marginTop: 20,
     marginBottom: 20,
+    fontWeight: "500",
   },
   contentInput: {
     width: "100%",
     marginBottom: 25,
     paddingLeft: 1,
-    fontSize: 14,
   },
   buttonModal: {
     flexDirection: "row",
-    justifyContent: "space-around",
-    paddingTop: 20
+    justifyContent: "space-between",
+    paddingTop: 20,
+    gap: 10,
   },
   buttonAccept: {
-    padding: 7,
-    justifyContent: "space-between",
+    flex: 1,
     backgroundColor: "#2fa360",
-    marginRight: 10,
+    borderRadius: 8,
+    marginRight: 5,
   },
   buttonClose: {
-    padding: 7,
-    justifyContent: "space-between",
+    flex: 1,
     backgroundColor: "#6c757d",
+    borderRadius: 8,
+    marginLeft: 5,
   },
 });

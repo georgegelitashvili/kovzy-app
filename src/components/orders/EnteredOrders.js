@@ -35,7 +35,7 @@ import { debounce } from 'lodash';
 // This will be replaced with a dynamic calculation based on screen size
 const initialWidth = Dimensions.get("window").width;
 const getColumnsByScreenSize = (screenWidth) => {
-  if (screenWidth < 600) return 1; // Mobile phones
+  if (screenWidth < 750) return 1; // Mobile phones
   if (screenWidth < 960) return 2; // Tablets
   return 3; // Larger screens
 };
