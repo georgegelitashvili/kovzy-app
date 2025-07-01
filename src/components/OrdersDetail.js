@@ -3,112 +3,42 @@ import React, {
   useEffect,
   useContext,
   useCallback,
-  useRef,
   useMemo,
 } from "react";
-import { StyleSheet, View, FlatList, ActivityIndicator } from "react-native";
-import { List, Text, Button } from "react-native-paper";
+import { StyleSheet, View, FlatList } from "react-native";
+import { List, Text } from "react-native-paper";
 import { Entypo } from "@expo/vector-icons";
 
-import { AuthContext } from "../context/AuthProvider";
 import { LanguageContext } from "./Language";
-import axiosInstance from "../apiConfig/apiRequests";
 
-function OrdersDetail({ orderId, onDataLoaded }) {
+/**
+ * OrdersDetail Component
+ * 
+ * Displays order details using pre-fetched data from parent component.
+ * No longer makes individual API calls - expects orderData to be provided.
+ * 
+ * @param {string|number} orderId - The order ID to display details for
+ * @param {Array} orderData - Pre-fetched order data from parent component
+ * @param {Function} onDataLoaded - Optional callback when data is loaded
+ */
+function OrdersDetail({ orderId, orderData, onDataLoaded }) {
+  // console.log("OrdersDetail rendered with orderId:", orderData);
   const [expanded, setExpanded] = useState(true);
   const [orderCart, setOrderCart] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
 
-  const abortControllerRef = useRef(null);
-  const prevOrderIdRef = useRef(null);
-  const hasDataRef = useRef(false);
-
-  const { domain } = useContext(AuthContext);
-  const { dictionary, userLanguage } = useContext(LanguageContext);
-
-  const fetchOrderCart = useCallback(async () => {
-    if (!orderId || !domain) return;
-
-    // თავიდან ავირიდოთ დუბლირებული fetch
-    if (orderId === prevOrderIdRef.current && hasDataRef.current) return;
-    
-    // განახლება orderId-ის შეცვლისას
-    if (orderId !== prevOrderIdRef.current) {
-      prevOrderIdRef.current = orderId;
-      hasDataRef.current = false;
-      setOrderCart([]);
-      setError(null);
-    }
-
-    // წინა მოთხოვნის გაუქმება
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
-    }
-
-    abortControllerRef.current = new AbortController();
-    setLoading(true);
-    setError(null);
-
-    try {
-      const url = `https://${domain}/api/v1/admin/getOrderCart`;
-
-      const response = await axiosInstance.post(
-        url,
-        { Orderid: orderId, lang: userLanguage },
-        {
-          timeout: 10000,
-          signal: abortControllerRef.current.signal,
-        }
-      );
-
-      const data = response.data.data;
-      if (data?.message) {
-        setOrderCart([]);
-        hasDataRef.current = true;
-        onDataLoaded?.(orderId, []);
-      } else {
-        const cartData = data ?? [];
-        setOrderCart(cartData);
-        hasDataRef.current = true;
-        onDataLoaded?.(orderId, cartData);
-      }
-    } catch (err) {
-      if (err.name !== "AbortError" && err.name !== "CanceledError") {
-        console.error("Error fetching order details:", err?.message || err);
-        setError(dictionary["errors.apiError"] || "Failed to load order details.");
-        setOrderCart([]);
-        hasDataRef.current = false;
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, [orderId, domain, userLanguage, dictionary]);
+  const { dictionary } = useContext(LanguageContext);
 
   useEffect(() => {
-    // Reset state when orderId changes
-    if (orderId !== prevOrderIdRef.current) {
-      hasDataRef.current = false;
+    // Use the pre-fetched orderData directly
+    if (orderData !== undefined) {
+      setOrderCart(orderData || []);
+      onDataLoaded?.(orderId, orderData || []);
+    } else {
+      // If no data provided, set empty array
       setOrderCart([]);
-      setError(null);
-      setLoading(false);
+      onDataLoaded?.(orderId, []);
     }
-    
-    fetchOrderCart();
-
-    return () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-        abortControllerRef.current = null;
-      }
-    };
-  }, [fetchOrderCart, orderId]);
-
-  const handleRetry = useCallback(() => {
-    hasDataRef.current = false;
-    fetchOrderCart();
-  }, [fetchOrderCart]);
+  }, [orderId, orderData, onDataLoaded]);
 
   const handlePress = useCallback(() => setExpanded((prev) => !prev), []);
 
@@ -160,39 +90,15 @@ function OrdersDetail({ orderId, onDataLoaded }) {
     []
   );
 
-  const emptyStateText = useMemo(
-    () => dictionary["orders.noDetails"] || "No order details available",
-    [dictionary]
-  );
-
-  const retryButtonText = useMemo(
-    () => dictionary["buttons.retry"] || "Retry",
-    [dictionary]
-  );
-
   const accordionTitle = useMemo(
     () => dictionary["orders.orderProducts"] || "Order Products",
     [dictionary]
   );
 
-  if (loading) {
-    return (
-      <View style={styles.emptyContainer}>
-        <ActivityIndicator size="large" />
-      </View>
-    );
-  }
-
-  if (error) {
-    return (
-      <View style={styles.emptyContainer}>
-        <Text style={styles.errorText}>{error}</Text>
-        <Button mode="contained" onPress={handleRetry} style={styles.retryButton}>
-          {retryButtonText}
-        </Button>
-      </View>
-    );
-  }
+  const emptyStateText = useMemo(
+    () => dictionary["orders.noDetails"] || "No order details available",
+    [dictionary]
+  );
 
   if (!orderCart.length) {
     return (
@@ -226,8 +132,9 @@ function OrdersDetail({ orderId, onDataLoaded }) {
 
 // ✅ Enhanced memo wrapping with deeper comparison
 export default React.memo(OrdersDetail, (prevProps, nextProps) => {
-  // Only re-render if orderId actually changes
-  return prevProps.orderId === nextProps.orderId;
+  // Only re-render if orderId or orderData actually changes
+  return prevProps.orderId === nextProps.orderId && 
+         prevProps.orderData === nextProps.orderData;
 });
 
 const styles = StyleSheet.create({
@@ -267,17 +174,9 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     marginRight: 5,
   },
-  errorText: {
-    color: "#d32f2f",
-    textAlign: "center",
-    marginBottom: 10,
-  },
   emptyText: {
     color: "#666",
     textAlign: "center",
     fontSize: 16,
-  },
-  retryButton: {
-    marginTop: 10,
   },
 });

@@ -5,18 +5,35 @@ import { MaterialCommunityIcons, SimpleLineIcons } from '@expo/vector-icons';
 import OrdersDetail from '../OrdersDetail';
 import { String, LanguageContext } from "../Language";
 
-const OrderCard = ({
-  item,
-  currency,
-  isOpen,
-  fees,
-  scheduled,
-  onToggle,
-  onAccept,
-  onDelay,
-  onReject,
-  loading
-}) => {
+const OrderCard = (props) => {
+  // Ensure all props exist before destructuring
+  const safeProps = {
+    item: props.item,
+    currency: props.currency || '',
+    isOpen: props.isOpen || false,
+    fees: props.fees || [],
+    scheduled: props.scheduled || {},
+    orderData: props.orderData || [],
+    onToggle: props.onToggle,
+    onAccept: props.onAccept,
+    onDelay: props.onDelay,
+    onReject: props.onReject,
+    loading: props.loading || false
+  };
+  
+  const {
+    item,
+    currency,
+    isOpen,
+    fees,
+    scheduled,
+    orderData,
+    onToggle,
+    onAccept,
+    onDelay,
+    onReject,
+    loading
+  } = safeProps;
   const { width, height } = useWindowDimensions();
   const deliveryPrice = parseFloat(item.delivery_price);
   const additionalFees = parseFloat(item.service_fee) / 100;
@@ -134,6 +151,7 @@ const OrderCard = ({
             deliveryPrice={deliveryPrice}
             additionalFees={additionalFees}
             feesDetails={feesDetails}
+            orderData={orderData}
           />
 
           <Card.Actions>
@@ -145,7 +163,7 @@ const OrderCard = ({
   );
 };
 
-const OrderDetails = ({ item, dictionary, currency, deliveryPrice, additionalFees, feesDetails }) => {
+const OrderDetails = ({ item, dictionary, currency, deliveryPrice, additionalFees, feesDetails, orderData }) => {
   const { width } = useWindowDimensions();
   const isSmallScreen = width < 400;
   const textSize = isSmallScreen ? 13 : 14;
@@ -185,7 +203,7 @@ const OrderDetails = ({ item, dictionary, currency, deliveryPrice, additionalFee
       </Text>
 
       <Divider />
-      <OrdersDetail orderId={item.id} />
+      <OrdersDetail orderId={item.id} orderData={orderData || []} />
       <Divider />
 
       <PriceDetails
@@ -336,12 +354,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default React.memo(OrderCard, (prevProps, nextProps) => {
-  return (
-    prevProps.item.id === nextProps.item.id &&
-    prevProps.isOpen === nextProps.isOpen &&
-    prevProps.currency === nextProps.currency &&
-    prevProps.loading === nextProps.loading &&
-    JSON.stringify(prevProps.fees) === JSON.stringify(nextProps.fees)
-  );
-});
+export default OrderCard;

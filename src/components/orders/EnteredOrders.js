@@ -31,6 +31,7 @@ import { orderReducer, initialState } from '../../reducers/orderReducer';
 import OrderCard from "./OrderCard";
 import { handleDelaySet } from '../../utils/timeUtils';
 import { debounce } from 'lodash';
+import { useOrderDetails } from "../../hooks/useOrderDetails";
 
 // This will be replaced with a dynamic calculation based on screen size
 const initialWidth = Dimensions.get("window").width;
@@ -55,6 +56,20 @@ export const EnteredOrdersList = () => {
   const { domain, branchid, user } = useContext(AuthContext);
   const { dictionary, languageId } = useContext(LanguageContext);
   const [state, dispatch] = useReducer(orderReducer, initialState);
+
+  console.log('languageId',languageId);
+  
+  // Use the custom hook for order details management
+  const {
+    orderDetails,
+    loadingDetails,
+    fetchBatchOrderDetails,
+    fetchOrderDetailsLazy,
+    isOrderDetailsLoaded,
+    clearOrderDetails,
+    getOrderDetails
+  } = useOrderDetails();
+  
   const NotificationSoundRef = useRef(null);
   const soundRef = useRef(null);
   const intervalRef = useRef(null);
@@ -154,6 +169,16 @@ export const EnteredOrdersList = () => {
       });
 
       const newOrders = resp.data.data;
+      console.log(`Fetched orders`, languageId);
+      
+      // Get current order IDs to compare with new ones
+      const currentOrderIds = state.orders.map(order => order.id);
+      const newOrderIds = newOrders.map(order => order.id);
+      
+      // Find orders that are new to the orders state AND don't have cached details
+      const ordersNeedingDetails = newOrderIds.filter(id => 
+        !currentOrderIds.includes(id) && !isOrderDetailsLoaded(id)
+      );
       
       if (isInitialFetchRef.current) {
         console.log('Initial fetch completed');
@@ -174,6 +199,13 @@ export const EnteredOrdersList = () => {
           }
         }
         newOrders.forEach(order => lastOrdersRef.current.add(order.id));
+        
+        // For initial load, fetch details for all uncached orders
+        const uncachedOrders = newOrderIds.filter(id => !isOrderDetailsLoaded(id));
+        if (uncachedOrders.length > 0) {
+          console.log(`Initial load: fetching details for ${uncachedOrders.length} uncached orders`);
+          await fetchBatchOrderDetails(uncachedOrders, true);
+        }
       } else {
         const hasNewOrders = newOrders.some(order => !lastOrdersRef.current.has(order.id));
         
@@ -193,6 +225,12 @@ export const EnteredOrdersList = () => {
           }
           
           newOrders.forEach(order => lastOrdersRef.current.add(order.id));
+        }
+        
+        // Only fetch order details if there are new orders that need details
+        if (ordersNeedingDetails.length > 0) {
+          console.log(`Fetching details for ${ordersNeedingDetails.length} new orders:`, ordersNeedingDetails);
+          await fetchBatchOrderDetails(ordersNeedingDetails, false); // Don't show loader for interval calls
         }
       }
 
@@ -233,7 +271,7 @@ export const EnteredOrdersList = () => {
         handleReload();
       }
     }
-  }, [user, options.url_unansweredOrders, branchid, languageId, dictionary, retryCount]);
+  }, [user, options.url_unansweredOrders, branchid, languageId, dictionary, retryCount, state.orders, isOrderDetailsLoaded, fetchBatchOrderDetails]);
 
 
 
@@ -283,8 +321,10 @@ export const EnteredOrdersList = () => {
     } else if (domain || branchid) {
       setOptionsIsLoaded(false);
       dispatch({ type: 'SET_ORDERS', payload: { orders: [], fees: [], currency: "", scheduled: [] }});
+      // Clear order details cache when switching domains/branches
+      clearOrderDetails();
     }
-  }, [domain, branchid, apiOptions]);
+  }, [domain, branchid, apiOptions, clearOrderDetails]);
 
   // Monitor internet connectivity
   useEffect(() => {
@@ -339,7 +379,12 @@ export const EnteredOrdersList = () => {
 
   const handleToggleContent = useCallback((id) => {
     dispatch({ type: 'TOGGLE_CONTENT', payload: id });
-  }, []);
+    
+    // Lazy load: fetch order details when expanding if not already loaded
+    if (!state.isOpen.includes(id) && !orderDetails[id]) {
+      fetchOrderDetailsLazy(id);
+    }
+  }, [state.isOpen, orderDetails, fetchOrderDetailsLazy]);
 
   const handleAcceptOrder = useCallback(async (itemId, itemTakeAway) => {
     try {
@@ -486,27 +531,32 @@ export const EnteredOrdersList = () => {
     await handleDelaySet(params);
   }, [state.deliveryScheduled, state.scheduled, state.itemId, options, dictionary]);
 
-  const renderOrderCard = useCallback(({ item }) => (
-    <View style={{
-      width: width / numColumns - (numColumns > 1 ? 15 : 30),
-      marginHorizontal: 5
-    }}>
-      <OrderCard
-        key={item.id}
-        item={item}
-        currency={state.currency}
-        isOpen={state.isOpen.includes(item.id)}
-        fees={state.fees}
-        scheduled={state.scheduled}
-        dictionary={dictionary}
-        onToggle={handleToggleContent}
-        onAccept={handleAcceptOrder}
-        onDelay={handleDelayOrder}
-        onReject={handleRejectOrder}
-        loading={state.loading}
-      />
-    </View>
-  ), [state.currency, state.isOpen, state.fees, state.scheduled, state.loading, dictionary, handleToggleContent, handleAcceptOrder, handleDelayOrder, handleRejectOrder]);
+  const renderOrderCard = useCallback(({ item }) => {
+    const orderDataForItem = getOrderDetails(item.id) || [];
+    
+    return (
+      <View style={{
+        width: width / numColumns - (numColumns > 1 ? 15 : 30),
+        marginHorizontal: 5
+      }}>
+        <OrderCard
+          key={item.id}
+          item={item}
+          currency={state.currency}
+          isOpen={state.isOpen.includes(item.id)}
+          fees={state.fees}
+          scheduled={state.scheduled}
+          dictionary={dictionary}
+          orderData={orderDataForItem}
+          onToggle={handleToggleContent}
+          onAccept={handleAcceptOrder}
+          onDelay={handleDelayOrder}
+          onReject={handleRejectOrder}
+          loading={state.loading}
+        />
+      </View>
+    );
+  }, [state.currency, state.isOpen, state.fees, state.scheduled, state.loading, dictionary, getOrderDetails, handleToggleContent, handleAcceptOrder, handleDelayOrder, handleRejectOrder, width, numColumns]);
 
   const keyExtractor = useCallback((item) => item.id.toString(), []);
 
@@ -538,7 +588,7 @@ export const EnteredOrdersList = () => {
     <View style={styles.container}>
       {state.loadingOptions && <Loader />}
       <NotificationSound ref={NotificationSoundRef} />
-      {state.loading && <Loader show={state.loading} />}
+      {(state.loading || loadingDetails) && <Loader show={state.loading || loadingDetails} />}
       <ErrorDisplay 
         error={error} 
         onDismiss={clearError} 

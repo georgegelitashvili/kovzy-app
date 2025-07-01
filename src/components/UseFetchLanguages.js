@@ -1,6 +1,7 @@
 // useFetchLanguages.js
 import { useState, useEffect } from 'react';
 import axiosInstance from '../apiConfig/apiRequests';
+import { storeData } from '../helpers/storage';
 
 export const useFetchLanguages = (apiUrls) => {
   const [languages, setLanguages] = useState([]);
@@ -14,7 +15,12 @@ export const useFetchLanguages = (apiUrls) => {
       try {
         const response = await axiosInstance.post(apiUrls.languages);
         if (response.data?.languages) {
-          setLanguages(response.data.languages);
+          const fetchedLanguages = response.data.languages;
+          setLanguages(fetchedLanguages);
+          
+          // Store languages in async storage for LanguageContext to access
+          await storeData('languages', fetchedLanguages);
+          console.log('Languages stored successfully:', fetchedLanguages);
         }
       } catch (error) {
         console.error('Error fetching languages:', error);

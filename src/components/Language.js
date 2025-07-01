@@ -48,7 +48,7 @@ export function LanguageProvider({ children }) {
     };
 
     updateLanguageId();
-  }, [userLanguage]);
+  }, [userLanguage, languageId]);
   
   const userLanguageChange = async (selected) => {
     try {
