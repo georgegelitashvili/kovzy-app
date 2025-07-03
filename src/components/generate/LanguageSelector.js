@@ -12,7 +12,6 @@ export default function LanguageSelector() {
     const fetchLanguages = async () => {
       try {
         const fetchedLanguages = await getData('languages');
-        console.log('Fetched languages:', fetchedLanguages);
         if (fetchedLanguages) {
           const transformedLanguages = fetchedLanguages.map(lang => ({
             label: lang.name,
