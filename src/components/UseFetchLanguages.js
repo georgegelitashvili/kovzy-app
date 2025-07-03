@@ -17,10 +17,6 @@ export const useFetchLanguages = (apiUrls) => {
         if (response.data?.languages) {
           const fetchedLanguages = response.data.languages;
           setLanguages(fetchedLanguages);
-          
-          // Store languages in async storage for LanguageContext to access
-          await storeData('languages', fetchedLanguages);
-          console.log('Languages stored successfully:', fetchedLanguages);
         }
       } catch (error) {
         console.error('Error fetching languages:', error);
