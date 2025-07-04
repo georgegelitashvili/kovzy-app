@@ -7,11 +7,14 @@ import { AuthContext, AuthProvider } from '../context/AuthProvider';
 import { domainValidator } from '../helpers/domainValidator';
 import { storeData, getData } from '../helpers/storage';
 import { LanguageContext } from "../components/Language";
+import useErrorDisplay from "../hooks/useErrorDisplay";
 
 export const DomainScreen = ({ navigation }) => {
   const { domain, setDomain, readDomain, intervalId } = useContext(AuthContext);
   const [inputDomain, setInputDomain] = useState({ value: domain || '', error: '' });
   const { dictionary } = useContext(LanguageContext);
+
+  const { errorDisplay, error, setError, clearError } = useErrorDisplay();
 
   const readData = async () => {
     try {
@@ -25,7 +28,8 @@ export const DomainScreen = ({ navigation }) => {
   const onCheckPressed = async () => {
     const domainError = domainValidator(inputDomain.value.trim());
     if (domainError) {
-      setInputDomain({ ...inputDomain, error: domainError });
+      console.log('Domain validation error:', domainError);
+      setError({ type: "VALIDATION_ERROR", message: domainError });
       return;
     }
     
@@ -48,6 +52,7 @@ export const DomainScreen = ({ navigation }) => {
 
   return (
     <Background>
+      {errorDisplay}
       <Logo />
       <TextField
         label="Enter domain"

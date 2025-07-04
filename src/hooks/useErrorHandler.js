@@ -1,106 +1,118 @@
 import { useState, useCallback } from 'react';
-
-// ONLY these errors should be shown to users - all others will be hidden
-const USER_VISIBLE_ERROR_TYPES = [
-  'NETWORK_ERROR',     // Only show network connectivity issues
-  'NOT_FOUND'          // Only show when requested data is not found
-];
-
-// Regex patterns to detect technical errors that should never be shown to users
-const TECHNICAL_ERROR_PATTERNS = [
-  /failed to load/i,
-  /music/i,
-  /audio/i,
-  /sound/i,
-  /cannot read/i,
-  /undefined/i,
-  /null/i,
-  /function/i,
-  /error code/i,
-  /exception/i,
-  /stack/i,
-  /syntax/i,
-  /reference/i,
-  /type error/i
-];
+import { USER_VISIBLE_ERROR_TYPES, TECHNICAL_ERROR_PATTERNS } from '../utils/ErrorConstants';
 
 /**
- * Function to check if an error should be shown to users
- * @param {string} type Error type
- * @param {string} message Error message
- * @returns {boolean} Whether the error should be shown
+ * ამოწმებს, უნდა გამოჩნდეს თუ არა ერორი მომხმარებელზე
  */
 const shouldShowError = (type, message) => {
-  // Only allow specific error types
   if (!USER_VISIBLE_ERROR_TYPES.includes(type)) {
     return false;
   }
-  
-  // Check if message contains technical details
-  if (message && TECHNICAL_ERROR_PATTERNS.some(pattern => pattern.test(message))) {
+
+  if (message && TECHNICAL_ERROR_PATTERNS.some((pattern) => pattern.test(message))) {
     return false;
   }
-  
+
   return true;
 };
 
 /**
- * A custom hook for handling errors in components
- * @returns {Object} Error handling methods and state
+ * ეცდება ამოიღოს type და message ნებისმიერ ფორმატში მოწოდებული ერორიდან
+ */
+const extractError = (err, fallbackType = "UNKNOWN") => {
+  if (!err) return { type: fallbackType, message: "Unknown error" };
+
+  if (typeof err === "string") return { type: fallbackType, message: err };
+
+  if (err?.type && err?.message) {
+    return { type: err.type, message: err.message };
+  }
+
+  if (err?.response?.data?.message) {
+    return { type: fallbackType, message: err.response.data.message };
+  }
+
+  if (err?.message) {
+    return { type: fallbackType, message: err.message };
+  }
+
+  return { type: fallbackType, message: JSON.stringify(err) };
+};
+
+/**
+ * Error handler ჰუკი — ამუშავებს ერორების ლოგიკას
  */
 export default function useErrorHandler() {
-  const [error, setError] = useState(null);
+  const [error, setErrorState] = useState(null);
+  const [persistent, setPersistent] = useState(false);
 
   /**
-   * Set an error with type and message, but only if it's a user-visible error
-   * @param {string} type - Error type (e.g., 'NETWORK_ERROR', 'SERVER_ERROR')
-   * @param {string} message - Error message
+   * გადასცემ ერორს როგორც ობიექტს, ან ტიპად + მესიჯად
+   * options.persistent = true თუ გინდა რომ ერორი დარჩეს სანამ არ დააფრისდ
    */
-  const setErrorWithType = useCallback((type, message) => {
-    // Log all errors for debugging
-    console.log(`[useErrorHandler] Error triggered: ${type} - ${message}`);
-    
-    // Only set errors that should be shown to users
-    if (shouldShowError(type, message)) {
-      setError({ type, message });
-    } else {
-      console.log(`[useErrorHandler] Suppressed error: ${type}`);
-      // Don't update state for technical errors
+  const setError = useCallback((errOrType, maybeMessage = null, options = {}) => {
+    let type, message, persistentFlag;
+
+    // ✅ თუ გადმოცემულია ობიექტი (შეიძლება იყოს error object)
+    if (typeof errOrType === "object" && errOrType?.type && errOrType?.message) {
+      type = errOrType.type;
+      message = errOrType.message;
+      persistentFlag = errOrType.persistent === true || options?.persistent === true;
     }
+    // ✅ თუ მხოლოდ ერთი არგუმენტია და ობიექტია
+    else if (typeof errOrType === "object" && maybeMessage === null) {
+      const extracted = extractError(errOrType);
+      type = extracted.type;
+      message = extracted.message;
+      persistentFlag = options?.persistent === true;
+    }
+    // ✅ სხვა შემთხვევა — ტიპი და მესიჯი ცალკეა
+    else {
+      type = errOrType;
+      message = maybeMessage;
+      persistentFlag = options?.persistent === true;
+    }
+
+    console.log(`[useErrorHandler] Error triggered: ${type} - ${message}, persistentFlag: ${persistentFlag}`);
+
+    const show = shouldShowError(type, message);
+    if (!show) {
+      console.log(`[useErrorHandler] Suppressed error: ${type}`);
+      return;
+    }
+
+    console.log(`[useErrorHandler] Setting error state: ${type} - ${message}, persistent: ${persistentFlag}`);
+
+    setErrorState({ type, message, persistent: persistentFlag });
+    setPersistent(persistentFlag);
   }, []);
 
   /**
-   * Set an error directly from an API error response
-   * @param {Object} apiError - The error from API request
+   * კონკრეტულად API-ს პასუხზე გამზადებული ფუნქცია
    */
   const setApiError = useCallback((apiError) => {
-    if (!apiError) return;
-    
-    // If it's already a formatted error from our API interceptor
-    if (apiError.type && apiError.message) {
-      // Only set the error if it should be shown to users
-      if (shouldShowError(apiError.type, apiError.message)) {
-        setError(apiError);
-      } else {
-        console.log(`[useErrorHandler] Suppressed API error: ${apiError.type}`);
-      }
+    const { type, message } = extractError(apiError);
+    if (shouldShowError(type, message)) {
+      setErrorState({ type, message });
     } else {
-      // Don't show raw errors at all - they're always technical
-      console.log('[useErrorHandler] Suppressed raw API error');
+      console.log(`[useErrorHandler] Suppressed API error: ${type}`);
     }
   }, []);
 
   /**
-   * Clear the current error
+   * კლავს ერორს
    */
   const clearError = useCallback(() => {
-    setError(null);
+    console.log('[useErrorHandler] clearError called');
+    setErrorState(null);
+    setPersistent(false);
   }, []);
 
   return {
     error,
-    setError: setErrorWithType,
+    persistent,
+    setError,
     setApiError,
-    clearError
+    clearError,
   };
 }

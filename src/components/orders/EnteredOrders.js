@@ -56,9 +56,6 @@ export const EnteredOrdersList = () => {
   const { domain, branchid, user } = useContext(AuthContext);
   const { dictionary, languageId } = useContext(LanguageContext);
   const [state, dispatch] = useReducer(orderReducer, initialState);
-
-  console.log('languageId',languageId);
-  
   // Use the custom hook for order details management
   const {
     orderDetails,
@@ -169,7 +166,6 @@ export const EnteredOrdersList = () => {
       });
 
       const newOrders = resp.data.data;
-      console.log(`Fetched orders`, languageId);
       
       // Get current order IDs to compare with new ones
       const currentOrderIds = state.orders.map(order => order.id);
@@ -314,6 +310,7 @@ export const EnteredOrdersList = () => {
     }
     setAppState(nextAppState);
   }, [appState]);
+
 
   useEffect(() => {
     if (domain && branchid) {
