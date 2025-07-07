@@ -182,6 +182,7 @@ export const AcceptedOrdersList = () => {
       clearOrderDetails();
     }
   }, [domain, branchid, apiOptions, clearOrderDetails]);
+  
   // Optimize useFocusEffect to prevent excessive API calls
   const fetchOrdersCallback = React.useCallback(() => {
     fetchAcceptedOrders();

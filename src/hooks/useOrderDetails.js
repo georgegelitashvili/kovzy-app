@@ -13,6 +13,7 @@ export const useOrderDetails = () => {
   
   const [orderDetails, setOrderDetails] = useState({});
   const [loadingDetails, setLoadingDetails] = useState(false);
+  const [loadingFinished, setLoadingFinished] = useState(false);
   
   // Use a ref to keep track of current orderDetails for synchronous access
   const orderDetailsRef = useRef({});
@@ -21,6 +22,13 @@ export const useOrderDetails = () => {
   useEffect(() => {
     orderDetailsRef.current = orderDetails;
   }, [orderDetails]);
+
+  // Clear cached order details when language changes
+  useEffect(() => {
+    console.log(`🌐 Language changed to ${languageId}, clearing cached order details`);
+    setOrderDetails({});
+    orderDetailsRef.current = {}; // Also clear the ref
+  }, [languageId]);
 
   /**
    * Fetch details for a single order
@@ -31,6 +39,8 @@ export const useOrderDetails = () => {
       console.log(`Order ${orderId} details already cached, skipping`);
       return orderDetailsRef.current[orderId];
     }
+
+    console.log(`📋 Fetching order ${orderId} details with languageId: ${languageId}`);
 
     try {
       const response = await axiosInstance.post(
@@ -49,7 +59,6 @@ export const useOrderDetails = () => {
         ...prev,
         [orderId]: orderData
       }));
-      
       return orderData;
       
     } catch (err) {
@@ -74,7 +83,9 @@ export const useOrderDetails = () => {
     if (!orderIds || orderIds.length === 0) return;
 
     // Filter out orders that already have details using ref for current state
-    const orderIdsToFetch = orderIds.filter(orderId => !orderDetailsRef.current[orderId]);
+    const orderIdsToFetch = [...new Set(
+      orderIds.filter(orderId => !orderDetailsRef.current[orderId])
+    )];
     
     if (orderIdsToFetch.length === 0) {
       console.log(`All ${orderIds.length} requested orders already have cached details`);
@@ -83,6 +94,7 @@ export const useOrderDetails = () => {
 
     console.log(`Batch fetching details for ${orderIdsToFetch.length} orders (${orderIds.length - orderIdsToFetch.length} already cached)`);
     setLoadingDetails(true);
+    setLoadingFinished(false); 
 
     try {
       const detailPromises = orderIdsToFetch.map(orderId => 
@@ -91,6 +103,7 @@ export const useOrderDetails = () => {
       
       if (waitForAll) {
         await Promise.allSettled(detailPromises);
+        setLoadingFinished(true); 
       } else {
         // Fire and forget - don't wait for completion
         Promise.allSettled(detailPromises);
@@ -121,6 +134,7 @@ export const useOrderDetails = () => {
    */
   const clearOrderDetails = useCallback(() => {
     setOrderDetails({});
+    setLoadingFinished(false);
   }, []);
 
   /**
@@ -140,6 +154,7 @@ export const useOrderDetails = () => {
   return {
     orderDetails,
     loadingDetails,
+    loadingFinished,
     fetchSingleOrderDetails,
     fetchBatchOrderDetails,
     fetchOrderDetailsLazy,

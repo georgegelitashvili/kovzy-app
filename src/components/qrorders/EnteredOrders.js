@@ -79,6 +79,10 @@ export const EnteredOrdersList = () => {
   const [cardSize, setCardSize] = useState(getCardSize(width, numColumns));
   const [previousOrderCount, setPreviousOrderCount] = useState(0);
 
+  const prevLanguageIdRef = useRef(languageId);
+  const isLanguageChangeInProgressRef = useRef(false);
+  const isComponentMountedRef = useRef(false);
+
   const [retryCount, setRetryCount] = useState(0);
   const MAX_RETRIES = 3;
   const RETRY_DELAY = 5000;
@@ -173,6 +177,7 @@ export const EnteredOrdersList = () => {
     }
 
     try {
+      console.log(`📋 Fetching QR orders with languageId: ${languageId}`);
       const resp = await axiosInstance.post(options.url_unansweredOrders, {
         type: 1,
         page: 1,
@@ -187,29 +192,37 @@ export const EnteredOrdersList = () => {
       const newOrderIds = data.map(order => order.id);
       
       // Find orders that are new to the orders state AND don't have cached details
-      const newOrders = newOrderIds.filter(id => 
+      const ordersNeedingDetails = newOrderIds.filter(id => 
         !currentOrderIds.includes(id) && !isOrderDetailsLoaded(id)
       );
       
-      // Update orders, fees, and currency
+      // Update orders, fees, and currency first
       setOrders(data);
       setFees(feesData);
       setCurrency(resp.data.currency);
 
-      // Only fetch order details if there are actually new orders to process
-      if (newOrders.length > 0) {
-        console.log(`Fetching details for ${newOrders.length} new orders:`, newOrders);
-        await fetchBatchOrderDetails(newOrders, showLoader); // Fetch only for new orders
-      }
-      // Special case: if this is the very first load (no previous orders), fetch only uncached orders
-      else if (currentOrderIds.length === 0 && newOrderIds.length > 0) {
-        const uncachedOrders = newOrderIds.filter(id => !isOrderDetailsLoaded(id));
-        if (uncachedOrders.length > 0) {
-          console.log(`Initial load: fetching details for ${uncachedOrders.length} uncached orders`);
-          await fetchBatchOrderDetails(uncachedOrders, showLoader);
+      // Handle order details fetching
+      if (isLanguageChangeInProgressRef.current) {
+        // During language change, force fetch all order details
+        if (newOrderIds.length > 0) {
+          console.log(`Language change: force fetching details for ${newOrderIds.length} QR orders with languageId: ${languageId}`);
+          await fetchBatchOrderDetails(newOrderIds, true);
+        }
+      } else {
+        // Normal flow - only fetch details for new orders
+        if (ordersNeedingDetails.length > 0) {
+          console.log(`Fetching details for ${ordersNeedingDetails.length} new QR orders:`, ordersNeedingDetails);
+          await fetchBatchOrderDetails(ordersNeedingDetails, showLoader);
+        }
+        // Special case: if this is the very first load, fetch only uncached orders
+        else if (currentOrderIds.length === 0 && newOrderIds.length > 0) {
+          const uncachedOrders = newOrderIds.filter(id => !isOrderDetailsLoaded(id));
+          if (uncachedOrders.length > 0) {
+            console.log(`Initial QR load: fetching details for ${uncachedOrders.length} uncached orders`);
+            await fetchBatchOrderDetails(uncachedOrders, showLoader);
+          }
         }
       }
-      // If no new orders need fetching, don't call fetchBatchOrderDetails at all
       
       // Reset retry count on successful fetch
       setRetryCount(0);
@@ -266,7 +279,11 @@ export const EnteredOrdersList = () => {
 
   const handleAppStateChange = (nextAppState) => {
     if (appState.match(/inactive|background/) && nextAppState === "active") {
-      startInterval();
+      console.log('QR App state changed: background -> active');
+      // Don't interfere if language change is in progress
+      if (!isLanguageChangeInProgressRef.current) {
+        startInterval();
+      }
     } else {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
@@ -281,13 +298,75 @@ export const EnteredOrdersList = () => {
     } else if (domain || branchid) {
       setOptionsIsLoaded(false);
       setOrders([]);
+      // Clear order details cache when switching domains/branches
+      clearOrderDetails();
     }
-  }, [domain, branchid, apiOptions]);
+  }, [domain, branchid, apiOptions, clearOrderDetails]);
 
   useEffect(() => {
-    if (optionsIsLoaded) {
+    // Skip first run (component mount)
+    if (!isComponentMountedRef.current) {
+      isComponentMountedRef.current = true;
+      if (optionsIsLoaded) {
+        const subscribe = AppState.addEventListener('change', handleAppStateChange);
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+        }
+        startInterval();
+        console.log('Interval started.');
+        return () => {
+          setPreviousOrderCount(0);
+          if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+          }
+          subscribe.remove();
+        };
+      }
+      return;
+    }
+    
+    // Handle language change
+    const previousLangId = prevLanguageIdRef.current;
+    const hasLanguageChanged = previousLangId !== languageId;
+    
+    if (optionsIsLoaded && hasLanguageChanged) {
+      console.log(`🔄 Language changed from ${previousLangId} to ${languageId}, forcing complete refresh`);
+      
+      // Set language change flag to prevent double intervals
+      isLanguageChangeInProgressRef.current = true;
+      prevLanguageIdRef.current = languageId;
+      
+      // Stop current interval to prevent conflicts
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+      
+      // Force fetch with new language ID
+      (async () => {
+        try {
+          console.log(`🌍 Fetching QR orders with new languageId: ${languageId}`);
+          
+          // Fetch orders with new language
+          await fetchEnteredOrders(true);
+          
+          // Clear language change flag
+          isLanguageChangeInProgressRef.current = false;
+          
+          // Restart interval
+          startInterval();
+          
+          console.log(`✅ QR Language change complete - orders and details refreshed with languageId: ${languageId}`);
+        } catch (error) {
+          console.log('Error in QR language change fetch:', error);
+          // Clear language change flag even on error
+          isLanguageChangeInProgressRef.current = false;
+          // Restart interval even on error
+          startInterval();
+        }
+      })();
+    } else if (optionsIsLoaded && !isLanguageChangeInProgressRef.current) {
+      // Normal flow - no language change
       const subscribe = AppState.addEventListener('change', handleAppStateChange);
-      console.log('Starting interval...');
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
