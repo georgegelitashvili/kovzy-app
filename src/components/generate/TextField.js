@@ -31,13 +31,9 @@ const styles = StyleSheet.create({
     // backgroundColor: theme.colors.surface,
     ...Platform.select({
       ios: {
-        // fontFamily: 'Roboto',
-        // placeholderTextColor: '#ccc',
         textAlignVertical: 'top',
       },
       android: {
-        fontFamily: 'Roboto',
-        // placeholderTextColor: '#ccc',
         textAlignVertical: 'top',
       },
     }),
