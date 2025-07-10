@@ -16,7 +16,8 @@
     },
     "preview": {
       "android": {
-        "buildType": "apk"
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease"
       },
       "channel": "preview",
       "env": {
@@ -27,6 +28,9 @@
       "distribution": "store",
       "channel": "production",
       "autoIncrement": true,
+      "android": {
+        "gradleCommand": ":app:bundleRelease"
+      },
       "env": {
         "NODE_VERSION": "18"
       }
