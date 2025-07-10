@@ -25,6 +25,7 @@ import axiosInstance from "../../apiConfig/apiRequests";
 import OrdersDetail from "../OrdersDetail";
 import OrdersModal from "../modal/OrdersModal";
 import printRows from "../../PrintRows";
+import { useOrderDetails } from "../../hooks/useOrderDetails";
 
 // This will be replaced with a dynamic calculation based on screen size
 const initialWidth = Dimensions.get("window").width;
@@ -42,6 +43,16 @@ export const AcceptedOrdersList = () => {
   const [orders, setOrders] = useState([]);
   const [fees, setFees] = useState([]);
   const [currency, setCurrency] = useState("");
+
+  // Use the custom hook for order details management
+  const {
+    orderDetails,
+    loadingDetails,
+    fetchBatchOrderDetails,
+    fetchOrderDetailsLazy,
+    clearOrderDetails,
+    getOrderDetails
+  } = useOrderDetails();
 
   const [page, setPage] = useState(0);
   const [options, setOptions] = useState({
@@ -75,8 +86,13 @@ export const AcceptedOrdersList = () => {
       setOpenState(isOpen.filter((i) => i !== value));
     } else {
       setOpenState([...isOpen, value]);
+      
+      // Lazy load: fetch order details when expanding if not already loaded
+      if (!getOrderDetails(value) || getOrderDetails(value).length === 0) {
+        fetchOrderDetailsLazy(value);
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, getOrderDetails, fetchOrderDetailsLazy]);
 
   useEffect(() => {
     const updateLayout = () => {
@@ -106,19 +122,6 @@ export const AcceptedOrdersList = () => {
     setModalType(type);
     setVisible(true);
   };
-  // Update layout on dimension change
-  useEffect(() => {
-    const updateLayout = () => {
-      const newWidth = Dimensions.get('window').width;
-      const columns = getColumnsByScreenSize(newWidth);
-      setWidth(newWidth);
-      setNumColumns(columns);
-      setCardSize(getCardSize(newWidth, columns));
-    };
-
-    const subscription = Dimensions.addEventListener('change', updateLayout);
-    return () => subscription?.remove();
-  }, []);
 
   const fetchAcceptedOrders = useCallback(async () => {
     setOptionsIsLoaded(true);
@@ -141,6 +144,13 @@ export const AcceptedOrdersList = () => {
       setOrders(data);
       setFees(feesData);
       setCurrency(resp.data.currency);
+      
+      // Non-blocking background fetch of order details
+      if (data && data.length > 0) {
+        const orderIds = data.map(order => order.id);
+        // Don't wait for order details - fetch in background
+        fetchBatchOrderDetails(orderIds, false);
+      }
     } catch (error) {
       console.log('Error fetching accepted orders full:', error);
       const statusCode = error?.status || 'Unknown';
@@ -149,16 +159,18 @@ export const AcceptedOrdersList = () => {
     } finally {
       setLoading(false);
     }
-  }, [user, options.url_getAcceptedOrders, page, languageId, branchid, intervalId]);
+  }, [user, options.url_getAcceptedOrders, page, languageId, branchid, intervalId, fetchBatchOrderDetails]);
 
   const onChangeModalState = useCallback((newState) => {
     setVisible(newState);
-    setIsDeliveronOptions(newState);
-    setItemId(null);
-    setDeliveron([]);
-    setOrders([]);
-    fetchAcceptedOrders();
-  }, [orders]);
+    if (!newState) {  // If the modal is closed
+      setLoading(false);  // Reset loading state
+      setLoadingOptions(false);  // Reset options loading state
+      setItemId(null);
+      // Only refetch if the modal action might have changed order status
+      // For now, we'll keep the current data and let the user manually refresh if needed
+    }
+  }, []);
 
   useEffect(() => {
     if (domain && branchid) {
@@ -166,8 +178,11 @@ export const AcceptedOrdersList = () => {
     } else if (domain || branchid) {
       setOptionsIsLoaded(false);
       setOrders([]);
+      // Clear order details cache when switching domains/branches
+      clearOrderDetails();
     }
-  }, [domain, branchid, apiOptions]);
+  }, [domain, branchid, apiOptions, clearOrderDetails]);
+  
   // Optimize useFocusEffect to prevent excessive API calls
   const fetchOrdersCallback = React.useCallback(() => {
     fetchAcceptedOrders();
@@ -291,7 +306,7 @@ export const AcceptedOrdersList = () => {
               </Text>
 
               <Divider />
-                <OrdersDetail orderId={item.id} />
+                <OrdersDetail orderId={item.id} orderData={getOrderDetails(item.id) || []} />
               <Divider />
 
               <Text variant="titleMedium" style={styles.title}> {dictionary["orders.initialPrice"]}: {item.real_price} {currency}</Text>
@@ -345,7 +360,10 @@ export const AcceptedOrdersList = () => {
           ) : null}
         </Card>
       </View>
-    );  }, (prevProps, nextProps) => prevProps.item.id === nextProps.item.id);
+    );  }, (prevProps, nextProps) => {
+      return prevProps.item.id === nextProps.item.id &&
+             JSON.stringify(prevProps.item) === JSON.stringify(nextProps.item);
+    });
 
   const getItemLayout = useCallback((data, index) => ({
     length: cardSize,
@@ -356,7 +374,7 @@ export const AcceptedOrdersList = () => {
   return (
     <View style={styles.container}>
       {loadingOptions && <Loader />}
-      {loading && <Loader show={loading} />}
+      {(loading || loadingDetails) && <Loader show={loading || loadingDetails} />}
       
       {visible && (
         <OrdersModal

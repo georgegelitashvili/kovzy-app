@@ -19,6 +19,7 @@ import axiosInstance from "../../apiConfig/apiRequests";
 import OrdersDetail from "../OrdersDetail";
 import OrdersModal from "../modal/OrdersModalQr";
 import OrdersFilters from "./OrdersFilters";
+import { useOrderDetails } from "../../hooks/useOrderDetails";
 
 const initialWidth = Dimensions.get("window").width;
 const getColumnsByScreenSize = (screenWidth) => {
@@ -46,16 +47,25 @@ export const OrdersListBase = ({ orderType }) => {
     url_getOrdersLogs: "",
     url_checkOrderStatus: "",
   });
+
+  // Use the custom hook for order details management
+  const {
+    orderDetails,
+    loadingDetails,
+    fetchBatchOrderDetails,
+    fetchOrderDetailsLazy,
+    clearOrderDetails,
+    getOrderDetails
+  } = useOrderDetails();
+
   const [optionsIsLoaded, setOptionsIsLoaded] = useState(false);
-  const [visible, setVisible] = useState(false);
-  const [itemId, setItemId] = useState(null);
   const [isOpen, setOpenState] = useState([]);
-  const [modalType, setModalType] = useState("");  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [loadingOptions, setLoadingOptions] = useState(false);
 
   const [loadingMore, setLoadingMore] = useState(false); // For infinite scroll
   const [hasMore, setHasMore] = useState(true); // To check if more data is available
-  
+
   const [width, setWidth] = useState(Dimensions.get('window').width);
   const [numColumns, setNumColumns] = useState(getColumnsByScreenSize(width));
   const [cardSize, setCardSize] = useState(getCardSize(width, numColumns));
@@ -68,7 +78,7 @@ export const OrdersListBase = ({ orderType }) => {
     } else {
       setOpenState([...isOpen, value]);
     }
-  }, [isOpen]);
+  }, [isOpen, orderDetails]);
 
   const apiOptions = useCallback(() => {
     setOptions({
@@ -87,30 +97,33 @@ export const OrdersListBase = ({ orderType }) => {
 
   const fetchAcceptedOrders = async (appliedFilters = filters, reset = false) => {
     if (!user || !options.url_getOrdersLogs) return;
+
+    // Clear previous order details when fetching new orders
+    clearOrderDetails();
     
     try {
       const requestFilters = {
-        status: { exact: appliedFilters.orderStatus},
-        type: { exact: orderType.toString() }, 
+        status: { exact: appliedFilters.orderStatus },
+        type: { exact: orderType.toString() },
         branchid: { exact: branchid.toString() },
       };
-  
+
       if (appliedFilters.startDate) {
         const startDate = new Date(appliedFilters.startDate);
         startDate.setHours(0, 0, 0, 0);
-        
-        const endDate = appliedFilters.endDate 
+
+        const endDate = appliedFilters.endDate
           ? new Date(appliedFilters.endDate)
           : new Date(appliedFilters.startDate);
-        
+
         endDate.setHours(23, 59, 59, 999);
-  
+
         requestFilters.created_at = {
           min: startDate.toISOString().replace('T', ' ').replace('.000Z', ''),
           max: endDate.toISOString().replace('T', ' ').replace('.000Z', '')
         };
       }
-  
+
       const requestBody = {
         Languageid: languageId,
         Pagination: {
@@ -119,23 +132,29 @@ export const OrdersListBase = ({ orderType }) => {
         },
         Filters: requestFilters
       };
-  
+
       const resp = await axiosInstance.post(options.url_getOrdersLogs, requestBody);
-  
+
       const newData = resp.data.data;
       const feesData = resp.data.fees;
-  
+
       // Filter out duplicates
-      const uniqueData = newData.filter(
-        (order) => !orders.some((existingOrder) => existingOrder.id === order.id)
-      );
-  
+      const merged = reset ? newData : [...orders, ...newData];
+      const uniqueData = Array.from(new Map(merged.map(order => [order.id, order])).values());
+
       if (uniqueData.length === 0) {
         setHasMore(false);
       } else {
-        setOrders((prevOrders) => reset ? uniqueData : [...prevOrders, ...uniqueData]);
+        setOrders(uniqueData);
       }
-  
+
+      // Fetch details for all orders and wait for all to complete
+      if (uniqueData && uniqueData.length > 0) {
+        const orderIds = uniqueData.map(order => order.id);
+        console.log('Order IDs before details fetch:', orderIds);
+        await fetchBatchOrderDetails(orderIds, true); // Wait for all to complete
+      }
+
       setFees(feesData);
       setCurrency(resp.data.currency);
     } catch (error) {
@@ -157,6 +176,7 @@ export const OrdersListBase = ({ orderType }) => {
       return () => { };
     }, [options, branchid, languageId, filters])
   );
+
   useEffect(() => {
     if (domain && branchid) {
       apiOptions();
@@ -165,7 +185,7 @@ export const OrdersListBase = ({ orderType }) => {
       setOrders([]);
     }
   }, [domain, branchid, apiOptions]);
-  
+
   // Update layout on dimension change
   useEffect(() => {
     const updateLayout = () => {
@@ -179,7 +199,8 @@ export const OrdersListBase = ({ orderType }) => {
     const subscription = Dimensions.addEventListener('change', updateLayout);
     return () => subscription?.remove();
   }, []);
-  const RenderEnteredOrdersList = memo(({ item, toggleContent, isOpen, dictionary, currency, fees }) => {
+
+  const RenderEnteredOrdersList = ({ item, toggleContent, isOpen, dictionary, currency, fees }) => {
     const trackLink = [JSON.parse(item.deliveron_data)]?.map(link => {
       return link.trackLink ?? null;
     });
@@ -251,9 +272,11 @@ export const OrdersListBase = ({ orderType }) => {
               <Text variant="titleSmall" style={styles.title} numberOfLines={2} ellipsizeMode="tail">
                 {dictionary["orders.paymentMethod"]}: {item.payment_type}
               </Text>
+              
               <Divider />
-              <OrdersDetail orderId={item.id} />
+              <OrdersDetail orderId={item.id} orderData={getOrderDetails(item.id)} />
               <Divider />
+
               <Text variant="titleMedium" style={styles.title}>
                 {dictionary["orders.initialPrice"]}: {item.real_price} {currency}
               </Text>
@@ -285,8 +308,9 @@ export const OrdersListBase = ({ orderType }) => {
         </Card>
       </View>
     );
-  });
-  const renderItem = useCallback(({ item }) => {
+  };
+
+  const renderItem = ({ item }) => {
     return (
       <RenderEnteredOrdersList
         item={item}
@@ -297,7 +321,7 @@ export const OrdersListBase = ({ orderType }) => {
         fees={fees}
       />
     );
-  }, [toggleContent, isOpen, dictionary, currency, fees, width, numColumns]);
+  };
 
   const getItemLayout = useCallback((data, index) => ({
     length: cardSize,
@@ -318,25 +342,13 @@ export const OrdersListBase = ({ orderType }) => {
       </View>
 
       <View style={{ flex: 1, width: "100%" }}>
-        {visible ? (
-          <OrdersModal
-            isVisible={visible}
-            onChangeState={() => setVisible(false)}
-            orders={orders}
-            hasItemId={itemId}
-            type={modalType}
-            options={options}
-            PendingOrders={false}
-          />
-        ) : null}
-        
         <FlatGrid
           key={`flat-grid-${numColumns}`}
           adjustGridToStyles={true}
           itemDimension={cardSize}
           spacing={10}
           data={orders}
-          keyExtractor={(item) => String(item.id)} 
+          keyExtractor={(item, index) => `${item.id}-${index + 1}`}
           renderItem={renderItem}
           getItemLayout={getItemLayout}
           itemContainerStyle={{ justifyContent: 'space-between' }}
@@ -348,7 +360,7 @@ export const OrdersListBase = ({ orderType }) => {
           }
           removeClippedSubviews={true}
           initialNumToRender={10}
-          windowSize={21} 
+          windowSize={21}
         />
       </View>
     </View>

@@ -1,5 +1,13 @@
 import React from 'react';
-import { ImageBackground, StyleSheet, KeyboardAvoidingView } from 'react-native';
+import {
+  ImageBackground,
+  StyleSheet,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  TouchableWithoutFeedback,
+  Keyboard,
+} from 'react-native';
 
 export default function Background({ children }) {
   return (
@@ -7,11 +15,21 @@ export default function Background({ children }) {
       resizeMode="cover"
       style={styles.background}
     >
-      <KeyboardAvoidingView style={styles.container} behavior="padding">
-        {children}
+      <KeyboardAvoidingView
+        style={styles.keyboardContainer}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <ScrollView
+            contentContainerStyle={styles.scrollContainer}
+            keyboardShouldPersistTaps="handled"
+          >
+            {children}
+          </ScrollView>
+        </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
     </ImageBackground>
-  )
+  );
 }
 
 const styles = StyleSheet.create({
@@ -19,12 +37,16 @@ const styles = StyleSheet.create({
     flex: 1,
     width: '100%',
   },
-  container: {
+  keyboardContainer: {
     flex: 1,
+  },
+  scrollContainer: {
+    flexGrow: 1,
     width: '100%',
     maxWidth: 360,
     alignSelf: 'center',
     alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: 24,
   },
-})
+});

@@ -25,7 +25,7 @@ import printRows from "../../PrintRows";
 
 import NotificationSound from '../../utils/NotificationSound';
 import NotificationManager from '../../utils/NotificationManager';
-
+import { useOrderDetails } from "../../hooks/useOrderDetails";
 
 const initialWidth = Dimensions.get("window").width;
 const getColumnsByScreenSize = (screenWidth) => {
@@ -43,6 +43,16 @@ const type = 1;
 export const EnteredOrdersList = () => {
   const { domain, branchid, user } = useContext(AuthContext);
   const [isNotificationReady, setIsNotificationReady] = useState(false);
+  // Use the custom hook for order details management
+  const {
+    orderDetails,
+    loadingDetails,
+    fetchBatchOrderDetails,
+    fetchOrderDetailsLazy,
+    isOrderDetailsLoaded,
+    clearOrderDetails,
+    getOrderDetails
+  } = useOrderDetails();
   const NotificationSoundRef = useRef(NotificationSound);
   const intervalRef = useRef(null);
   const [orders, setOrders] = useState([]);
@@ -69,6 +79,10 @@ export const EnteredOrdersList = () => {
   const [cardSize, setCardSize] = useState(getCardSize(width, numColumns));
   const [previousOrderCount, setPreviousOrderCount] = useState(0);
 
+  const prevLanguageIdRef = useRef(languageId);
+  const isLanguageChangeInProgressRef = useRef(false);
+  const isComponentMountedRef = useRef(false);
+
   const [retryCount, setRetryCount] = useState(0);
   const MAX_RETRIES = 3;
   const RETRY_DELAY = 5000;
@@ -85,11 +99,20 @@ export const EnteredOrdersList = () => {
     }, 0);
   };
 
-  const toggleContent = (value) => {
-    setOpenState([...isOpen, value]);
-    let index = isOpen.indexOf(value);
-    if (index > -1) setOpenState([...isOpen.filter((i) => i !== value)]);
-  };
+  const toggleContent = useCallback((value) => {
+    if (isOpen.includes(value)) {
+      // Currently collapsed - expand it by removing from the closed list
+      setOpenState(isOpen.filter((i) => i !== value));
+      
+      // Lazy load: fetch order details when expanding if not already loaded
+      if (!orderDetails[value]) {
+        fetchOrderDetailsLazy(value);
+      }
+    } else {
+      // Currently expanded - collapse it by adding to the closed list
+      setOpenState([...isOpen, value]);
+    }
+  }, [isOpen, orderDetails, fetchOrderDetailsLazy]);
 
   const handleReload = async () => {
     await Updates.reloadAsync();
@@ -143,12 +166,18 @@ export const EnteredOrdersList = () => {
     }
   };
 
-  const fetchEnteredOrders = async () => {
+  const fetchEnteredOrders = async (showLoader = false) => {
     if (!user || !options.url_unansweredOrders) {
       return null;
     }
 
+    // Only show loading when explicitly requested (initial load)
+    if (showLoader) {
+      setLoading(true);
+    }
+
     try {
+      console.log(`📋 Fetching QR orders with languageId: ${languageId}`);
       const resp = await axiosInstance.post(options.url_unansweredOrders, {
         type: 1,
         page: 1,
@@ -157,10 +186,47 @@ export const EnteredOrdersList = () => {
       });
       const data = resp.data.data;
       const feesData = resp.data.fees;
+      
+      // Get current order IDs to compare with new ones
+      const currentOrderIds = orders.map(order => order.id);
+      const newOrderIds = data.map(order => order.id);
+      
+      // Find orders that are new to the orders state AND don't have cached details
+      const ordersNeedingDetails = newOrderIds.filter(id => 
+        !currentOrderIds.includes(id) && !isOrderDetailsLoaded(id)
+      );
+      
+      // Update orders, fees, and currency first
       setOrders(data);
       setFees(feesData);
       setCurrency(resp.data.currency);
-      setScheduled(resp.data.scheduled);
+
+      // Handle order details fetching
+      if (isLanguageChangeInProgressRef.current) {
+        // During language change, force fetch all order details
+        if (newOrderIds.length > 0) {
+          console.log(`Language change: force fetching details for ${newOrderIds.length} QR orders with languageId: ${languageId}`);
+          await fetchBatchOrderDetails(newOrderIds, true);
+        }
+      } else {
+        // Normal flow - only fetch details for new orders
+        if (ordersNeedingDetails.length > 0) {
+          console.log(`Fetching details for ${ordersNeedingDetails.length} new QR orders:`, ordersNeedingDetails);
+          await fetchBatchOrderDetails(ordersNeedingDetails, showLoader);
+        }
+        // Special case: if this is the very first load, fetch only uncached orders
+        else if (currentOrderIds.length === 0 && newOrderIds.length > 0) {
+          const uncachedOrders = newOrderIds.filter(id => !isOrderDetailsLoaded(id));
+          if (uncachedOrders.length > 0) {
+            console.log(`Initial QR load: fetching details for ${uncachedOrders.length} uncached orders`);
+            await fetchBatchOrderDetails(uncachedOrders, showLoader);
+          }
+        }
+      }
+      
+      // Reset retry count on successful fetch
+      setRetryCount(0);
+      
     } catch (error) {
       console.log('Error fetching qr entered orders full:', error);
       const statusCode = error?.status || 'Unknown';
@@ -184,7 +250,10 @@ export const EnteredOrdersList = () => {
         handleReload();
       }
     } finally {
-      setLoading(false);
+      // Only hide loading if it was shown
+      if (showLoader) {
+        setLoading(false);
+      }
     }
   };
 
@@ -193,9 +262,15 @@ export const EnteredOrdersList = () => {
       clearInterval(intervalRef.current);
     }
     console.log('call interval');
+    
+    // Initial fetch with loader
+    if (optionsIsLoaded) {
+      fetchEnteredOrders(true); // Show loader for first call
+    }
+    
     intervalRef.current = setInterval(() => {
       if (optionsIsLoaded) {
-        fetchEnteredOrders();
+        fetchEnteredOrders(false); // No loader for interval calls
       } else {
         console.log('Options not loaded');
       }
@@ -204,7 +279,11 @@ export const EnteredOrdersList = () => {
 
   const handleAppStateChange = (nextAppState) => {
     if (appState.match(/inactive|background/) && nextAppState === "active") {
-      startInterval();
+      console.log('QR App state changed: background -> active');
+      // Don't interfere if language change is in progress
+      if (!isLanguageChangeInProgressRef.current) {
+        startInterval();
+      }
     } else {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
@@ -219,13 +298,75 @@ export const EnteredOrdersList = () => {
     } else if (domain || branchid) {
       setOptionsIsLoaded(false);
       setOrders([]);
+      // Clear order details cache when switching domains/branches
+      clearOrderDetails();
     }
-  }, [domain, branchid, apiOptions]);
+  }, [domain, branchid, apiOptions, clearOrderDetails]);
 
   useEffect(() => {
-    if (optionsIsLoaded) {
+    // Skip first run (component mount)
+    if (!isComponentMountedRef.current) {
+      isComponentMountedRef.current = true;
+      if (optionsIsLoaded) {
+        const subscribe = AppState.addEventListener('change', handleAppStateChange);
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+        }
+        startInterval();
+        console.log('Interval started.');
+        return () => {
+          setPreviousOrderCount(0);
+          if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+          }
+          subscribe.remove();
+        };
+      }
+      return;
+    }
+    
+    // Handle language change
+    const previousLangId = prevLanguageIdRef.current;
+    const hasLanguageChanged = previousLangId !== languageId;
+    
+    if (optionsIsLoaded && hasLanguageChanged) {
+      console.log(`🔄 Language changed from ${previousLangId} to ${languageId}, forcing complete refresh`);
+      
+      // Set language change flag to prevent double intervals
+      isLanguageChangeInProgressRef.current = true;
+      prevLanguageIdRef.current = languageId;
+      
+      // Stop current interval to prevent conflicts
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+      
+      // Force fetch with new language ID
+      (async () => {
+        try {
+          console.log(`🌍 Fetching QR orders with new languageId: ${languageId}`);
+          
+          // Fetch orders with new language
+          await fetchEnteredOrders(true);
+          
+          // Clear language change flag
+          isLanguageChangeInProgressRef.current = false;
+          
+          // Restart interval
+          startInterval();
+          
+          console.log(`✅ QR Language change complete - orders and details refreshed with languageId: ${languageId}`);
+        } catch (error) {
+          console.log('Error in QR language change fetch:', error);
+          // Clear language change flag even on error
+          isLanguageChangeInProgressRef.current = false;
+          // Restart interval even on error
+          startInterval();
+        }
+      })();
+    } else if (optionsIsLoaded && !isLanguageChangeInProgressRef.current) {
+      // Normal flow - no language change
       const subscribe = AppState.addEventListener('change', handleAppStateChange);
-      console.log('Starting interval...');
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
@@ -287,7 +428,7 @@ export const EnteredOrdersList = () => {
               </Text>
               <Text style={styles.takeAway}>{item.take_away === 1 ? "(" + dictionary["orders.takeAway"] + ")" : ""}</Text>
               <Text variant="headlineMedium" style={styles.header}>              <SimpleLineIcons
-                  name={isOpen.includes(item.id) ? "arrow-up" : "arrow-down"}
+                  name={isOpen.includes(item.id) ? "arrow-down" : "arrow-up"}
                   style={styles.rightIcon}
                 />
               </Text>
@@ -319,7 +460,7 @@ export const EnteredOrdersList = () => {
               </Text>
 
               <Divider />
-              <OrdersDetail orderId={item.id} />
+              <OrdersDetail orderId={item.id} orderData={getOrderDetails(item.id)} />
               <Divider />
 
               <Text variant="titleMedium" style={styles.title}> {dictionary["orders.initialPrice"]}: {item.real_price} {currency}</Text>
@@ -391,46 +532,49 @@ export const EnteredOrdersList = () => {
       {/* Always render NotificationSound */}
       <NotificationSound ref={NotificationSoundRef} />
 
-      {loading && <Loader show={loading} />}
-
-      {/* Display a fallback message when there are no orders */}
-      {(!orders || orders.length === 0) ? (
-        null
+      {/* Show loader while loading orders or order details on initial load */}
+      {(loading || loadingDetails) ? (
+        <Loader show={loading || loadingDetails} />
       ) : (
-        <FlatList
-          data={[{}]} // Dummy data for the FlatList since we're using ListHeaderComponent for main content
-          renderItem={null} // No items in the FlatList itself
+        /* Display orders when loaded */
+        (!orders || orders.length === 0) ? (
+          null
+        ) : (
+          <FlatList
+            data={[{}]} // Dummy data for the FlatList since we're using ListHeaderComponent for main content
+            renderItem={null} // No items in the FlatList itself
             keyExtractor={() => 'dummy-header-content'} // Fixed key for the single dummy item
-          showsVerticalScrollIndicator={false}
-          ListHeaderComponent={
-            <View style={{ flexDirection: 'row', flexWrap: 'nowrap', flex: 1 }}>
-              {visible && (
-                <OrdersModal
-                  isVisible={visible}
-                  onChangeState={onChangeModalState}
-                  orders={orders}
-                  hasItemId={itemId}
-                  type={modalType}
-                  options={options}
-                  takeAway={itemTakeAway}
-                  PendingOrders={true}
+            showsVerticalScrollIndicator={false}
+            ListHeaderComponent={
+              <View style={{ flexDirection: 'row', flexWrap: 'nowrap', flex: 1 }}>
+                {visible && (
+                  <OrdersModal
+                    isVisible={visible}
+                    onChangeState={onChangeModalState}
+                    orders={orders}
+                    hasItemId={itemId}
+                    type={modalType}
+                    options={options}
+                    takeAway={itemTakeAway}
+                    PendingOrders={true}
+                  />
+                )}
+                <FlatList
+                  key={`flat-list-${numColumns}`}
+                  numColumns={numColumns}
+                  spacing={10}
+                  data={orders}
+                  renderItem={renderEnteredOrdersList}
+                  keyExtractor={(item) => (item && item.id ? item.id.toString() : '')}
+                  style={{ flex: 1 }}
+                  onEndReachedThreshold={0.5}
+                  removeClippedSubviews={true}
+                  getItemLayout={getItemLayout}
                 />
-              )}
-              <FlatList
-                key={`flat-list-${numColumns}`}
-                numColumns={numColumns}
-                spacing={10}
-                data={orders}
-                renderItem={renderEnteredOrdersList}
-                keyExtractor={(item) => (item && item.id ? item.id.toString() : '')}
-                style={{ flex: 1 }}
-                onEndReachedThreshold={0.5}
-                removeClippedSubviews={true}
-                getItemLayout={getItemLayout}
-              />
-            </View>
-          }
-        />
+              </View>
+            }
+          />
+        )
       )}
     </View>
   );

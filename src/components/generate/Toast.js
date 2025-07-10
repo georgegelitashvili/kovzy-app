@@ -1,153 +1,131 @@
 import React, { useRef, useEffect, useState, useContext } from "react";
-import { View, Text, StyleSheet, Animated, useWindowDimensions, TouchableOpacity, StatusBar } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  Animated,
+  useWindowDimensions,
+  TouchableOpacity,
+  StatusBar,
+} from "react-native";
 import Icon from "react-native-vector-icons/Ionicons";
-import { LanguageContext } from '../Language';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { USER_VISIBLE_ERROR_TYPES, TECHNICAL_ERROR_PATTERNS } from '../../utils/ErrorConstants';
+import { LanguageContext } from "../Language";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+  USER_VISIBLE_ERROR_TYPES,
+  TECHNICAL_ERROR_PATTERNS,
+} from "../../utils/ErrorConstants";
 
-const Toast = ({ type, title, subtitle, animate, addStyles, onDismiss }) => {
-  const [toastDuration, setToastDuration] = useState(0);
+const Toast = ({ type, title, subtitle, animate, addStyles, onDismiss, persistent = false }) => {
   const { dictionary } = useContext(LanguageContext);
   const insets = useSafeAreaInsets();
-  
-  // Skip rendering technical error toasts completely
-  if (type === 'failed') {
-    // Check if it's a technical error message
-    const containsTechnicalDetails = TECHNICAL_ERROR_PATTERNS.some(pattern => 
-      pattern.test(subtitle || '')
-    );
-    
-    if (containsTechnicalDetails) {
-      console.log('Suppressing toast with technical error details:', subtitle);
-      return null; // Don't render anything
-    }
-  }
-  
-  // Map error types to appropriate icons
+  const slideAnim = useRef(new Animated.Value(-120)).current;
+
   const ICON = {
     success: "checkmark-circle",
     warning: "alert-circle",
     failed: "close-circle",
-    info: "information-circle"
+    info: "information-circle",
   }[type] || "alert-circle";
 
-  // Map error types to appropriate colors
   const COLOR = {
     success: "#2fa360",
     warning: "#f57c00",
     failed: "#d32f2f",
-    info: "#1976d2"
+    info: "#1976d2",
   }[type] || "#f44336";
 
-  const { width: screenWidth } = useWindowDimensions();
+  const statusBarHeight = insets.top || StatusBar.currentHeight || 0;
+  const topPosition = statusBarHeight + 10;
 
-  useEffect(() => {
-    if (animate) {
-      animateToast();      // Auto-dismiss after a delay
-      if (type !== "failed") {
-        setToastDuration(3000); // Shorter display time (3 seconds) for normal toasts
-      } else {
-        setToastDuration(5000); // Longer (5 seconds) for error messages
-      }
-    } else {
-      setToastDuration(0);
+  // ❌ suppress technical errors
+  if (type === "failed") {
+    const containsTechnicalDetails = TECHNICAL_ERROR_PATTERNS.some((pattern) =>
+      pattern.test(subtitle || "")
+    );
+    if (containsTechnicalDetails) {
+      console.log("Suppressing toast with technical error:", subtitle);
+      return null;
     }
-  }, [animate]);
+  }
 
-  const slideAnim = useRef(new Animated.Value(-120)).current;
+  const getLocalizedMessage = (message, type) => {
+    if (type === "failed" && dictionary) {
+      if (message && typeof message === "string") {
+        if (USER_VISIBLE_ERROR_TYPES.includes(message)) {
+          return dictionary[`errors.${message}`] || dictionary["errors.USER_FRIENDLY"] || message;
+        }
+        if (message.startsWith("errors.")) {
+          return dictionary[message] || dictionary["errors.USER_FRIENDLY"] || message;
+        }
+        return message;
+      }
+    }
+    return message;
+  };
 
-  const animateToast = () => {
-    // Animate toast in
+  const processedMessage = getLocalizedMessage(subtitle, type);
+  if (processedMessage === null) return null;
+
+  // Animation effect
+  useEffect(() => {
+    if (!animate) return;
+
     Animated.timing(slideAnim, {
       toValue: 0,
       duration: 400,
       useNativeDriver: true,
     }).start();
 
-    // Automatically animate toast out after delay
-    setTimeout(() => {
+    if (persistent) {
+      // თუ persistentა, არ ვაყენებთ timeout-ს
+      return;
+    }
+
+    const duration = type === "failed" ? 5000 : 3000;
+    const timeout = setTimeout(() => {
       Animated.timing(slideAnim, {
         toValue: -120,
         duration: 300,
         useNativeDriver: true,
       }).start();
-      
-      // Call onDismiss when toast is hidden, if provided
+
       if (onDismiss) {
         setTimeout(onDismiss, 400);
       }
-    }, toastDuration);
-  };
+    }, duration);
 
-  const getLocalizedMessage = (message, type) => {
-    // For error messages, try to find a localized version or hide if it's technical
-    if (type === 'failed' && dictionary) {
-      // Check if it's a technical error that should not be shown
-      const isErrorKey = message && message.startsWith('errors.');
-      
-      if (isErrorKey) {
-        const errorType = message.replace('errors.', '');
-        if (!USER_VISIBLE_ERROR_TYPES.includes(errorType)) {
-          console.log('Suppressing toast message for error type:', errorType);
-          return null; // Will prevent rendering below
-        }
-      }
-      
-      const errorKey = `errors.${message}`;
-      return dictionary[errorKey] || dictionary['errors.USER_FRIENDLY'] || message;
-    }
-    return message;
-  };
-
-  // Process the message
-  const processedMessage = getLocalizedMessage(subtitle, type);
+    return () => clearTimeout(timeout);
+  }, [animate, persistent]);
   
-  // Don't render anything if message was suppressed
-  if (processedMessage === null) {
-    return null;
-  }
 
-  // Handle manual dismiss
+  // Handle dismiss action
   const handleDismiss = () => {
     Animated.timing(slideAnim, {
       toValue: -120,
       duration: 300,
       useNativeDriver: true,
-    }).start();
-    
-    if (onDismiss) {
-      setTimeout(onDismiss, 400);
-    }
+    }).start(() => {
+      if (onDismiss) onDismiss();
+    });
   };
 
-  // Calculate top position based on safe area insets
-  const statusBarHeight = insets.top || StatusBar.currentHeight || 0;
-  const topPosition = statusBarHeight + 10; // 10px additional padding
-  
   return (
     <Animated.View
       style={[
-        { 
-          transform: [{ translateY: slideAnim }],
-          top: topPosition
-        },
-        styles.animatedContainer
+        styles.animatedContainer,
+        { transform: [{ translateY: slideAnim }], top: topPosition },
       ]}
     >
       <View style={[styles.toastBox, addStyles]}>
         <View style={[styles.uiLine, { backgroundColor: COLOR }]} />
-        <Icon
-          name={ICON}
-          size={24}
-          color={COLOR}
-          style={styles.icon}
-        />
+        <Icon name={ICON} size={24} color={COLOR} style={styles.icon} />
         <View style={styles.textContainer}>
           <Text style={styles.toastTitle}>{title}</Text>
           <Text style={styles.toastMsg}>{processedMessage}</Text>
         </View>
-        <TouchableOpacity 
-          onPress={handleDismiss} 
+        <TouchableOpacity
+          onPress={handleDismiss}
           style={styles.closeButton}
           accessibilityLabel="Dismiss notification"
           accessibilityRole="button"
@@ -162,26 +140,26 @@ const Toast = ({ type, title, subtitle, animate, addStyles, onDismiss }) => {
 const styles = StyleSheet.create({
   animatedContainer: {
     position: "absolute",
-    width: "100%",
-    zIndex: 1024,
-    paddingHorizontal: 10,
+    left: 0,
+    right: 0,
+    zIndex: 1000, // ნაკლები zIndex, რომ ტოსტერი მაინც არ გადაეფაროს მუდმივად header მენიუს
+    paddingHorizontal: 16,
+    alignItems: "center",
+    pointerEvents: "box-none", // ✅ ტოსტერი არ დაბლოკავს touch-ს
   },
   toastBox: {
-    minHeight: 70,
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#F9FCFA",
     padding: 14,
     borderRadius: 12,
     shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 3,
-    },
+    shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.27,
     shadowRadius: 4.65,
     elevation: 6,
-    width: '100%',
+    width: "100%",
+    maxWidth: 600, // restrict max width
   },
   uiLine: {
     width: 4,
@@ -211,16 +189,16 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 50,
     marginLeft: 4,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: "#f0f0f0",
     width: 30,
     height: 30,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   closeIcon: {
     fontSize: 16,
-    color: '#666',
-    fontWeight: 'bold',
+    color: "#666",
+    fontWeight: "bold",
   },
 });
 

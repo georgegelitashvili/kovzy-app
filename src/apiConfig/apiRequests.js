@@ -7,9 +7,9 @@ import NetInfo from '@react-native-community/netinfo';
 
 const cache = new Map();
 const CACHE_DURATION = 5 * 60 * 1000;
-const RETRY_DELAY = 2000;  // Increased from 1000
-const MAX_RETRIES = 10;     // Increased from 3
-const INITIAL_TIMEOUT = 15000; // Increased from 10000
+const RETRY_DELAY = 200;  // Very fast retry
+const MAX_RETRIES = 1;     // Only 1 retry for maximum speed
+const INITIAL_TIMEOUT = 5000; // Much faster timeout
 
 // ONLY these errors should be shown to users - all others will be hidden
 const USER_VISIBLE_ERROR_TYPES = [

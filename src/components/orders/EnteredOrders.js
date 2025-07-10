@@ -31,6 +31,7 @@ import { orderReducer, initialState } from '../../reducers/orderReducer';
 import OrderCard from "./OrderCard";
 import { handleDelaySet } from '../../utils/timeUtils';
 import { debounce } from 'lodash';
+import { useOrderDetails } from "../../hooks/useOrderDetails";
 
 // This will be replaced with a dynamic calculation based on screen size
 const initialWidth = Dimensions.get("window").width;
@@ -55,6 +56,17 @@ export const EnteredOrdersList = () => {
   const { domain, branchid, user } = useContext(AuthContext);
   const { dictionary, languageId } = useContext(LanguageContext);
   const [state, dispatch] = useReducer(orderReducer, initialState);
+  // Use the custom hook for order details management
+  const {
+    orderDetails,
+    loadingDetails,
+    fetchBatchOrderDetails,
+    fetchOrderDetailsLazy,
+    isOrderDetailsLoaded,
+    clearOrderDetails,
+    getOrderDetails
+  } = useOrderDetails();
+  
   const NotificationSoundRef = useRef(null);
   const soundRef = useRef(null);
   const intervalRef = useRef(null);
@@ -65,6 +77,7 @@ export const EnteredOrdersList = () => {
   const [isPickerVisible, setPickerVisible] = useState(false);
   const [appState, setAppState] = useState(AppState.currentState);
   const [isConnected, setIsConnected] = useState(true);
+  const [isLanguageChangeLoading, setIsLanguageChangeLoading] = useState(false);
   const { error, setError, setApiError, clearError } = useErrorHandler();
   const [options, setOptions] = useState({
     url_unansweredOrders: "",
@@ -77,6 +90,8 @@ export const EnteredOrdersList = () => {
   const processedOrdersRef = useRef(new Set());
   const lastOrdersRef = useRef(new Set());
   const isInitialFetchRef = useRef(true);
+  const isLanguageChangeInProgressRef = useRef(false);
+  const isComponentMountedRef = useRef(false);
   const [layoutKey, setLayoutKey] = useState(0);
 
   const MAX_RETRIES = 15;
@@ -155,14 +170,25 @@ export const EnteredOrdersList = () => {
 
       const newOrders = resp.data.data;
       
-      if (isInitialFetchRef.current) {
+      // Get current order IDs to compare with new ones
+      const currentOrderIds = state.orders.map(order => order.id);
+      const newOrderIds = newOrders.map(order => order.id);
+
+      // Find orders that are new to the orders state AND don't have cached details
+      const ordersNeedingDetails = newOrderIds.filter(id => 
+        !currentOrderIds.includes(id) && !isOrderDetailsLoaded(id)
+      );
+      
+      if (isInitialFetchRef.current && !isLanguageChangeInProgressRef.current) {
         console.log('Initial fetch completed');
         isInitialFetchRef.current = false;
+        
+        // Show alert if there are orders on initial load
         if (newOrders.length > 0) {
           Alert.alert(
-            dictionary["general.alerts"],
-            dictionary["orders.newOrder"],
-            [{ text: dictionary["okay"] }]
+            dictionary["general.alerts"] || "შეტყობინება",
+            dictionary["orders.newOrder"] || "ახალი შეკვეთა მიღებულია",
+            [{ text: dictionary["okay"] || "კარგი" }]
           );
           
           if (NotificationSoundRef?.current) {
@@ -173,15 +199,23 @@ export const EnteredOrdersList = () => {
             }
           }
         }
+        
         newOrders.forEach(order => lastOrdersRef.current.add(order.id));
+        
+        // For initial load, fetch details for all orders (ignore cache after language change)
+        const uncachedOrders = newOrderIds; // Fetch all orders on initial load
+        if (uncachedOrders.length > 0) {
+          console.log(`Initial load: fetching details for ${uncachedOrders.length} orders`);
+          await fetchBatchOrderDetails(uncachedOrders, true);
+        }
       } else {
         const hasNewOrders = newOrders.some(order => !lastOrdersRef.current.has(order.id));
         
         if (hasNewOrders) {
           Alert.alert(
-            dictionary["general.alerts"],
-            dictionary["orders.newOrder"],
-            [{ text: dictionary["okay"] }]
+            dictionary["general.alerts"] || "შეტყობინება",
+            dictionary["orders.newOrder"] || "ახალი შეკვეთა მიღებულია",
+            [{ text: dictionary["okay"] || "კარგი" }]
           );
 
           if (NotificationSoundRef?.current) {
@@ -193,6 +227,12 @@ export const EnteredOrdersList = () => {
           }
           
           newOrders.forEach(order => lastOrdersRef.current.add(order.id));
+        }
+        
+        // Only fetch order details if there are new orders that need details
+        if (ordersNeedingDetails.length > 0) {
+          console.log(`Fetching details for ${ordersNeedingDetails.length} new orders:`, ordersNeedingDetails);
+          await fetchBatchOrderDetails(ordersNeedingDetails, false); // Don't show loader for interval calls
         }
       }
 
@@ -233,7 +273,7 @@ export const EnteredOrdersList = () => {
         handleReload();
       }
     }
-  }, [user, options.url_unansweredOrders, branchid, languageId, dictionary, retryCount]);
+  }, [user, options.url_unansweredOrders, branchid, languageId, dictionary, retryCount, state.orders, isOrderDetailsLoaded, fetchBatchOrderDetails]);
 
 
 
@@ -266,8 +306,13 @@ export const EnteredOrdersList = () => {
 
   const handleAppStateChange = useCallback((nextAppState) => {
     if (appState.match(/inactive|background/) && nextAppState === "active") {
-      isInitialFetchRef.current = true;
-      lastOrdersRef.current.clear();
+      // Only set initial fetch to true on genuine app background->foreground transition
+      // But not if we're already in a language change scenario
+      console.log('App state changed: background -> active');
+      if (!isLanguageChangeInProgressRef.current) {
+        isInitialFetchRef.current = true;
+        lastOrdersRef.current.clear();
+      }
       startInterval();
     } else {
       if (intervalRef.current) {
@@ -277,14 +322,17 @@ export const EnteredOrdersList = () => {
     setAppState(nextAppState);
   }, [appState]);
 
+
   useEffect(() => {
     if (domain && branchid) {
       apiOptions();
     } else if (domain || branchid) {
       setOptionsIsLoaded(false);
       dispatch({ type: 'SET_ORDERS', payload: { orders: [], fees: [], currency: "", scheduled: [] }});
+      // Clear order details cache when switching domains/branches
+      clearOrderDetails();
     }
-  }, [domain, branchid, apiOptions]);
+  }, [domain, branchid, apiOptions, clearOrderDetails]);
 
   // Monitor internet connectivity
   useEffect(() => {
@@ -292,8 +340,8 @@ export const EnteredOrdersList = () => {
       const connectionStatus = state.isConnected && state.isInternetReachable !== false;
       setIsConnected(connectionStatus);
       
-      if (connectionStatus && !isConnected) {
-        // Connection restored, restart interval
+      if (connectionStatus && !isConnected && !isLanguageChangeInProgressRef.current) {
+        // Connection restored, restart interval (but not during language change)
         if (optionsIsLoaded) {
           startInterval();
         }
@@ -309,7 +357,7 @@ export const EnteredOrdersList = () => {
   }, [isConnected, optionsIsLoaded]);
 
   useEffect(() => {
-    if (optionsIsLoaded) {
+    if (optionsIsLoaded && !isLanguageChangeInProgressRef.current) {
       const subscribe = AppState.addEventListener('change', handleAppStateChange);
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
@@ -317,6 +365,7 @@ export const EnteredOrdersList = () => {
       if (isConnected) {
         startInterval();
       }
+
       return () => {
         if (intervalRef.current) {
         clearInterval(intervalRef.current);
@@ -325,7 +374,106 @@ export const EnteredOrdersList = () => {
         subscribe.remove();
       };
     }
-  }, [optionsIsLoaded, languageId, appState, isConnected]);
+  }, [optionsIsLoaded, appState, isConnected]);
+
+  // Separate effect for language changes - force initial fetch  
+  useEffect(() => {
+    // Skip first run (component mount)
+    if (!isComponentMountedRef.current) {
+      isComponentMountedRef.current = true;
+      return;
+    }
+    
+    if (optionsIsLoaded && user && options.url_unansweredOrders) {
+      console.log(`🔄 Language changed to ${languageId}, forcing complete refresh`);
+      
+      // Show loader during language change
+      setIsLanguageChangeLoading(true);
+      
+      // Set language change flag to prevent alerts
+      isLanguageChangeInProgressRef.current = true;
+      // Mark as not initial to prevent alerts during language change
+      isInitialFetchRef.current = false;
+      lastOrdersRef.current.clear();
+      
+      // Stop current interval to prevent conflicts
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+      
+      // Force fetch with new language ID (no alerts for language change)
+      (async () => {
+        try {
+          console.log(`🌍 Fetching orders with new languageId: ${languageId}`);
+          const resp = await axiosInstance.post(options.url_unansweredOrders, {
+            type: 0,
+            page: 1,
+            branchid: branchid,
+            Languageid: languageId, // This will have the new language ID
+            postponeOrder: false
+          });
+
+          const newOrders = resp.data.data;
+          const newOrderIds = newOrders.map(order => order.id);
+          
+          // Update state with new orders (including payment methods in new language)
+          dispatch({
+            type: 'SET_ORDERS',
+            payload: {
+              orders: newOrders,
+              fees: resp.data.fees,
+              currency: resp.data.currency,
+              scheduled: resp.data.scheduled
+            }
+          });
+          
+          // Force fetch all order details with new language
+          if (newOrderIds.length > 0) {
+            console.log(`Language change: force fetching details for ${newOrderIds.length} orders with languageId: ${languageId}`);
+            await fetchBatchOrderDetails(newOrderIds, false); // Don't show internal loader, we have our own
+          }
+          
+          newOrders.forEach(order => lastOrdersRef.current.add(order.id));
+          
+          // Clear language change flag
+          isLanguageChangeInProgressRef.current = false;
+          
+          // Hide loader after everything is complete (including order details)
+          // Don't hide if loadingDetails is still true
+          if (!loadingDetails) {
+            setIsLanguageChangeLoading(false);
+          }
+          
+          // Restart interval - but ensure it doesn't trigger initial alert
+          if (isConnected) {
+            startInterval();
+          }
+          
+          console.log(`✅ Language change complete - orders and details refreshed with languageId: ${languageId}`);
+        } catch (error) {
+          console.log('Error in language change fetch:', error);
+          // Clear language change flag even on error
+          isLanguageChangeInProgressRef.current = false;
+          // Hide loader even on error (but only if details aren't loading)
+          if (!loadingDetails) {
+            setIsLanguageChangeLoading(false);
+          }
+          // Restart interval even on error
+          if (isConnected) {
+            startInterval();
+          }
+        }
+      })();
+    }
+  }, [languageId, loadingDetails, fetchBatchOrderDetails, optionsIsLoaded, user, options.url_unansweredOrders, branchid, isConnected, startInterval]);
+
+  // Monitor loadingDetails and hide language change loader when details are fully loaded
+  useEffect(() => {
+    if (isLanguageChangeInProgressRef.current === false && isLanguageChangeLoading && !loadingDetails) {
+      console.log('Order details loaded, hiding language change loader');
+      setIsLanguageChangeLoading(false);
+    }
+  }, [loadingDetails, isLanguageChangeLoading]);
 
   // Initialize notifications
   useEffect(() => {
@@ -339,7 +487,12 @@ export const EnteredOrdersList = () => {
 
   const handleToggleContent = useCallback((id) => {
     dispatch({ type: 'TOGGLE_CONTENT', payload: id });
-  }, []);
+    
+    // Lazy load: fetch order details when expanding if not already loaded
+    if (!state.isOpen.includes(id) && !orderDetails[id]) {
+      fetchOrderDetailsLazy(id);
+    }
+  }, [state.isOpen, orderDetails, fetchOrderDetailsLazy]);
 
   const handleAcceptOrder = useCallback(async (itemId, itemTakeAway) => {
     try {
@@ -348,9 +501,9 @@ export const EnteredOrdersList = () => {
       if (!netInfo.isConnected || netInfo.isInternetReachable === false) {
         dispatch({ type: 'SET_LOADING', payload: false });
         Alert.alert(
-          dictionary["general.alerts"] || "Alert",
-          dictionary["connection.required"] || "Internet connection required to process orders",
-          [{ text: dictionary["okay"] || "OK" }]
+          dictionary["general.alerts"] || "შეტყობინება",
+          dictionary["connection.required"] || "ინტერნეტ კავშირი საჭიროა შეკვეთების დასამუშავებლად",
+          [{ text: dictionary["okay"] || "კარგი" }]
         );
         return;
       }
@@ -404,9 +557,9 @@ export const EnteredOrdersList = () => {
           }
         });
 
-        Alert.alert("ALERT", dictionary["dv.empty"], [
+        Alert.alert("ALERT", dictionary["dv.empty"] || "მიწოდების ინფორმაცია ცარიელია", [
           {
-            text: "okay",
+            text: dictionary["okay"] || "კარგი",
             onPress: () => {
               dispatch({
                 type: 'SET_DELIVERON_DATA',
@@ -434,9 +587,9 @@ export const EnteredOrdersList = () => {
     if (!netInfo.isConnected || netInfo.isInternetReachable === false) {
       dispatch({ type: 'SET_LOADING', payload: false });
       Alert.alert(
-        dictionary["general.alerts"] || "Alert",
-        dictionary["connection.required"] || "Internet connection required to process orders",
-        [{ text: dictionary["okay"] || "OK" }]
+        dictionary["general.alerts"] || "შეტყობინება",
+        dictionary["connection.required"] || "ინტერნეტ კავშირი საჭიროა შეკვეთების დასამუშავებლად",
+        [{ text: dictionary["okay"] || "კარგი" }]
       );
       return;
     }
@@ -486,27 +639,32 @@ export const EnteredOrdersList = () => {
     await handleDelaySet(params);
   }, [state.deliveryScheduled, state.scheduled, state.itemId, options, dictionary]);
 
-  const renderOrderCard = useCallback(({ item }) => (
-    <View style={{
-      width: width / numColumns - (numColumns > 1 ? 15 : 30),
-      marginHorizontal: 5
-    }}>
-      <OrderCard
-        key={item.id}
-        item={item}
-        currency={state.currency}
-        isOpen={state.isOpen.includes(item.id)}
-        fees={state.fees}
-        scheduled={state.scheduled}
-        dictionary={dictionary}
-        onToggle={handleToggleContent}
-        onAccept={handleAcceptOrder}
-        onDelay={handleDelayOrder}
-        onReject={handleRejectOrder}
-        loading={state.loading}
-      />
-    </View>
-  ), [state.currency, state.isOpen, state.fees, state.scheduled, state.loading, dictionary, handleToggleContent, handleAcceptOrder, handleDelayOrder, handleRejectOrder]);
+  const renderOrderCard = useCallback(({ item }) => {
+    const orderDataForItem = getOrderDetails(item.id) || [];
+    
+    return (
+      <View style={{
+        width: width / numColumns - (numColumns > 1 ? 15 : 30),
+        marginHorizontal: 5
+      }}>
+        <OrderCard
+          key={item.id}
+          item={item}
+          currency={state.currency}
+          isOpen={state.isOpen.includes(item.id)}
+          fees={state.fees}
+          scheduled={state.scheduled}
+          dictionary={dictionary}
+          orderData={orderDataForItem}
+          onToggle={handleToggleContent}
+          onAccept={handleAcceptOrder}
+          onDelay={handleDelayOrder}
+          onReject={handleRejectOrder}
+          loading={state.loading}
+        />
+      </View>
+    );
+  }, [state.currency, state.isOpen, state.fees, state.scheduled, state.loading, dictionary, getOrderDetails, handleToggleContent, handleAcceptOrder, handleDelayOrder, handleRejectOrder, width, numColumns]);
 
   const keyExtractor = useCallback((item) => item.id.toString(), []);
 
@@ -531,6 +689,10 @@ export const EnteredOrdersList = () => {
     return () => {
       subscription.remove();
       processedOrdersRef.current.clear();
+      // Clear language change loading state on unmount
+      setIsLanguageChangeLoading(false);
+      // Clear language change progress flag
+      isLanguageChangeInProgressRef.current = false;
     };
   }, []);
 
@@ -538,74 +700,80 @@ export const EnteredOrdersList = () => {
     <View style={styles.container}>
       {state.loadingOptions && <Loader />}
       <NotificationSound ref={NotificationSoundRef} />
-      {state.loading && <Loader show={state.loading} />}
-      <ErrorDisplay 
-        error={error} 
-        onDismiss={clearError} 
-        style={styles.errorDisplay} 
-      />
-      <ConnectionStatusBar dictionary={dictionary} />
+      {(state.loading || loadingDetails || isLanguageChangeLoading) && <Loader show={state.loading || loadingDetails || isLanguageChangeLoading} />}
+      
+      {/* Hide content during language change loading */}
+      {!isLanguageChangeLoading && (
+        <>
+          <ErrorDisplay 
+            error={error} 
+            onDismiss={clearError} 
+            style={styles.errorDisplay} 
+          />
+          <ConnectionStatusBar dictionary={dictionary} />
 
-      {state.visible && (
-        <OrdersModal
-          isVisible={state.visible}
-          onChangeState={handleModalClose}
-          orders={state.orders}
-          hasItemId={state.itemId}
-          deliveron={state.deliveron}
-          deliveronOptions={state.deliveronOptions}
-          type={state.modalType}
-          options={options}
-          takeAway={state.itemTakeAway}
-          PendingOrders={true}
-        />
-      )}
+          {state.visible && (
+            <OrdersModal
+              isVisible={state.visible}
+              onChangeState={handleModalClose}
+              orders={state.orders}
+              hasItemId={state.itemId}
+              deliveron={state.deliveron}
+              deliveronOptions={state.deliveronOptions}
+              type={state.modalType}
+              options={options}
+              takeAway={state.itemTakeAway}
+              PendingOrders={true}
+            />
+          )}
 
-      <Modal
-        transparent={true}
-        visible={isPickerVisible}
-        animationType="fade"
-        onRequestClose={() => {
-          setPickerVisible(false);
-          dispatch({ type: 'SET_LOADING_OPTIONS', payload: false });
-        }}
-      >
-        <View style={styles.modalContainer}>
-          <TimePicker
-            scheduled={state.scheduled}
-            showButton={true}
-            onDelaySet={handleDelaySetWrapper}
-            onClose={() => {
+          <Modal
+            transparent={true}
+            visible={isPickerVisible}
+            animationType="fade"
+            onRequestClose={() => {
               setPickerVisible(false);
               dispatch({ type: 'SET_LOADING_OPTIONS', payload: false });
             }}
-          />
-        </View>
-      </Modal>
+          >
+            <View style={styles.modalContainer}>
+              <TimePicker
+                scheduled={state.scheduled}
+                showButton={true}
+                onDelaySet={handleDelaySetWrapper}
+                onClose={() => {
+                  setPickerVisible(false);
+                  dispatch({ type: 'SET_LOADING_OPTIONS', payload: false });
+                }}
+              />
+            </View>
+          </Modal>
 
-      <FlatList
-        key={`flat-list-${numColumns}`}
-        numColumns={numColumns}
-        data={state.orders}
-        renderItem={renderOrderCard}
-        keyExtractor={keyExtractor}
-        removeClippedSubviews={true}
-        maxToRenderPerBatch={10}
-        windowSize={21}
-        initialNumToRender={10}
-        onEndReachedThreshold={0.5}
-        contentContainerStyle={[
-          styles.listContainer,
-          { paddingHorizontal: 5 }
-        ]}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text>{dictionary["orders.noOrders"]}</Text>
-          </View>
-        }
-        refreshing={state.loading}
-        // onRefresh={debouncedFetch}
-      />
+          <FlatList
+            key={`flat-list-${numColumns}`}
+            numColumns={numColumns}
+            data={state.orders}
+            renderItem={renderOrderCard}
+            keyExtractor={keyExtractor}
+            removeClippedSubviews={true}
+            maxToRenderPerBatch={10}
+            windowSize={21}
+            initialNumToRender={10}
+            onEndReachedThreshold={0.5}
+            contentContainerStyle={[
+              styles.listContainer,
+              { paddingHorizontal: 5 }
+            ]}
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <Text>{dictionary["orders.noOrders"]}</Text>
+              </View>
+            }
+            refreshing={state.loading}
+            // onRefresh={debouncedFetch}
+          />
+        </>
+      )}
     </View>
   );
 };

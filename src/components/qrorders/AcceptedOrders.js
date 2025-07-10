@@ -26,6 +26,7 @@ import axiosInstance from "../../apiConfig/apiRequests";
 import OrdersDetail from "../OrdersDetail";
 import OrdersModal from "../modal/OrdersModalQr";
 import printRows from "../../PrintRows";
+import { useOrderDetails } from "../../hooks/useOrderDetails";
 
 const initialWidth = Dimensions.get("window").width;
 const getColumnsByScreenSize = (screenWidth) => {
@@ -43,6 +44,16 @@ export const AcceptedOrdersList = () => {
   const [orders, setOrders] = useState([]);
   const [fees, setFees] = useState([]);
   const [currency, setCurrency] = useState("");
+  
+  // Use the custom hook for order details management
+  const {
+    orderDetails,
+    loadingDetails,
+    fetchBatchOrderDetails,
+    fetchOrderDetailsLazy,
+    clearOrderDetails,
+    getOrderDetails
+  } = useOrderDetails();
 
   const [page, setPage] = useState(0);
   const [options, setOptions] = useState({
@@ -56,7 +67,8 @@ export const AcceptedOrdersList = () => {
   const [itemId, setItemId] = useState(null);
   const [isOpen, setOpenState] = useState([]);
   const [modalType, setModalType] = useState("");
-  const [loading, setLoading] = useState(true);  const [loadingOptions, setLoadingOptions] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadingOptions, setLoadingOptions] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [width, setWidth] = useState(Dimensions.get('window').width);
   const [numColumns, setNumColumns] = useState(getColumnsByScreenSize(width));
@@ -65,15 +77,17 @@ export const AcceptedOrdersList = () => {
   const { dictionary, languageId } = useContext(LanguageContext);
 
   const increment = () => { setPage(page + 1); setLoading(true) };
-  const decrement = () => { setPage(page - 1); setLoading(true) };
+  const decrement = () => { setPage(page - 1); setLoading(true)  };
 
   const toggleContent = useCallback((value) => {
     if (isOpen.includes(value)) {
+      // Currently collapsed - expand it by removing from the closed list
       setOpenState(isOpen.filter((i) => i !== value));
     } else {
+      // Currently expanded - collapse it by adding to the closed list
       setOpenState([...isOpen, value]);
     }
-  }, [isOpen]);
+  }, [isOpen, orderDetails]);
 
   const apiOptions = useCallback(() => {
     setOptions({
@@ -106,6 +120,9 @@ export const AcceptedOrdersList = () => {
   const fetchAcceptedOrders = async () => {
     if (!user || !options.url_getAcceptedOrders) return;
 
+    // Clear previous order details when fetching new orders
+    clearOrderDetails();
+
     try {
       const resp = await axiosInstance.post(options.url_getAcceptedOrders, JSON.stringify({
         Pagination: {
@@ -116,11 +133,20 @@ export const AcceptedOrdersList = () => {
         branchid: branchid,
         type: 1
       }));
+      
       const data = resp.data.data;
       const feesData = resp.data.fees;
+      
       setOrders(data);
       setFees(feesData);
       setCurrency(resp.data.currency);
+      
+      // Fetch details for all orders and wait for all to complete
+      if (data && data.length > 0) {
+        const orderIds = data.map(order => order.id);
+        await fetchBatchOrderDetails(orderIds, true); // Wait for all to complete
+      }
+      
     } catch (error) {
       console.log('Error fetching accepted orders:', error);
       const statusCode = error?.status || 'Unknown';
@@ -142,6 +168,7 @@ export const AcceptedOrdersList = () => {
     }
     setItemId(null);
     if (!newState) {  // Only fetch new orders when closing the modal
+      clearOrderDetails(); // Clear previous order details
       fetchAcceptedOrders();
     }
   }, [fetchAcceptedOrders]);
@@ -168,6 +195,7 @@ export const AcceptedOrdersList = () => {
       setLoadingOptions(true);
     }
   }, [itemId]);
+
   const RenderEnteredOrdersList = ({ item }) => {
     const additionalFees = parseFloat(item.service_fee) / 100;
     const feeData = JSON.parse(item.fees_details || '{}');
@@ -199,7 +227,7 @@ export const AcceptedOrdersList = () => {
               </Text>
             <Text variant="headlineMedium" style={styles.header}>
               <SimpleLineIcons
-                name={isOpen.includes(item.id) ? "arrow-up" : "arrow-down"}
+                name={isOpen.includes(item.id) ? "arrow-down" : "arrow-up"}
                 style={styles.rightIcon}
               />
             </Text>
@@ -236,7 +264,7 @@ export const AcceptedOrdersList = () => {
             </Text>
 
             <Divider />
-            <OrdersDetail orderId={item.id} />
+            <OrdersDetail orderId={item.id} orderData={getOrderDetails(item.id)} />
             <Divider />
 
             <Text variant="titleMedium" style={styles.title}> {dictionary["orders.initialPrice"]}: {item.real_price} {currency}</Text>
@@ -299,8 +327,8 @@ export const AcceptedOrdersList = () => {
     index,
   }), [cardSize]);
 
-  if (loading) {
-    return <Loader show={loading} />;
+  if (loading || loadingDetails) {
+    return <Loader show={loading || loadingDetails} />;
   }
 
   return (
@@ -312,6 +340,9 @@ export const AcceptedOrdersList = () => {
         keyExtractor={() => 'dummy-header-content-accepted'} // Fixed key for the single dummy item
         showsVerticalScrollIndicator={false}
         getItemLayout={getItemLayout}
+        refreshControl={
+          <RefreshControl refreshing={loading || loadingDetails} onRefresh={fetchAcceptedOrders} />
+        }
         ListHeaderComponent={
           <View style={{ flexDirection: 'row', flexWrap: 'nowrap', flex: 1 }}>
             {visible ? (

@@ -9,7 +9,11 @@
 // ONLY these errors should be shown to users - any other error types will be completely ignored
 export const USER_VISIBLE_ERROR_TYPES = [
   'NETWORK_ERROR',     // Only show network connectivity issues
-  'NOT_FOUND'          // Only show when requested data is not found
+  'NOT_FOUND',          // Only show when requested data is not found
+  'LOGIN_ERROR',        // Show login errors to users
+  'VALIDATION_ERROR',   // Only show validation errors
+  'BRANCH_TEMPORARILY_CLOSED', // Only show when branch is temporarily closed
+  'SESSION_EXPIRED',    // Show when session expires
 ];
 
 // Regex patterns to detect technical errors that should never be shown to users

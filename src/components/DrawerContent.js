@@ -10,7 +10,7 @@ import { LanguageContext } from "./Language";
 
 export default function DrawerContent(props) {
   const { navigation, ...otherProps } = props;
-  const { domain, branchid, branchName, branchEnabled, setBranchEnabled, logout, setIsLoading } = useContext(AuthContext);
+  const { domain, branchid, branchName, branchEnabled, setBranchEnabled, logout, setIsLoading, setIsVisible, handleError, clearErrors } = useContext(AuthContext);
   const { dictionary, userLanguage } = useContext(LanguageContext);
   const [qrOrdersBadge, setQrOrdersBadge] = useState(0);
   const [onlineOrdersBadge, setOnlineOrdersBadge] = useState(0);
@@ -75,20 +75,52 @@ export default function DrawerContent(props) {
 
   const toggleBranch = async () => {
     if (loading || !domain || !branchid) return;
-    
+
+    const newStatus = !branchEnabled; // toggle
     setLoading(true);
+
+    console.log("Toggling branch status:", newStatus, "for branch ID:", branchid);
+
     try {
       const resp = await axiosInstance.post(
         `https://${domain}/api/v1/admin/branchActivity`,
-        { branchid, enabled: branchEnabled ? 1 : 0 }
+        {
+          branchid,
+          enabled: newStatus ? 0 : 1, // 0 → ჩართვა, 1 → გათიშვა
+        }
       );
-      setBranchEnabled(resp.data.data);
+
+      const result = resp?.data?.data;
+      console.log("Toggle branch response:", resp?.data);
+
+      if (typeof result === "boolean") {
+        const isEnabled = result; // true = enabled, false = disabled
+        const isClosed = !isEnabled; // true = closed, false = open
+        setBranchEnabled(isClosed);     // Switch state
+        setIsVisible(isClosed);          // Toast visibility
+
+        if (!isClosed) {
+          handleError(
+            { message: dictionary?.["orders.branchDisabled"] || "Branch is temporarily closed" },
+            "BRANCH_TEMPORARILY_CLOSED",
+            { persistent: true }
+          );
+        } else {
+          console.log('🟢 Branch enabled, clearing persistent errors');
+          clearErrors();
+        }
+      } else {
+        console.warn("Unexpected response in toggleBranch:", resp?.data);
+        handleError(new Error("Invalid toggle response format"), "TOGGLE_BRANCH_INVALID");
+      }
+
     } catch (error) {
-      console.error('Branch toggle failed:', error);
+      console.error("Branch toggle failed:", error);
+      handleError(error, "TOGGLE_BRANCH_ERROR");
+
+      // optional: fallback მდგომარეობაზე არ გააკეთოს setBranchEnabled, შეინარჩუნოს არსებული
     } finally {
-      setTimeout(() => {
-        setLoading(false);
-      }, 1500);
+      setLoading(false);
     }
   };
 
