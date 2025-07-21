@@ -53,9 +53,10 @@ export const OrdersListBase = ({ orderType }) => {
     orderDetails,
     loadingDetails,
     fetchBatchOrderDetails,
-    fetchOrderDetailsLazy,
     clearOrderDetails,
-    getOrderDetails
+    getOrderDetails,
+    isOrderDetailsLoaded,
+    isOrderLoading
   } = useOrderDetails();
 
   const [optionsIsLoaded, setOptionsIsLoaded] = useState(false);
@@ -72,13 +73,16 @@ export const OrdersListBase = ({ orderType }) => {
 
   const { dictionary, languageId } = useContext(LanguageContext);
 
+  // FIXED: Memoize toggleContent to prevent unnecessary re-renders
   const toggleContent = useCallback((value) => {
-    if (isOpen.includes(value)) {
-      setOpenState(isOpen.filter((i) => i !== value));
-    } else {
-      setOpenState([...isOpen, value]);
-    }
-  }, [isOpen, orderDetails]);
+    setOpenState(prev => {
+      if (prev.includes(value)) {
+        return prev.filter((i) => i !== value);
+      } else {
+        return [...prev, value];
+      }
+    });
+  }, []);
 
   const apiOptions = useCallback(() => {
     setOptions({
@@ -98,10 +102,12 @@ export const OrdersListBase = ({ orderType }) => {
   const fetchAcceptedOrders = async (appliedFilters = filters, reset = false) => {
     if (!user || !options.url_getOrdersLogs) return;
 
-    // Clear previous order details when fetching new orders
-    clearOrderDetails();
-    
+    // Clear previous order details when fetching new orders (only on reset)
+    if (reset) clearOrderDetails();
+
     try {
+      if (!reset) setLoadingMore(true); // Show loader for infinite scroll
+
       const requestFilters = {
         status: { exact: appliedFilters.orderStatus },
         type: { exact: orderType.toString() },
@@ -148,11 +154,16 @@ export const OrdersListBase = ({ orderType }) => {
         setOrders(uniqueData);
       }
 
-      // Fetch details for all orders and wait for all to complete
-      if (uniqueData && uniqueData.length > 0) {
-        const orderIds = uniqueData.map(order => order.id);
-        console.log('Order IDs before details fetch:', orderIds);
-        await fetchBatchOrderDetails(orderIds, true); // Wait for all to complete
+      // Only fetch details for truly new orders
+      const prevOrderIds = new Set(orders.map(order => order.id));
+      const newOrderIds = newData
+        .map(order => order.id)
+        .filter(id => !prevOrderIds.has(id));
+
+      console.log('Fetching details for newOrderIds:', newOrderIds);
+      if (newOrderIds.length > 0) {
+        // Await until ALL details are loaded before hiding loader
+        await fetchBatchOrderDetails(newOrderIds, true, true);
       }
 
       setFees(feesData);
@@ -166,7 +177,7 @@ export const OrdersListBase = ({ orderType }) => {
       }
     } finally {
       setLoading(false);
-      setLoadingMore(false);
+      setLoadingMore(false); // Loader turns off ONLY after details are loaded
     }
   };
 
@@ -200,7 +211,19 @@ export const OrdersListBase = ({ orderType }) => {
     return () => subscription?.remove();
   }, []);
 
-  const RenderEnteredOrdersList = ({ item, toggleContent, isOpen, dictionary, currency, fees }) => {
+  const debounceRef = useRef(null);
+
+  const handleEndReached = () => {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
+    debounceRef.current = setTimeout(() => {
+      fetchAcceptedOrders();
+    }, 500); // 0.5 წამი
+  };
+
+  // FIXED: Memoized component to prevent unnecessary re-renders
+  const RenderEnteredOrdersList = React.memo(({ item, toggleContent, isOpen, dictionary, currency, fees }) => {
     const trackLink = [JSON.parse(item.deliveron_data)]?.map(link => {
       return link.trackLink ?? null;
     });
@@ -213,6 +236,10 @@ export const OrdersListBase = ({ orderType }) => {
       }
       return acc;
     }, []);
+
+    // FIXED: Get order details and loading state for this specific order
+    const orderDetailsData = getOrderDetails(item.id);
+    const isOrderDetailsLoading = isOrderLoading(item.id);
 
     return (
       <View style={{
@@ -272,9 +299,19 @@ export const OrdersListBase = ({ orderType }) => {
               <Text variant="titleSmall" style={styles.title} numberOfLines={2} ellipsizeMode="tail">
                 {dictionary["orders.paymentMethod"]}: {item.payment_type}
               </Text>
-              
+
               <Divider />
-              <OrdersDetail orderId={item.id} orderData={getOrderDetails(item.id)} />
+
+              {/* FIXED: Show loading state or content, prevent flickering */}
+              {isOrderDetailsLoading ? (
+                <View style={{ padding: 20, alignItems: 'center' }}>
+                  <ActivityIndicator size="small" color="#0000ff" />
+                  <Text style={{ marginTop: 8, color: '#666' }}>Loading order details...</Text>
+                </View>
+              ) : (
+                <OrdersDetail orderId={item.id} orderData={orderDetailsData} />
+              )}
+
               <Divider />
 
               <Text variant="titleMedium" style={styles.title}>
@@ -308,9 +345,9 @@ export const OrdersListBase = ({ orderType }) => {
         </Card>
       </View>
     );
-  };
+  });
 
-  const renderItem = ({ item }) => {
+  const renderItem = useCallback(({ item }) => {
     return (
       <RenderEnteredOrdersList
         item={item}
@@ -321,7 +358,7 @@ export const OrdersListBase = ({ orderType }) => {
         fees={fees}
       />
     );
-  };
+  }, [toggleContent, isOpen, dictionary, currency, fees]);
 
   const getItemLayout = useCallback((data, index) => ({
     length: cardSize,
@@ -329,8 +366,19 @@ export const OrdersListBase = ({ orderType }) => {
     index,
   }), [cardSize]);
 
+  // Add detailed logging at the start of the render function
+  console.log('loading:', loading, 'loadingMore:', loadingMore, 'loadingDetails:', loadingDetails);
+  console.log('orders:', orders.length, 'orderDetails:', Object.keys(orderDetails).length);
+
+  // Add logging in render to show which order IDs are missing details
+  const missingDetails = orders.filter(order => !isOrderDetailsLoaded(order.id)).map(order => order.id);
+  if (missingDetails.length > 0) {
+    console.log('Orders missing details:', missingDetails);
+  }
+
+  // Show main loader only for initial load
   if (loading) {
-    return <Loader show={loading} />;
+    return <Loader show={true} />;
   }
 
   return (
@@ -353,7 +401,7 @@ export const OrdersListBase = ({ orderType }) => {
           getItemLayout={getItemLayout}
           itemContainerStyle={{ justifyContent: 'space-between' }}
           style={{ flex: 1, width: "100%" }}
-          onEndReached={() => fetchAcceptedOrders()}
+          onEndReached={handleEndReached}
           onEndReachedThreshold={0.5}
           ListFooterComponent={
             loadingMore ? <ActivityIndicator size="large" color="#0000ff" /> : null

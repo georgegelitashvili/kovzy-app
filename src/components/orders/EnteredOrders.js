@@ -9,7 +9,7 @@ import {
   FlatList,
 } from "react-native";
 
-import { Text, Button, Divider, Card } from "react-native-paper";
+import { Text } from "react-native-paper";
 import { FlatGrid } from "react-native-super-grid";
 import * as Updates from 'expo-updates';
 import { Audio } from 'expo-av';
@@ -92,42 +92,35 @@ export const EnteredOrdersList = () => {
   const isInitialFetchRef = useRef(true);
   const isLanguageChangeInProgressRef = useRef(false);
   const isComponentMountedRef = useRef(false);
+  const isFirstAppLaunchRef = useRef(true); // Track if this is the very first app launch
+  const hasShownInitialAlertRef = useRef(false); // Track if we've shown initial load alert
+  const shownAlertsRef = useRef(new Set()); // Track shown alert order IDs to prevent duplicates
+  const abortControllerRef = useRef(null); // For cancelling in-flight requests
+  const lastRequestTimestampRef = useRef(0); // Track request timestamps to prevent stale responses
   const [layoutKey, setLayoutKey] = useState(0);
 
   const MAX_RETRIES = 15;
   const RETRY_DELAY = 5000;
   const FETCH_INTERVAL = 3000;
   const DEBOUNCE_DELAY = 300;
+  const LOADER_TIMEOUT = 10000; // 10 seconds max for loader
 
-  // Initialize notification sound
+  // Loader failsafe - force hide loader after timeout
   useEffect(() => {
-    NotificationSoundRef.current = {
-      orderReceived: async () => {
-        try {
-          if (soundRef.current) {
-            await soundRef.current.unloadAsync();
-          }
-          
-          const { sound } = await Audio.Sound.createAsync(
-            require('../../assets/audio/order.mp3')
-          );
-          soundRef.current = sound;
-          await sound.playAsync();
-        } catch (error) {
-          console.warn('Error playing notification sound:', error);
-        }
-      }
-    };
-
+    let loaderTimeout;
+    
+    if (state.loading) {
+      loaderTimeout = setTimeout(() => {
+        dispatch({ type: 'SET_LOADING', payload: false });
+      }, LOADER_TIMEOUT);
+    }
+    
     return () => {
-      if (soundRef.current) {
-        soundRef.current.unloadAsync();
-      }
-      if (NotificationSoundRef.current) {
-        NotificationSoundRef.current = null;
+      if (loaderTimeout) {
+        clearTimeout(loaderTimeout);
       }
     };
-  }, []);
+  }, [state.loading]);
 
   useEffect(() => {
     const updateLayout = () => {
@@ -155,84 +148,94 @@ export const EnteredOrdersList = () => {
   }, [domain]);
 
   const fetchEnteredOrders = useCallback(async () => {
-    if (!user || !options.url_unansweredOrders) {
-      return null;
+    if (!user || !options.url_unansweredOrders) return;
+
+    const wasFirstAppLaunch = isFirstAppLaunchRef.current;
+    const wasInitialFetch = isInitialFetchRef.current;
+
+    // Only show loader for the very first app launch or initial fetch
+    const shouldShowLoader = wasFirstAppLaunch && wasInitialFetch;
+    console.log('fetchEnteredOrders: shouldShowLoader=', shouldShowLoader, {
+      wasFirstAppLaunch,
+      wasInitialFetch,
+      isLanguageChangeInProgress: isLanguageChangeInProgressRef.current
+    });
+
+    if (shouldShowLoader) {
+      console.log('Setting loading to true for initial fetch');
+      dispatch({ type: 'SET_LOADING', payload: true });
     }
 
     try {
-      const resp = await axiosInstance.post(options.url_unansweredOrders, {
-        type: 0,
-        page: 1,
-        branchid: branchid,
-        Languageid: languageId,
-        postponeOrder: false
-      });
+      lastRequestTimestampRef.current = Date.now();
+
+      const resp = await axiosInstance.post(
+        options.url_unansweredOrders,
+        {
+          type: 0,
+          page: 1,
+          branchid,
+          Languageid: languageId,
+          postponeOrder: false
+        },
+        { signal: abortControllerRef.current?.signal }
+      );
 
       const newOrders = resp.data.data;
-      
-      // Get current order IDs to compare with new ones
-      const currentOrderIds = state.orders.map(order => order.id);
-      const newOrderIds = newOrders.map(order => order.id);
+      const newOrderIds = newOrders.map(o => o.id);
+      const currentOrderIds = state.orders.map(o => o.id);
 
-      // Find orders that are new to the orders state AND don't have cached details
-      const ordersNeedingDetails = newOrderIds.filter(id => 
-        !currentOrderIds.includes(id) && !isOrderDetailsLoaded(id)
+      const isFirstFetch = wasInitialFetch && !isLanguageChangeInProgressRef.current;
+      const isFirstLoad = state.orders.length === 0 && newOrders.length > 0;
+
+      const genuinelyNewOrders = newOrders.filter(order => !lastOrdersRef.current.has(order.id));
+      const genuinelyNewOrderIds = genuinelyNewOrders.map(o => o.id);
+
+      const shouldShowInitialAlert =
+        (wasFirstAppLaunch || isFirstFetch || isFirstLoad) &&
+        newOrders.length > 0 &&
+        !isLanguageChangeInProgressRef.current &&
+        !hasShownInitialAlertRef.current;
+
+      const shouldShowRuntimeAlert =
+        genuinelyNewOrderIds.length > 0 &&
+        !isLanguageChangeInProgressRef.current &&
+        !wasFirstAppLaunch;
+
+      const showAlert = shouldShowInitialAlert || shouldShowRuntimeAlert;
+
+      if (showAlert) {
+        const alertKey = (shouldShowInitialAlert ? newOrderIds : genuinelyNewOrderIds)
+          .sort()
+          .join('-');
+
+        if (!shownAlertsRef.current.has(alertKey)) {
+          shownAlertsRef.current.add(alertKey);
+
+          if (shouldShowInitialAlert) {
+            hasShownInitialAlertRef.current = true;
+          }
+
+          NotificationSoundRef.current?.orderReceived?.().catch(error => {
+            console.warn("🔈 Sound error:", error);
+          });
+        }
+      }
+
+      const ordersNeedingDetails = newOrderIds.filter(
+        id => !currentOrderIds.includes(id) && !isOrderDetailsLoaded(id)
       );
-      
-      if (isInitialFetchRef.current && !isLanguageChangeInProgressRef.current) {
-        console.log('Initial fetch completed');
-        isInitialFetchRef.current = false;
-        
-        // Show alert if there are orders on initial load
-        if (newOrders.length > 0) {
-          Alert.alert(
-            dictionary["general.alerts"] || "შეტყობინება",
-            dictionary["orders.newOrder"] || "ახალი შეკვეთა მიღებულია",
-            [{ text: dictionary["okay"] || "კარგი" }]
-          );
-          
-          if (NotificationSoundRef?.current) {
-            try {
-              await NotificationSoundRef.current.orderReceived();
-            } catch (error) {
-              console.warn('Error playing notification sound:', error);
-            }
-          }
-        }
-        
-        newOrders.forEach(order => lastOrdersRef.current.add(order.id));
-        
-        // For initial load, fetch details for all orders (ignore cache after language change)
-        const uncachedOrders = newOrderIds; // Fetch all orders on initial load
-        if (uncachedOrders.length > 0) {
-          console.log(`Initial load: fetching details for ${uncachedOrders.length} orders`);
-          await fetchBatchOrderDetails(uncachedOrders, true);
-        }
-      } else {
-        const hasNewOrders = newOrders.some(order => !lastOrdersRef.current.has(order.id));
-        
-        if (hasNewOrders) {
-          Alert.alert(
-            dictionary["general.alerts"] || "შეტყობინება",
-            dictionary["orders.newOrder"] || "ახალი შეკვეთა მიღებულია",
-            [{ text: dictionary["okay"] || "კარგი" }]
-          );
 
-          if (NotificationSoundRef?.current) {
-            try {
-              await NotificationSoundRef.current.orderReceived();
-            } catch (error) {
-              console.warn('Error playing notification sound:', error);
-            }
+      if ((isFirstFetch || isFirstLoad) && !isLanguageChangeInProgressRef.current) {
+        isInitialFetchRef.current = false;
+        newOrderIds.forEach(id => lastOrdersRef.current.add(id));
+
+        if (newOrderIds.length > 0) {
+          try {
+            await fetchBatchOrderDetails(newOrderIds, false); // No loader for details
+          } catch (e) {
+            console.error("❌ Initial order detail fetch failed", e);
           }
-          
-          newOrders.forEach(order => lastOrdersRef.current.add(order.id));
-        }
-        
-        // Only fetch order details if there are new orders that need details
-        if (ordersNeedingDetails.length > 0) {
-          console.log(`Fetching details for ${ordersNeedingDetails.length} new orders:`, ordersNeedingDetails);
-          await fetchBatchOrderDetails(ordersNeedingDetails, false); // Don't show loader for interval calls
         }
       }
 
@@ -242,40 +245,67 @@ export const EnteredOrdersList = () => {
           orders: newOrders,
           fees: resp.data.fees,
           currency: resp.data.currency,
-          scheduled: resp.data.scheduled
+          scheduled: resp.data.scheduled,
+          loading: false
         }
       });
-      
-      console.log('State updated successfully');
-      dispatch({ type: 'SET_LOADING', payload: false });
+
+      // Always ensure loading is false after fetch
+      if (state.loading) {
+        console.log('Forcing loading to false after fetch');
+        dispatch({ type: 'SET_LOADING', payload: false });
+      }
+
+      // Reset flags
+      if (wasInitialFetch) {
+        isInitialFetchRef.current = false;
+      }
+      if (wasFirstAppLaunch) {
+        isFirstAppLaunchRef.current = false;
+      }
 
       setRetryCount(0);
     } catch (error) {
-      console.log('Error in fetchEnteredOrders:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-        config: error.config
-      });
-      
+      const isCancelled =
+        error.name === 'AbortError' ||
+        error.code === 'ERR_CANCELED' ||
+        error.message?.includes('canceled');
+
+      if (isCancelled) {
+        console.log('🚫 Request was cancelled');
+        return;
+      }
+
+      console.error('Fetch error:', error);
+      dispatch({ type: 'SET_LOADING', payload: false });
+
+      if (wasInitialFetch) {
+        isInitialFetchRef.current = false;
+      }
+      if (wasFirstAppLaunch) {
+        isFirstAppLaunchRef.current = false;
+      }
+
       if (retryCount < MAX_RETRIES) {
-        console.log(`Retrying... Attempt ${retryCount + 1} of ${MAX_RETRIES}`);
         setRetryCount(prev => prev + 1);
-        if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        }
+        if (intervalRef.current) clearInterval(intervalRef.current);
         setTimeout(startInterval, RETRY_DELAY);
       } else {
-        console.log('Max retries reached, reloading app');
-        if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        }
+        if (intervalRef.current) clearInterval(intervalRef.current);
         handleReload();
       }
     }
-  }, [user, options.url_unansweredOrders, branchid, languageId, dictionary, retryCount, state.orders, isOrderDetailsLoaded, fetchBatchOrderDetails]);
-
-
+  }, [
+    user,
+    options.url_unansweredOrders,
+    branchid,
+    languageId,
+    dictionary,
+    retryCount,
+    state.orders,
+    isOrderDetailsLoaded,
+    fetchBatchOrderDetails
+  ]);
 
   const debouncedFetch = useCallback(
     debounce(() => {
@@ -306,12 +336,9 @@ export const EnteredOrdersList = () => {
 
   const handleAppStateChange = useCallback((nextAppState) => {
     if (appState.match(/inactive|background/) && nextAppState === "active") {
-      // Only set initial fetch to true on genuine app background->foreground transition
-      // But not if we're already in a language change scenario
-      console.log('App state changed: background -> active');
       if (!isLanguageChangeInProgressRef.current) {
-        isInitialFetchRef.current = true;
         lastOrdersRef.current.clear();
+        shownAlertsRef.current.clear(); // Clear shown alerts on app resume
       }
       startInterval();
     } else {
@@ -328,9 +355,16 @@ export const EnteredOrdersList = () => {
       apiOptions();
     } else if (domain || branchid) {
       setOptionsIsLoaded(false);
-      dispatch({ type: 'SET_ORDERS', payload: { orders: [], fees: [], currency: "", scheduled: [] }});
+      dispatch({ type: 'SET_ORDERS', payload: { orders: [], fees: [], currency: "", scheduled: [], loading: false }});
       // Clear order details cache when switching domains/branches
       clearOrderDetails();
+      // Clear alert tracking when switching domains/branches
+      shownAlertsRef.current.clear();
+      lastOrdersRef.current.clear();
+      // Stop any playing sound when switching domains/branches
+      if (NotificationSoundRef?.current?.stopSound) {
+        NotificationSoundRef.current.stopSound();
+      }
     }
   }, [domain, branchid, apiOptions, clearOrderDetails]);
 
@@ -346,9 +380,13 @@ export const EnteredOrdersList = () => {
           startInterval();
         }
       } else if (!connectionStatus && isConnected) {
-        // Connection lost, stop interval
+        // Connection lost, stop interval and clear alerts
         if (intervalRef.current) {
           clearInterval(intervalRef.current);
+        }
+        // Stop any playing sound when connection is lost
+        if (NotificationSoundRef?.current?.stopSound) {
+          NotificationSoundRef.current.stopSound();
         }
       }
     });
@@ -378,87 +416,98 @@ export const EnteredOrdersList = () => {
 
   // Separate effect for language changes - force initial fetch  
   useEffect(() => {
-    // Skip first run (component mount)
     if (!isComponentMountedRef.current) {
       isComponentMountedRef.current = true;
       return;
     }
-    
+
     if (optionsIsLoaded && user && options.url_unansweredOrders) {
-      console.log(`🔄 Language changed to ${languageId}, forcing complete refresh`);
-      
-      // Show loader during language change
+      console.log(`🔄 User manually changed language to ${languageId}, forcing complete refresh`);
       setIsLanguageChangeLoading(true);
-      
-      // Set language change flag to prevent alerts
       isLanguageChangeInProgressRef.current = true;
-      // Mark as not initial to prevent alerts during language change
-      isInitialFetchRef.current = false;
+      isFirstAppLaunchRef.current = false;
       lastOrdersRef.current.clear();
-      
-      // Stop current interval to prevent conflicts
+      shownAlertsRef.current.clear();
+
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
-      
-      // Force fetch with new language ID (no alerts for language change)
+
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+
+      abortControllerRef.current = new AbortController();
+
       (async () => {
         try {
-          console.log(`🌍 Fetching orders with new languageId: ${languageId}`);
-          const resp = await axiosInstance.post(options.url_unansweredOrders, {
-            type: 0,
-            page: 1,
-            branchid: branchid,
-            Languageid: languageId, // This will have the new language ID
-            postponeOrder: false
-          });
+          const languageChangeTimestamp = Date.now();
+          lastRequestTimestampRef.current = languageChangeTimestamp;
 
-          const newOrders = resp.data.data;
+          if (languageChangeTimestamp < lastRequestTimestampRef.current) {
+            console.log('🚫 Ignoring stale language change response', {
+              responseTimestamp: languageChangeTimestamp,
+              latestTimestamp: lastRequestTimestampRef.current,
+            });
+            return;
+          }
+
+          const languageResponse = await axiosInstance.post(
+            options.url_unansweredOrders,
+            {
+              type: 0,
+              page: 1,
+              branchid: branchid,
+              Languageid: languageId,
+              postponeOrder: false,
+            },
+            { signal: abortControllerRef.current?.signal }
+          );
+
+          const newOrders = languageResponse.data.data;
           const newOrderIds = newOrders.map(order => order.id);
-          
-          // Update state with new orders (including payment methods in new language)
+
           dispatch({
             type: 'SET_ORDERS',
             payload: {
               orders: newOrders,
-              fees: resp.data.fees,
-              currency: resp.data.currency,
-              scheduled: resp.data.scheduled
-            }
+              fees: languageResponse.data.fees,
+              currency: languageResponse.data.currency,
+              scheduled: languageResponse.data.scheduled,
+              loading: false,
+            },
           });
-          
-          // Force fetch all order details with new language
+
           if (newOrderIds.length > 0) {
-            console.log(`Language change: force fetching details for ${newOrderIds.length} orders with languageId: ${languageId}`);
-            await fetchBatchOrderDetails(newOrderIds, false); // Don't show internal loader, we have our own
+            await fetchBatchOrderDetails(newOrderIds, false);
           }
-          
+
           newOrders.forEach(order => lastOrdersRef.current.add(order.id));
-          
-          // Clear language change flag
           isLanguageChangeInProgressRef.current = false;
-          
-          // Hide loader after everything is complete (including order details)
-          // Don't hide if loadingDetails is still true
+
           if (!loadingDetails) {
             setIsLanguageChangeLoading(false);
           }
-          
-          // Restart interval - but ensure it doesn't trigger initial alert
+
           if (isConnected) {
             startInterval();
           }
-          
-          console.log(`✅ Language change complete - orders and details refreshed with languageId: ${languageId}`);
         } catch (error) {
-          console.log('Error in language change fetch:', error);
-          // Clear language change flag even on error
+          if (
+            error.name === 'AbortError' ||
+            error.code === 'ERR_CANCELED' ||
+            error.message?.includes('canceled') ||
+            error.originalError?.name === 'CanceledError' ||
+            (error.originalError && error.originalError.toString().includes('canceled'))
+          ) {
+            console.log('🚫 Language change request was cancelled - this is expected during language switching');
+            return;
+          }
+
           isLanguageChangeInProgressRef.current = false;
-          // Hide loader even on error (but only if details aren't loading)
           if (!loadingDetails) {
             setIsLanguageChangeLoading(false);
           }
-          // Restart interval even on error
           if (isConnected) {
             startInterval();
           }
@@ -470,7 +519,6 @@ export const EnteredOrdersList = () => {
   // Monitor loadingDetails and hide language change loader when details are fully loaded
   useEffect(() => {
     if (isLanguageChangeInProgressRef.current === false && isLanguageChangeLoading && !loadingDetails) {
-      console.log('Order details loaded, hiding language change loader');
       setIsLanguageChangeLoading(false);
     }
   }, [loadingDetails, isLanguageChangeLoading]);
@@ -570,7 +618,7 @@ export const EnteredOrdersList = () => {
         ]);
       }
     } catch (error) {
-      console.log('Error in handleAcceptOrder:', error);
+      console.error('Error in handleAcceptOrder:', error);
       dispatch({
         type: 'BATCH_UPDATE',
         payload: {
@@ -682,6 +730,12 @@ export const EnteredOrdersList = () => {
     const handleAppStateChange = (nextAppState) => {
       if (nextAppState === 'background') {
         processedOrdersRef.current.clear();
+        shownAlertsRef.current.clear(); // Clear shown alerts when app goes to background
+        hasShownInitialAlertRef.current = false; // Reset initial alert flag when app goes to background
+        // Stop any playing sound when app goes to background
+        if (NotificationSoundRef?.current?.stopSound) {
+          NotificationSoundRef.current.stopSound();
+        }
       }
     };
 
@@ -689,10 +743,18 @@ export const EnteredOrdersList = () => {
     return () => {
       subscription.remove();
       processedOrdersRef.current.clear();
+      shownAlertsRef.current.clear(); // Clear shown alerts on unmount
+      hasShownInitialAlertRef.current = false; // Reset initial alert flag on unmount
       // Clear language change loading state on unmount
       setIsLanguageChangeLoading(false);
       // Clear language change progress flag
       isLanguageChangeInProgressRef.current = false;
+      // Reset first app launch flag on unmount
+      isFirstAppLaunchRef.current = true;
+      // Stop any playing sound on unmount
+      if (NotificationSoundRef?.current?.stopSound) {
+        NotificationSoundRef.current.stopSound();
+      }
     };
   }, []);
 
@@ -700,7 +762,8 @@ export const EnteredOrdersList = () => {
     <View style={styles.container}>
       {state.loadingOptions && <Loader />}
       <NotificationSound ref={NotificationSoundRef} />
-      {(state.loading || loadingDetails || isLanguageChangeLoading) && <Loader show={state.loading || loadingDetails || isLanguageChangeLoading} />}
+      {/* Only show loader for initial fetch or language change */}
+      {(state.loading || isLanguageChangeLoading) && <Loader show={state.loading || isLanguageChangeLoading} />}
       
       {/* Hide content during language change loading */}
       {!isLanguageChangeLoading && (
