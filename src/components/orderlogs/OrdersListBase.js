@@ -58,6 +58,9 @@ export const OrdersListBase = ({ orderType }) => {
     getOrderDetails
   } = useOrderDetails();
 
+  useEffect(() => {
+  }, [orderDetails]);
+
   const [optionsIsLoaded, setOptionsIsLoaded] = useState(false);
   const [isOpen, setOpenState] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -72,13 +75,32 @@ export const OrdersListBase = ({ orderType }) => {
 
   const { dictionary, languageId } = useContext(LanguageContext);
 
+  const openURLInBrowser = async (url) => {
+    try {
+      const supported = await Linking.canOpenURL(url);
+      if (supported) {
+        await Linking.openURL(url);
+      } else {
+        console.log('Cannot open URL:', url);
+      }
+    } catch (error) {
+      console.log('Error opening URL:', error);
+    }
+  };
+
   const toggleContent = useCallback((value) => {
     if (isOpen.includes(value)) {
       setOpenState(isOpen.filter((i) => i !== value));
     } else {
       setOpenState([...isOpen, value]);
+      // Lazy load: fetch order details when expanding if not already loaded
+      if (!orderDetails[value]) {
+        fetchOrderDetailsLazy(value);
+      } else {
+        console.log(`Order details for order ${value} already cached`);
+      }
     }
-  }, [isOpen, orderDetails]);
+  }, [isOpen, orderDetails, fetchOrderDetailsLazy]);
 
   const apiOptions = useCallback(() => {
     setOptions({
@@ -96,10 +118,15 @@ export const OrdersListBase = ({ orderType }) => {
   }, []);
 
   const fetchAcceptedOrders = async (appliedFilters = filters, reset = false) => {
+    console.log(`🔄 fetchAcceptedOrders called - reset: ${reset}, orders count: ${orders.length}`);
     if (!user || !options.url_getOrdersLogs) return;
 
-    // Clear previous order details when fetching new orders
-    clearOrderDetails();
+    // Only clear order details on reset (initial load), not on infinite scroll
+    if (reset) {
+      clearOrderDetails();
+    } else {
+      console.log('Keeping existing order details for infinite scroll');
+    }
     
     try {
       const requestFilters = {
@@ -127,8 +154,8 @@ export const OrdersListBase = ({ orderType }) => {
       const requestBody = {
         Languageid: languageId,
         Pagination: {
-          limit: 12,
-          page: reset ? 0 : Math.floor(orders.length / 12)
+          limit: reset ? 10 : 3,
+          page: reset ? 0 : Math.floor(orders.length / 3)
         },
         Filters: requestFilters
       };
@@ -142,17 +169,48 @@ export const OrdersListBase = ({ orderType }) => {
       const merged = reset ? newData : [...orders, ...newData];
       const uniqueData = Array.from(new Map(merged.map(order => [order.id, order])).values());
 
-      if (uniqueData.length === 0) {
-        setHasMore(false);
+      if (reset) {
+        setOrders(uniqueData);
+        setHasMore(uniqueData.length === 10);
       } else {
         setOrders(uniqueData);
+        setHasMore(newData.length === 3);
       }
 
-      // Fetch details for all orders and wait for all to complete
+      // Fetch details for orders
       if (uniqueData && uniqueData.length > 0) {
-        const orderIds = uniqueData.map(order => order.id);
-        console.log('Order IDs before details fetch:', orderIds);
-        await fetchBatchOrderDetails(orderIds, true); // Wait for all to complete
+        if (reset) {
+          // On initial load, fetch details for all orders
+          const orderIds = uniqueData.map(order => order.id);
+          try {
+            await fetchBatchOrderDetails(orderIds, true);
+            // Force a re-render by updating a state
+            setLoading(prev => prev);
+            
+          } catch (error) {
+            console.log('Initial load: error fetching order details:', error);
+          }
+        } else {
+          // On infinite scroll, only fetch details for new orders
+          const existingOrderIds = orders.map(order => order.id);
+          const newOrderIds = uniqueData
+            .map(order => order.id)
+            .filter(id => !existingOrderIds.includes(id));
+          
+          if (newOrderIds.length > 0) {
+            try {
+              await fetchBatchOrderDetails(newOrderIds, true);
+              // Force a re-render by updating a state
+              setLoadingMore(prev => prev);
+            } catch (error) {
+              console.log('Infinite scroll: error fetching order details:', error);
+            }
+          } else {
+            console.log(' Infinite scroll: no new orders to fetch details for');
+          }
+        }
+      } else {
+        console.log(' No orders to fetch details for');
       }
 
       setFees(feesData);
@@ -172,9 +230,15 @@ export const OrdersListBase = ({ orderType }) => {
 
   useFocusEffect(
     React.useCallback(() => {
-      fetchAcceptedOrders(filters, true);
+      // Only fetch on initial load or if orders are empty
+      if (orders.length === 0) {
+        console.log('🔄 Screen focused, fetching initial orders');
+        fetchAcceptedOrders(filters, true);
+      } else {
+        console.log('🔄 Screen focused, orders already loaded, skipping fetch');
+      }
       return () => { };
-    }, [options, branchid, languageId, filters])
+    }, [options, branchid, languageId, filters, orders.length])
   );
 
   useEffect(() => {
@@ -274,7 +338,16 @@ export const OrdersListBase = ({ orderType }) => {
               </Text>
               
               <Divider />
-              <OrdersDetail orderId={item.id} orderData={getOrderDetails(item.id)} />
+              {(() => {
+                const orderData = getOrderDetails(item.id);
+                console.log(`🔍 Rendering order ${item.id} with ${orderData.length} details`);
+                return (
+                  <OrdersDetail 
+                    orderId={item.id} 
+                    orderData={orderData} 
+                  />
+                );
+              })()}
               <Divider />
 
               <Text variant="titleMedium" style={styles.title}>
@@ -353,7 +426,12 @@ export const OrdersListBase = ({ orderType }) => {
           getItemLayout={getItemLayout}
           itemContainerStyle={{ justifyContent: 'space-between' }}
           style={{ flex: 1, width: "100%" }}
-          onEndReached={() => fetchAcceptedOrders()}
+          onEndReached={() => {
+            if (!loadingMore && hasMore) {
+              setLoadingMore(true);
+              fetchAcceptedOrders();
+            }
+          }}
           onEndReachedThreshold={0.5}
           ListFooterComponent={
             loadingMore ? <ActivityIndicator size="large" color="#0000ff" /> : null
