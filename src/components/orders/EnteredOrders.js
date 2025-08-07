@@ -18,7 +18,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { AuthContext, AuthProvider } from "../../context/AuthProvider";
 import Loader from "../generate/loader";
 import TimePicker from "../generate/TimePicker";
-import { String, LanguageContext } from "../Language";
+import { LanguageContext } from "../Language";
 import axiosInstance from "../../apiConfig/apiRequests";
 import OrdersModal from "../modal/OrdersModal";
 import ErrorDisplay from "../generate/ErrorDisplay";
@@ -148,14 +148,6 @@ export const EnteredOrdersList = () => {
   }, [domain]);
 
   const fetchEnteredOrders = useCallback(async () => {
-    // Prevent fetch if logged out
-    if (global.isLoggedOut) {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
-      return;
-    }
     if (!user || !options.url_unansweredOrders) return;
 
     const wasFirstAppLaunch = isFirstAppLaunchRef.current;
@@ -326,22 +318,11 @@ export const EnteredOrdersList = () => {
 
   const startInterval = useCallback(() => {
     if (intervalRef.current) {
-      clearInterval(intervalRef.current);
+    clearInterval(intervalRef.current);
     }
-    // Prevent polling if logged out
-    if (global.isLoggedOut) {
-      intervalRef.current = null;
-      return;
-    }
-    intervalRef.current = setInterval(() => {
-      if (!global.isLoggedOut) {
-        debouncedFetch();
-      } else {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
-    }, FETCH_INTERVAL);
-  }, [optionsIsLoaded, debouncedFetch]);
+    
+    intervalRef.current = setInterval(debouncedFetch, FETCH_INTERVAL);
+  }, [optionsIsLoaded]);
 
   
   const initializeNotifications = async () => {
@@ -706,12 +687,12 @@ export const EnteredOrdersList = () => {
     await handleDelaySet(params);
   }, [state.deliveryScheduled, state.scheduled, state.itemId, options, dictionary]);
 
+  // Memoize order details per order to avoid unnecessary re-renders
   const renderOrderCard = useCallback(({ item }) => {
     const orderDataForItem = getOrderDetails(item.id) || [];
-    
     return (
       <View style={{
-        width: width / numColumns - (numColumns > 1 ? 15 : 30),
+        width: cardSize,
         marginHorizontal: 5
       }}>
         <OrderCard
@@ -731,46 +712,40 @@ export const EnteredOrdersList = () => {
         />
       </View>
     );
-  }, [state.currency, state.isOpen, state.fees, state.scheduled, state.loading, dictionary, getOrderDetails, handleToggleContent, handleAcceptOrder, handleDelayOrder, handleRejectOrder, width, numColumns]);
+  }, [state.currency, state.isOpen, state.fees, state.scheduled, state.loading, dictionary, getOrderDetails, handleToggleContent, handleAcceptOrder, handleDelayOrder, handleRejectOrder, cardSize]);
 
-  const keyExtractor = useCallback((item) => item.id.toString(), []);
+  const keyExtractor = useCallback((item) => String(item.id), []);
 
-  const getItemLayout = useCallback((data, index) => ({
-    length: cardSize,
-    offset: cardSize * index,
-    index,
-  }), [cardSize]);
-
-  const getItem = (data, index) => data[index];
-  const getItemCount = (data) => data.length;
+  // Provide getItemLayout for FlatList performance
+  const getItemLayout = useCallback((data, index) => {
+    return {
+      length: cardSize,
+      offset: cardSize * index,
+      index,
+    };
+  }, [cardSize]);
 
   // Reset processed orders when component unmounts or app goes to background
   useEffect(() => {
     const handleAppStateChange = (nextAppState) => {
       if (nextAppState === 'background') {
         processedOrdersRef.current.clear();
-        shownAlertsRef.current.clear(); // Clear shown alerts when app goes to background
-        hasShownInitialAlertRef.current = false; // Reset initial alert flag when app goes to background
-        // Stop any playing sound when app goes to background
+        shownAlertsRef.current.clear();
+        hasShownInitialAlertRef.current = false;
         if (NotificationSoundRef?.current?.stopSound) {
           NotificationSoundRef.current.stopSound();
         }
       }
     };
-
     const subscription = AppState.addEventListener('change', handleAppStateChange);
     return () => {
       subscription.remove();
       processedOrdersRef.current.clear();
-      shownAlertsRef.current.clear(); // Clear shown alerts on unmount
-      hasShownInitialAlertRef.current = false; // Reset initial alert flag on unmount
-      // Clear language change loading state on unmount
+      shownAlertsRef.current.clear();
+      hasShownInitialAlertRef.current = false;
       setIsLanguageChangeLoading(false);
-      // Clear language change progress flag
       isLanguageChangeInProgressRef.current = false;
-      // Reset first app launch flag on unmount
       isFirstAppLaunchRef.current = true;
-      // Stop any playing sound on unmount
       if (NotificationSoundRef?.current?.stopSound) {
         NotificationSoundRef.current.stopSound();
       }
@@ -781,10 +756,7 @@ export const EnteredOrdersList = () => {
     <View style={styles.container}>
       {state.loadingOptions && <Loader />}
       <NotificationSound ref={NotificationSoundRef} />
-      {/* Only show loader for initial fetch or language change */}
       {(state.loading || isLanguageChangeLoading) && <Loader show={state.loading || isLanguageChangeLoading} />}
-      
-      {/* Hide content during language change loading */}
       {!isLanguageChangeLoading && (
         <>
           <ErrorDisplay 
@@ -793,7 +765,6 @@ export const EnteredOrdersList = () => {
             style={styles.errorDisplay} 
           />
           <ConnectionStatusBar dictionary={dictionary} />
-
           {state.visible && (
             <OrdersModal
               isVisible={state.visible}
@@ -808,7 +779,6 @@ export const EnteredOrdersList = () => {
               PendingOrders={true}
             />
           )}
-
           <Modal
             transparent={true}
             visible={isPickerVisible}
@@ -830,13 +800,12 @@ export const EnteredOrdersList = () => {
               />
             </View>
           </Modal>
-
           <FlatList
-            key={`flat-list-${numColumns}`}
-            numColumns={numColumns}
             data={state.orders}
             renderItem={renderOrderCard}
             keyExtractor={keyExtractor}
+            numColumns={numColumns}
+            getItemLayout={getItemLayout}
             removeClippedSubviews={true}
             maxToRenderPerBatch={10}
             windowSize={21}
@@ -852,7 +821,7 @@ export const EnteredOrdersList = () => {
               </View>
             }
             refreshing={state.loading}
-            // onRefresh={debouncedFetch}
+            onRefresh={debouncedFetch}
           />
         </>
       )}
