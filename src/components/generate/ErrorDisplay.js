@@ -8,8 +8,13 @@ const ErrorDisplay = ({ error, style, onDismiss }) => {
 
   if (!error) return null;
 
+
+  // Suppress NETWORK_ERROR everywhere (do nothing, no log, no UI, no state)
+  if (error.type === 'NETWORK_ERROR') {
+    return null;
+  }
+
   if (!USER_VISIBLE_ERROR_TYPES.includes(error.type)) {
-    console.log('Suppressing error display for error type:', error.type);
     return null;
   }
 
@@ -18,12 +23,10 @@ const ErrorDisplay = ({ error, style, onDismiss }) => {
   );
 
   if (containsTechnicalDetails) {
-    console.log('Suppressing error with technical details:', error.message);
     return null;
   }
 
   const getErrorMessage = (error) => {
-    console.log('[ErrorDisplay] Processing error:', error);
     if (error.message) return error.message;
 
     if (dictionary?.[`errors.${error.type}`]) {

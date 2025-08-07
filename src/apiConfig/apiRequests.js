@@ -158,7 +158,7 @@ const handleApiError = (error, dictionary) => {
     eventEmitter.emit('showToast', {
       type: 'failed',
       title: dictionary ? dictionary["info.warning"] : 'Error',
-      message: errorMessage
+      subtitle: errorMessage // <-- use subtitle so Toast displays the message
     });
     
     // Also emit an error event for ErrorDisplay components

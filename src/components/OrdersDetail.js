@@ -22,19 +22,20 @@ import { LanguageContext } from "./Language";
  * @param {Function} onDataLoaded - Optional callback when data is loaded
  */
 function OrdersDetail({ orderId, orderData, onDataLoaded }) {
-  // console.log("OrdersDetail rendered with orderId:", orderData);
+  // Debug: log received props on every render
+  // console.log('[OrdersDetail] Rendered with orderId:', orderId, 'orderData:', orderData);
   const [expanded, setExpanded] = useState(true);
   const [orderCart, setOrderCart] = useState([]);
 
   const { dictionary } = useContext(LanguageContext);
 
   useEffect(() => {
-    // Use the pre-fetched orderData directly
+    // Always treat orderData as array
     if (orderData !== undefined) {
-      setOrderCart(orderData || []);
-      onDataLoaded?.(orderId, orderData || []);
+      const arr = Array.isArray(orderData) ? orderData : [orderData];
+      setOrderCart(arr);
+      onDataLoaded?.(orderId, arr);
     } else {
-      // If no data provided, set empty array
       setOrderCart([]);
       onDataLoaded?.(orderId, []);
     }

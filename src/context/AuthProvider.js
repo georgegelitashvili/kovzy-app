@@ -155,9 +155,18 @@ export const AuthProvider = ({ isConnected, children }) => {
         ]);
         if (isMounted.current) setUser(userResponse);
       } catch (error) {
+        // Detect network error and handle as NETWORK_ERROR, not LOGIN_ERROR
+        let isNetworkError = false;
+        if (!error.response && (error.code === 'ERR_NETWORK' || (error.message && error.message.toLowerCase().includes('network')))) {
+          isNetworkError = true;
+        }
         const errorMessage = error.response?.data?.message || error.message;
         setLoginError(errorMessage);
-        handleError(error, "LOGIN_ERROR", { persistent: true }); // persistent=true რომ დარჩეს სანამ დახურავ
+        if (isNetworkError) {
+          handleError(error, "NETWORK_ERROR", { persistent: true });
+        } else {
+          handleError(error, "LOGIN_ERROR", { persistent: true }); // persistent=true რომ დარჩეს სანამ დახურავ
+        }
       } finally {
         setIsLoading(false);
       }

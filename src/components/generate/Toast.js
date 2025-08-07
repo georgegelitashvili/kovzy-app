@@ -38,13 +38,26 @@ const Toast = ({ type, title, subtitle, animate, addStyles, onDismiss, persisten
   const statusBarHeight = insets.top || StatusBar.currentHeight || 0;
   const topPosition = statusBarHeight + 10;
 
+
+  // ❌ suppress NETWORK_ERROR toasts everywhere (robust)
+  const lowerType = typeof type === 'string' ? type.toLowerCase() : '';
+  const lowerSubtitle = typeof subtitle === 'string' ? subtitle.toLowerCase() : '';
+  if (
+    lowerType.includes('network_error') ||
+    lowerType.includes('network error') ||
+    lowerType.includes('ქსელთან კავშირის პრობლემა') ||
+    lowerSubtitle.includes('network_error') ||
+    lowerSubtitle.includes('network error') ||
+    lowerSubtitle.includes('ქსელთან კავშირის პრობლემა')
+  ) {
+    return null;
+  }
   // ❌ suppress technical errors
   if (type === "failed") {
     const containsTechnicalDetails = TECHNICAL_ERROR_PATTERNS.some((pattern) =>
       pattern.test(subtitle || "")
     );
     if (containsTechnicalDetails) {
-      console.log("Suppressing toast with technical error:", subtitle);
       return null;
     }
   }
