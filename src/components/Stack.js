@@ -41,11 +41,12 @@ const Header = ({ options, navigation, route, showDrawer }) => {
   );
 };
 
-export const AuthNavigator = () => {
+export const AuthNavigator = ({ initialRouteName }) => {
   const { dictionary, userLanguage } = useContext(LanguageContext);
 
   return (
     <Stack.Navigator
+      initialRouteName={initialRouteName || "Domain"}
       screenOptions={({ navigation, route }) => ({
         headerMode: 'screen',
         header: (props) => {

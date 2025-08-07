@@ -543,5 +543,6 @@
     "errors.LOGOUT_ERROR": "Ելքի սխալ",    "errors.SESSION_EXPIRED": "Ձեր սեսիան ավարտվել է։ Խնդրում ենք կրկին մուտք գործել։",
     "errors.CLEANUP_ERROR": "Սեսիայի տվյալների մաքրման սխալ",
     "errors.UPDATE_ERROR": "Թարմացումների ստուգման սխալ",
-    "errors.USER_FRIENDLY": "Տեղի ունեցավ սխալ։ Խնդրում ենք փորձել կրկին։"
+    "errors.USER_FRIENDLY": "Տեղի ունեցավ սխալ։ Խնդրում ենք փորձել կրկին։",
+    "auth.ALREADY_AUTHORIZED": "Օգտատերը արդեն մուտք է գործել համակարգ"
 }

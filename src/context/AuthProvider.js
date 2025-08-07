@@ -1,3 +1,4 @@
+// ...existing code...
 import React, {
   createContext,
   useContext,
@@ -30,11 +31,15 @@ export const AuthContext = createContext();
 export const AuthProvider = ({ isConnected, children }) => {
   // ==== ყველა Hook აუცილებლად ერთ რიგში და კონდიციონალი ლოგიკის გარეშე ====  
   const [user, setUser] = useState(null);
+  // ტოასტერი მხოლოდ ერთხელ რომ გამოვიდეს აპის გახსნისას
+  const didShowAuthToast = useRef(false);
+  // ტოასტერი მხოლოდ ერთხელ რომ გამოვიდეს არასწორი credentials-ზე
+  const didShowLoginErrorToast = useRef(false);
   const [domain, setDomain] = useState(null);
   const [branchid, setBranchid] = useState(null);
   const [branchName, setBranchName] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [loginError, setLoginError] = useState(null);
+  // loginError state REMOVED, use only useErrorDisplay's error
   const [branchEnabled, setBranchEnabled] = useState(false);
   const [deliveronEnabled, setDeliveronEnabled] = useState(false);
   const [appState, setAppState] = useState(AppState.currentState);
@@ -56,12 +61,13 @@ export const AuthProvider = ({ isConnected, children }) => {
         branchStatus: `${url.origin}/api/v1/admin/branchStatus`,
         deliveronStatus: `${url.origin}/api/v1/admin/deliveronStatus`,
         authUser: `${url.origin}/api/v1/admin/auth/authorized`,
-        languages: `${url.origin}/api/v1/admin/languages`,
-      };
-    } catch {
-      return null;
-    }
-  }, [domain]);
+
+      languages: `${url.origin}/api/v1/admin/languages`,
+    };
+  } catch {
+    return null;
+  }
+}, [domain]);
 
   // Custom Hook-ები სტაბილური რიგით
   const { languages } = useFetchLanguages(apiUrls);
@@ -75,7 +81,6 @@ export const AuthProvider = ({ isConnected, children }) => {
 
   const clearErrors = useCallback(() => {
     console.log('[AuthProvider] clearErrors called');
-    setLoginError(null);
     clearError();
   }, [clearError]);
 
@@ -83,11 +88,40 @@ export const AuthProvider = ({ isConnected, children }) => {
 
   const handleError = useCallback(
     (errorParam, type = "UNKNOWN", options = {}) => {
-      // ზოგადი ერორების დამუშავება
-      const errorMessage = errorParam?.message || dictionary?.["errors.UNKNOWN"] || "Unknown error";
+      // Suppress errors of type LOGGED_OUT_SUPPRESS
+      if (type === "LOGGED_OUT_SUPPRESS") {
+        console.log('[AuthProvider handleError] Suppressing LOGGED_OUT_SUPPRESS error');
+        return;
+      }
+      let errorMessage = errorParam?.message;
+      if (!errorMessage) {
+        if (type === "LOGIN_ERROR") {
+          errorMessage = dictionary?.["errors.LOGIN_FAILED"] || "მომხმარებელი ან პაროლი არასწორია";
+        } else if (type === "SESSION_EXPIRED") {
+          errorMessage = dictionary?.["errors.SESSION_EXPIRED"] || "Your session has expired. Please log in again.";
+        } else {
+          errorMessage = dictionary?.["errors.UNKNOWN"] || "Unknown error";
+        }
+      }
+      if (type === "LOGIN_ERROR") {
+        console.log('[AuthProvider handleError] LOGIN_ERROR called. didShowLoginErrorToast:', didShowLoginErrorToast.current, { errorMessage, options });
+      }
       console.log(`[AuthProvider handleError] Calling setError with:`, { type, errorMessage, options });
       setError(type, errorMessage, options);
       eventEmitter.emit("apiError", { type, message: errorMessage });
+
+      // არასწორი credentials-ზე ტოასტერი მხოლოდ ერთხელ
+      if (type === "LOGIN_ERROR" && !didShowLoginErrorToast.current) {
+        didShowLoginErrorToast.current = true;
+        console.log('[AuthProvider handleError] Showing toast for LOGIN_ERROR');
+        eventEmitter.emit("showToast", {
+          type: "error",
+          text: errorMessage,
+          message: errorMessage,
+          title: errorMessage
+        });
+      }
+      // სხვა error-ებზე ტოასტერი არ გამოვიდეს აქედან
     },
     [dictionary, setError]
   );
@@ -140,7 +174,6 @@ export const AuthProvider = ({ isConnected, children }) => {
 
   const login = useCallback(
     async (username, password) => {
-      clearErrors();
       setIsLoading(true);
       try {
         if (!apiUrls?.login) throw new Error("Login URL not set");
@@ -154,20 +187,37 @@ export const AuthProvider = ({ isConnected, children }) => {
           SecureStore.setItemAsync("user", JSON.stringify(userResponse)),
         ]);
         // Mark as logged in
-        global.isLoggedOut = false;
+        // setLoginError(null); // REMOVED, use only clearError
+        didShowLoginErrorToast.current = false; // Reset error toast deduplication flag
+        clearErrors(); // წარმატებული ლოგინისას ყველა წინა ერორის გასუფთავება
+        eventEmitter.emit("showToast", {
+          type: "success",
+          text: dictionary?.["auth.ALREADY_AUTHORIZED"] || "ავტორიზაცია წარმატებულია",
+          message: dictionary?.["auth.ALREADY_AUTHORIZED"] || "ავტორიზაცია წარმატებულია",
+          title: dictionary?.["auth.ALREADY_AUTHORIZED"] || "ავტორიზაცია წარმატებულია"
+        });
+        window.isLoggedOut = false;
         if (isMounted.current) setUser(userResponse);
       } catch (error) {
-        // Detect network error and handle as NETWORK_ERROR, not LOGIN_ERROR
         let isNetworkError = false;
         if (!error.response && (error.code === 'ERR_NETWORK' || (error.message && error.message.toLowerCase().includes('network')))) {
           isNetworkError = true;
         }
-        const errorMessage = error.response?.data?.message || error.message;
-        setLoginError(errorMessage);
+        // Check for 401 unauthorized (credentials error)
+        const status = error.response?.status || error.response?.data?.error?.status;
+        if (status === 401) {
+          const msg = dictionary?.["errors.LOGIN_FAILED"] || "მომხმარებელი ან პაროლი არასწორია";
+          // setLoginError(msg); // REMOVED, use only setError
+          setUser(null);
+          console.log('[AuthProvider login] calling handleError for LOGIN_ERROR');
+          handleError({ message: msg }, "LOGIN_ERROR", { persistent: true });
+          return;
+        }
+        // Network or other errors
         if (isNetworkError) {
           handleError(error, "NETWORK_ERROR", { persistent: true });
         } else {
-          handleError(error, "LOGIN_ERROR", { persistent: true }); // persistent=true რომ დარჩეს სანამ დახურავ
+          handleError(error, "LOGIN_ERROR", { persistent: true });
         }
       } finally {
         setIsLoading(false);
@@ -240,11 +290,29 @@ export const AuthProvider = ({ isConnected, children }) => {
       if (credentials && token) {
         const { username, password } = credentials;
         await login(username, password);
+        // ტოასტერი გამოჩნდება user-ის useEffect-იდან
       }
     } catch (error) {
       handleError(error, "LOAD_USER_ERROR");
     }
   }, [login, handleError]);
+  // ტოასტერი გამოჩნდეს მხოლოდ ერთხელ, როცა user პირველად განისაზღვრება აპის გახსნისას
+  useEffect(() => {
+    if (user) {
+      // Always reset toast flag on successful login
+      didShowLoginErrorToast.current = false;
+      if (!didShowAuthToast.current) {
+        didShowAuthToast.current = true;
+        const msg = dictionary?.["auth.ALREADY_AUTHORIZED"] || "ავტორიზებული იუზერი";
+        eventEmitter.emit("showToast", {
+          type: "success",
+          text: msg,
+          message: msg,
+          title: msg
+        });
+      }
+    }
+  }, [user, dictionary]);
 
   useEffect(() => {
     isMounted.current = true;
@@ -301,21 +369,28 @@ export const AuthProvider = ({ isConnected, children }) => {
     })();
   }, [languages, apiUrls, userLanguageChange, setAvailableLanguages, handleError]);
 
-  useEffect(() => {
-    const listener = eventEmitter.addEventListener("sessionExpired", () => {
-      // Mark as logged out
-      global.isLoggedOut = true;
+useEffect(() => {
+  const listener = eventEmitter.addEventListener("sessionExpired", (event) => {
+    // If event or event.type is SESSION_EXPIRED, treat as session expiration
+    // If event.type is CREDENTIALS_ERROR, do not cleanupAuth, just show error
+    if (event && event.type === "CREDENTIALS_ERROR") {
+      handleError({ message: dictionary?.["errors.LOGIN_FAILED"] || "მომხმარებელი ან პაროლი არასწორია" }, "LOGIN_ERROR", { persistent: false });
+      setUser(null);
+      // setLoginError(dictionary?.["errors.LOGIN_FAILED"] || "მომხმარებელი ან პაროლი არასწორია");
+    } else {
+      // Default: treat as session expired
+      window.isLoggedOut = true;
       cleanupAuth();
       handleError({ message: dictionary?.["errors.SESSION_EXPIRED"] }, "SESSION_EXPIRED", { persistent: true });
-    });
-    return () => eventEmitter.removeEventListener(listener);
-  }, [cleanupAuth, handleError, dictionary]);
+    }
+  });
+  return () => eventEmitter.removeEventListener(listener);
+}, [cleanupAuth, handleError, dictionary]);
 
   const contextValue = useMemo(() => ({
     domain,
     setDomain,
     user,
-    loginError,
     error,
     setError,
     clearErrors,
@@ -339,7 +414,6 @@ export const AuthProvider = ({ isConnected, children }) => {
   }), [
     domain,
     user,
-    loginError,
     error,
     isLoading,
     branchid,
@@ -365,8 +439,8 @@ export const AuthProvider = ({ isConnected, children }) => {
         onError={(err) => handleError(err, "UPDATE_ERROR")}
       />
 
-      {/* ErrorDisplay კომპონენტი, რომელიც აჩვენებს current error-ს */}
-      {errorDisplay}
+      {/* ErrorDisplay კომპონენტი, რომელიც აჩვენებს მხოლოდ useErrorDisplay-ის error-ს */}
+      {error && <ErrorDisplay error={error} />}
 
       {/* Loading სპინერი თუ საჭირო */}
       {isLoading ? (
@@ -374,6 +448,9 @@ export const AuthProvider = ({ isConnected, children }) => {
       ) : (
         children
       )}
+
     </AuthContext.Provider>
   );
-};
+}
+
+export default AuthProvider;

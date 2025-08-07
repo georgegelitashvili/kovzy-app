@@ -502,5 +502,6 @@
     "errors.SESSION_EXPIRED": "Your session has expired. Please log in again.",
     "errors.CLEANUP_ERROR": "Error cleaning up session data",
     "errors.UPDATE_ERROR": "Error checking for updates",
-    "errors.USER_FRIENDLY": "Something went wrong. Please try again later."
+    "errors.USER_FRIENDLY": "Something went wrong. Please try again later.",
+    "auth.ALREADY_AUTHORIZED": "User is already authorized"
 }

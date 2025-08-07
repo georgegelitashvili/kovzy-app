@@ -11,14 +11,25 @@ import Loader from "./components/generate/loader";
 const Drawer = createDrawerNavigator();
 
 const RootNavigator = () => {
-  const { user, isLoading, branchEnabled } = useContext(AuthContext);
+  const { user, isLoading, branchEnabled, error } = useContext(AuthContext);
   const { dictionary } = useContext(LanguageContext);
 
   if (isLoading) {
     return <Loader text={dictionary?.["loading"]} />;
   }
 
+  // If there is a persistent LOGIN_ERROR, show AuthNavigator but keep error visible
   if (!user?.token) {
+    if (error && error.type === "LOGIN_ERROR" && error.persistent) {
+      // Force AuthNavigator to show Login screen
+      return (
+        <>
+          <ErrorDisplay error={error} />
+          <AuthNavigator initialRouteName="Login" />
+        </>
+      );
+    }
+    console.log("[RootNavigator] User not authenticated, showing AuthNavigator");
     return <AuthNavigator />;
   }
 
