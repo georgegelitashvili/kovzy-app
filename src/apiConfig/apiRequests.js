@@ -215,8 +215,11 @@ axiosInstance.interceptors.response.use(
     return response;
   },
   async (error) => {
+    // Suppress all error logging and propagation if logged out
+    if (global.isLoggedOut) {
+      return Promise.reject({ type: 'LOGGED_OUT_SUPPRESS', message: '', showToUser: false });
+    }
     const originalRequest = error.config;
-    
     // Get current dictionary from the LanguageContext
     let dictionary = null;
     try {

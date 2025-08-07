@@ -148,6 +148,14 @@ export const EnteredOrdersList = () => {
   }, [domain]);
 
   const fetchEnteredOrders = useCallback(async () => {
+    // Prevent fetch if logged out
+    if (global.isLoggedOut) {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+      return;
+    }
     if (!user || !options.url_unansweredOrders) return;
 
     const wasFirstAppLaunch = isFirstAppLaunchRef.current;
@@ -318,11 +326,22 @@ export const EnteredOrdersList = () => {
 
   const startInterval = useCallback(() => {
     if (intervalRef.current) {
-    clearInterval(intervalRef.current);
+      clearInterval(intervalRef.current);
     }
-    
-    intervalRef.current = setInterval(debouncedFetch, FETCH_INTERVAL);
-  }, [optionsIsLoaded]);
+    // Prevent polling if logged out
+    if (global.isLoggedOut) {
+      intervalRef.current = null;
+      return;
+    }
+    intervalRef.current = setInterval(() => {
+      if (!global.isLoggedOut) {
+        debouncedFetch();
+      } else {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    }, FETCH_INTERVAL);
+  }, [optionsIsLoaded, debouncedFetch]);
 
   
   const initializeNotifications = async () => {

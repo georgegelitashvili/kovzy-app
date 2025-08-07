@@ -24,6 +24,10 @@ class ErrorManager {  /**
    * @param {string} message The error message to display
    */
   static showError(type, message) {
+    // Suppress all errors if user is logged out
+    if (global.isLoggedOut) {
+      return;
+    }
     // Suppress NETWORK_ERROR completely: no logs, no UI
     if (type === 'NETWORK_ERROR') {
       return;
@@ -56,6 +60,10 @@ class ErrorManager {  /**
    * @param {Object} error The error object from an API request
    */
   static handleApiError(error) {
+    // Suppress all errors if user is logged out
+    if (global.isLoggedOut) {
+      return;
+    }
     let errorType = 'UNKNOWN';
     let errorMessage = '';
 

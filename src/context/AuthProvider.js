@@ -153,6 +153,8 @@ export const AuthProvider = ({ isConnected, children }) => {
           SecureStore.setItemAsync("token", JSON.stringify(authorized)),
           SecureStore.setItemAsync("user", JSON.stringify(userResponse)),
         ]);
+        // Mark as logged in
+        global.isLoggedOut = false;
         if (isMounted.current) setUser(userResponse);
       } catch (error) {
         // Detect network error and handle as NETWORK_ERROR, not LOGIN_ERROR
@@ -175,6 +177,8 @@ export const AuthProvider = ({ isConnected, children }) => {
   );
 
   const logout = useCallback(async () => {
+    // Mark as logged out
+    global.isLoggedOut = true;
     setIsLoading(true);
     try {
       if (apiUrls?.logout) await axiosInstance.post(apiUrls.logout);
@@ -299,6 +303,8 @@ export const AuthProvider = ({ isConnected, children }) => {
 
   useEffect(() => {
     const listener = eventEmitter.addEventListener("sessionExpired", () => {
+      // Mark as logged out
+      global.isLoggedOut = true;
       cleanupAuth();
       handleError({ message: dictionary?.["errors.SESSION_EXPIRED"] }, "SESSION_EXPIRED", { persistent: true });
     });
