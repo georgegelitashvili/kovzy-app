@@ -10,11 +10,11 @@ import Toast from '../components/generate/Toast';
 const BACKGROUND_NOTIFICATION_TASK = 'background-notification-task';
 Notifications.setNotificationHandler({
     handleNotification: async () => ({
-    shouldShowBanner: true,   // iOS - აჩვენებს banner-ს
-    shouldShowList: true,     // iOS - აჩვენებს notification list-ში
+    shouldShowBanner: true,
+    shouldShowList: true,
     shouldPlaySound: true,
     shouldSetBadge: false,
-        priority: Notifications.AndroidNotificationPriority.HIGH
+    priority: Notifications.AndroidNotificationPriority.HIGH
     }),
 });
 
@@ -124,12 +124,12 @@ const notificationManager = {
 
     async registerForPushNotificationsAsync() {
         if (Platform.OS === 'android') {
-            await Notifications.setNotificationChannelAsync('myNotificationChannel', {
-                name: 'default',
+            await Notifications.setNotificationChannelAsync('kovzyOrders', {
+                name: 'kovzyOrders',
                 importance: Notifications.AndroidImportance.MAX,
-                sound: 'order.mp3',
+                sound: 'plucky.mp3',
                 vibrationPattern: [0, 250, 250, 250],
-                lightColor: '#FF231F7C',
+                lightColor: '#ffffff',
             });
         }
 

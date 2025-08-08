@@ -74,14 +74,8 @@
         {
           "icon": "./assets/icon.png",
           "color": "#ffffff",
-          "sound": "./assets/audio/order.mp3",
-          "vibrate": [
-            0,
-            250,
-            250,
-            250
-          ],
-          "defaultChannel": "default",
+          "sounds": ["./src/assets/audio/plucky.mp3"],
+          "defaultChannel": "kovzyOrders",
           "enableBackgroundRemoteNotifications": true
         }
       ],
