@@ -54,6 +54,13 @@ const type = 0;
 
 export const EnteredOrdersList = () => {
   const { domain, branchid, user } = useContext(AuthContext);
+  // DEBUG: Log user and options state
+  useEffect(() => {
+    console.log('[EnteredOrdersList] user:', user);
+  }, [user]);
+  useEffect(() => {
+    console.log('[EnteredOrdersList] optionsIsLoaded:', optionsIsLoaded, 'options:', options);
+  }, [optionsIsLoaded, options]);
   const { dictionary, languageId } = useContext(LanguageContext);
   const [state, dispatch] = useReducer(orderReducer, initialState);
   // Use the custom hook for order details management
@@ -148,6 +155,7 @@ export const EnteredOrdersList = () => {
   }, [domain]);
 
   const fetchEnteredOrders = useCallback(async () => {
+    console.log('[EnteredOrdersList] fetchEnteredOrders called. user:', user, 'options:', options);
     if (!user || !options.url_unansweredOrders) return;
 
     const wasFirstAppLaunch = isFirstAppLaunchRef.current;

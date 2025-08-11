@@ -101,7 +101,13 @@ export default function useErrorHandler() {
    * კლავს ერორს
    */
   const clearError = useCallback(() => {
-    setErrorState(null);
+    setErrorState((prev) => {
+      if (prev?.persistent) {
+        // თუ persistent, არ გაასუფთავო ავტომატურად
+        return prev;
+      }
+      return null;
+    });
     setPersistent(false);
   }, []);
 

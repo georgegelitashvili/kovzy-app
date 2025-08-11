@@ -20,8 +20,9 @@ const RootNavigator = () => {
 
   // If there is a persistent LOGIN_ERROR, show AuthNavigator but keep error visible
   if (!user?.token) {
-    if (error && error.type === "LOGIN_ERROR" && error.persistent) {
-      // Force AuthNavigator to show Login screen
+    console.log("[RootNavigator] checking for persistent LOGIN_ERROR", error);
+    if (error && error.type === "LOGIN_ERROR") {
+      // Force AuthNavigator to show Login screen for any LOGIN_ERROR
       return (
         <>
           <ErrorDisplay error={error} />

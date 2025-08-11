@@ -73,11 +73,7 @@ export default function Main({ isConnected }) {
           <AuthProvider isConnected={isConnected}>
             <NavigationContainer ref={navigationRef}>
               <RootNavigator />
-              {error && (
-                <View style={{ position: 'absolute', top: 0, left: 0, right: 0 }}>
-                  <ErrorDisplay error={error} />
-                </View>
-              )}
+              {/* ErrorDisplay is now handled only in RootNavigator to avoid duplicates */}
               {toastConfig && (
                 <Toast
                   type={toastConfig.type}
