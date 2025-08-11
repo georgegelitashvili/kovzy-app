@@ -69,7 +69,7 @@ export const DomainScreen = ({ navigation }) => {
         value={inputDomain.value}
         onChangeText={(text) => {
           clearError();
-          setInputDomain({ value: text, error: '' }); // trim მოშორებული!
+          setInputDomain({ value: text, error: '' });
         }}
         error={!!inputDomain.error}
         errorText={inputDomain.error}
