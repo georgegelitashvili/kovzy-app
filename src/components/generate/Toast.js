@@ -91,7 +91,6 @@ const Toast = ({ type, title, subtitle, animate, addStyles, onDismiss, persisten
     }).start();
 
     if (persistent) {
-      // თუ persistentა, არ ვაყენებთ timeout-ს
       return;
     }
 
@@ -155,10 +154,10 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 0,
     right: 0,
-    zIndex: 1000, // ნაკლები zIndex, რომ ტოსტერი მაინც არ გადაეფაროს მუდმივად header მენიუს
+    zIndex: 1000,
     paddingHorizontal: 16,
     alignItems: "center",
-    pointerEvents: "box-none", // ✅ ტოსტერი არ დაბლოკავს touch-ს
+    pointerEvents: "box-none",
   },
   toastBox: {
     flexDirection: "row",
