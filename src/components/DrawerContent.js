@@ -7,6 +7,7 @@ import { AuthContext } from "../context/AuthProvider";
 import LanguageSelector from "./generate/LanguageSelector";
 import axiosInstance from "../apiConfig/apiRequests";
 import { LanguageContext } from "./Language";
+import eventEmitter from "../utils/EventEmitter";
 
 export default function DrawerContent(props) {
   const { navigation, ...otherProps } = props;
@@ -57,10 +58,21 @@ export default function DrawerContent(props) {
     }
     intervalRef.current = setInterval(fetchUnansweredOrders, 10000);
 
+    // Listen for forceLogout event to clear interval
+    const logoutListener = () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+      setQrOrdersBadge(0);
+      setOnlineOrdersBadge(0);
+    };
+    eventEmitter.addEventListener('forceLogout', logoutListener);
+
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
+      eventEmitter.removeEventListener(logoutListener);
     };
   }, [branchid, domain]);
 
@@ -70,7 +82,8 @@ export default function DrawerContent(props) {
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
     }
-    logout();
+    // Call logout with navigation to force reset
+    logout(props.navigation);
   };
 
   const toggleBranch = async () => {

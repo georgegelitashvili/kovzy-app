@@ -23,6 +23,7 @@ import axiosInstance from "../../apiConfig/apiRequests";
 import OrdersModal from "../modal/OrdersModal";
 import ErrorDisplay from "../generate/ErrorDisplay";
 import useErrorHandler from "../../hooks/useErrorHandler";
+import eventEmitter from "../../utils/EventEmitter";
 
 import NotificationSound from '../../utils/NotificationSound';
 import NotificationManager from '../../utils/NotificationManager';
@@ -54,13 +55,6 @@ const type = 0;
 
 export const EnteredOrdersList = () => {
   const { domain, branchid, user } = useContext(AuthContext);
-  // DEBUG: Log user and options state
-  useEffect(() => {
-    console.log('[EnteredOrdersList] user:', user);
-  }, [user]);
-  useEffect(() => {
-    console.log('[EnteredOrdersList] optionsIsLoaded:', optionsIsLoaded, 'options:', options);
-  }, [optionsIsLoaded, options]);
   const { dictionary, languageId } = useContext(LanguageContext);
   const [state, dispatch] = useReducer(orderReducer, initialState);
   // Use the custom hook for order details management
@@ -155,8 +149,10 @@ export const EnteredOrdersList = () => {
   }, [domain]);
 
   const fetchEnteredOrders = useCallback(async () => {
-    console.log('[EnteredOrdersList] fetchEnteredOrders called. user:', user, 'options:', options);
-    if (!user || !options.url_unansweredOrders) return;
+    if (!user || !options.url_unansweredOrders || global.isLoggedOut) {
+      console.log('[EnteredOrdersList] Skipped fetchEnteredOrders: no user, no url, or logged out');
+      return;
+    }
 
     const wasFirstAppLaunch = isFirstAppLaunchRef.current;
     const wasInitialFetch = isInitialFetchRef.current;
@@ -317,7 +313,7 @@ export const EnteredOrdersList = () => {
 
   const debouncedFetch = useCallback(
     debounce(() => {
-      if (optionsIsLoaded && user && options.url_unansweredOrders) {
+      if (optionsIsLoaded && user && options.url_unansweredOrders && !global.isLoggedOut) {
         fetchEnteredOrders();
       }
     }, DEBOUNCE_DELAY),
@@ -326,11 +322,12 @@ export const EnteredOrdersList = () => {
 
   const startInterval = useCallback(() => {
     if (intervalRef.current) {
-    clearInterval(intervalRef.current);
+      clearInterval(intervalRef.current);
     }
-    
+    // Prevent polling if logged out or no user
+    if (!user || global.isLoggedOut) return;
     intervalRef.current = setInterval(debouncedFetch, FETCH_INTERVAL);
-  }, [optionsIsLoaded]);
+  }, [optionsIsLoaded, user]);
 
   
   const initializeNotifications = async () => {
@@ -408,19 +405,30 @@ export const EnteredOrdersList = () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
-      if (isConnected) {
+      if (isConnected && user && !global.isLoggedOut) {
         startInterval();
+      }
+
+      // Listen for forceLogout event to clear interval
+      const logoutListener = () => {
+        if (intervalRef.current) clearInterval(intervalRef.current);
+      };
+      if (typeof eventEmitter !== 'undefined') {
+        eventEmitter.addEventListener('forceLogout', logoutListener);
       }
 
       return () => {
         if (intervalRef.current) {
-        clearInterval(intervalRef.current);
+          clearInterval(intervalRef.current);
         }
         dispatch({ type: 'UPDATE_ORDER_COUNT', payload: 0 });
         subscribe.remove();
+        if (typeof eventEmitter !== 'undefined') {
+          eventEmitter.removeEventListener(logoutListener);
+        }
       };
     }
-  }, [optionsIsLoaded, appState, isConnected]);
+  }, [optionsIsLoaded, appState, isConnected, user]);
 
   // Separate effect for language changes - force initial fetch  
   useEffect(() => {
@@ -760,6 +768,31 @@ export const EnteredOrdersList = () => {
     };
   }, []);
 
+  useEffect(() => {
+    // Listen for forceLogout event to clear all orders and state
+    const logoutListener = () => {
+      dispatch({ type: 'RESET_ALL_STATE' });
+      processedOrdersRef.current.clear();
+      shownAlertsRef.current.clear();
+      hasShownInitialAlertRef.current = false;
+      setIsLanguageChangeLoading(false);
+      isLanguageChangeInProgressRef.current = false;
+      isFirstAppLaunchRef.current = true;
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      if (NotificationSoundRef?.current?.stopSound) {
+        NotificationSoundRef.current.stopSound();
+      }
+    };
+    if (typeof eventEmitter !== 'undefined') {
+      eventEmitter.addEventListener('forceLogout', logoutListener);
+    }
+    return () => {
+      if (typeof eventEmitter !== 'undefined') {
+        eventEmitter.removeEventListener(logoutListener);
+      }
+    };
+  }, []);
+
   return (
     <View style={styles.container}>
       {state.loadingOptions && <Loader />}
@@ -809,6 +842,7 @@ export const EnteredOrdersList = () => {
             </View>
           </Modal>
           <FlatList
+            key={`flat-list-${numColumns}`}
             data={state.orders}
             renderItem={renderOrderCard}
             keyExtractor={keyExtractor}

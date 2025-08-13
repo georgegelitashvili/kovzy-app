@@ -24,6 +24,7 @@ import OrdersDetail from "../OrdersDetail";
 import OrdersModal from "../modal/OrdersModal";
 import printRows from "../../PrintRows";
 import NotificationSound from '../../utils/NotificationSound';
+import eventEmitter from '../../utils/EventEmitter';
 
 const initialWidth = Dimensions.get("window").width;
 const getColumnsByScreenSize = (screenWidth) => {
@@ -157,6 +158,20 @@ export const PostponeOrders = () => {
             setOptionsIsLoaded(false);
             setOrders([]);
         }
+        // Listen for forceLogout event to clear all orders and state
+        const logoutListener = () => {
+            setOrders([]);
+            setFees([]);
+            setCurrency("");
+            setOpenState([]);
+            setVisible(false);
+            setItemId(null);
+            setModalType("");
+        };
+        eventEmitter.addEventListener('forceLogout', logoutListener);
+        return () => {
+            eventEmitter.removeEventListener(logoutListener);
+        };
     }, [domain, branchid, apiOptions]);
 
     useFocusEffect(

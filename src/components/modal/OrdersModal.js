@@ -57,6 +57,7 @@ export default function OrdersModal({
   takeAway,
   PendingOrders,
 }) {
+  // ALWAYS call ALL hooks at the top level - NEVER conditionally
   const { width, height } = useWindowDimensions();
   const { dictionary } = useContext(LanguageContext);
   const [forDelivery, setForDelivery] = useState(0); // Default to 0
@@ -115,11 +116,11 @@ export default function OrdersModal({
     }
   }, [type, hasItemId, deliveron, options, takeAway, items, deliveronOptions, orders, forDelivery]);
 
-  if (
-    type !== "reject" &&
-    type !== "status" &&
-    type !== "accept"
-  ) {
+  // Check if we should hide the modal (after all hooks are called)
+  const shouldHide = type !== "reject" && type !== "status" && type !== "accept";
+
+  // Return null only after all hooks have been called
+  if (shouldHide) {
     return null;
   }
 

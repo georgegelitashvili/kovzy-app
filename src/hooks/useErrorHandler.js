@@ -111,11 +111,20 @@ export default function useErrorHandler() {
     setPersistent(false);
   }, []);
 
+  /**
+   * ფორსირებულად კლავს ყველა ერორს, persistent ჩათვლით
+   */
+  const forceClearError = useCallback(() => {
+    setErrorState(null);
+    setPersistent(false);
+  }, []);
+
   return {
     error,
     persistent,
     setError,
     setApiError,
     clearError,
+    forceClearError,
   };
 }

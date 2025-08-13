@@ -26,6 +26,7 @@ import printRows from "../../PrintRows";
 import NotificationSound from '../../utils/NotificationSound';
 import NotificationManager from '../../utils/NotificationManager';
 import { useOrderDetails } from "../../hooks/useOrderDetails";
+import eventEmitter from "../../utils/EventEmitter";
 
 const initialWidth = Dimensions.get("window").width;
 const getColumnsByScreenSize = (screenWidth) => {
@@ -167,7 +168,8 @@ export const EnteredOrdersList = () => {
 
   const fetchEnteredOrders = useCallback(
     async (showLoader = false) => {
-      if (!user || !options.url_unansweredOrders) {
+      if (!user || !options.url_unansweredOrders || global.isLoggedOut) {
+        console.log('[QrOrders] Skipped fetchEnteredOrders: no user, no url, or logged out');
         return;
       }
 
@@ -257,6 +259,13 @@ export const EnteredOrdersList = () => {
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
     }
+    
+    // Prevent polling if logged out or no user
+    if (!user || global.isLoggedOut) {
+      console.log('[QrOrders] Skipped startInterval: no user or logged out');
+      return;
+    }
+    
     console.log('Starting interval');
 
     if (optionsIsLoaded) {
@@ -264,13 +273,13 @@ export const EnteredOrdersList = () => {
     }
 
     intervalRef.current = setInterval(() => {
-      if (optionsIsLoaded) {
+      if (optionsIsLoaded && user && !global.isLoggedOut) {
         fetchEnteredOrders(false); // Interval fetch without loader
       } else {
-        console.log('Options not loaded');
+        console.log('Options not loaded or user logged out');
       }
     }, 5000);
-  }, [optionsIsLoaded, fetchEnteredOrders]);
+  }, [optionsIsLoaded, fetchEnteredOrders, user]);
 
   const handleAppStateChange = useCallback(
     (nextAppState) => {
@@ -303,6 +312,16 @@ export const EnteredOrdersList = () => {
       prevLanguageIdRef.current = languageId;
       if (optionsIsLoaded) {
         const subscribe = AppState.addEventListener('change', handleAppStateChange);
+        
+        // Listen for forceLogout event to clear interval
+        const logoutListener = () => {
+          if (intervalRef.current) clearInterval(intervalRef.current);
+          setOrders([]);
+          setFees([]);
+          setCurrency("");
+        };
+        eventEmitter.addEventListener('forceLogout', logoutListener);
+        
         startInterval();
         console.log('Interval started.');
         return () => {
@@ -311,6 +330,7 @@ export const EnteredOrdersList = () => {
             clearInterval(intervalRef.current);
           }
           subscribe.remove();
+          eventEmitter.removeEventListener(logoutListener);
         };
       }
       return;
@@ -345,6 +365,16 @@ export const EnteredOrdersList = () => {
       })();
     } else if (optionsIsLoaded && !isLanguageChangeInProgressRef.current) {
       const subscribe = AppState.addEventListener('change', handleAppStateChange);
+      
+      // Listen for forceLogout event to clear interval
+      const logoutListener = () => {
+        if (intervalRef.current) clearInterval(intervalRef.current);
+        setOrders([]);
+        setFees([]);
+        setCurrency("");
+      };
+      eventEmitter.addEventListener('forceLogout', logoutListener);
+      
       startInterval();
       console.log('Interval started.');
       return () => {
@@ -353,6 +383,7 @@ export const EnteredOrdersList = () => {
           clearInterval(intervalRef.current);
         }
         subscribe.remove();
+        eventEmitter.removeEventListener(logoutListener);
       };
     }
   }, [optionsIsLoaded, languageId, handleAppStateChange, startInterval]);

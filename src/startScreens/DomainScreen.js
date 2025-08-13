@@ -5,18 +5,20 @@ import { Button } from "react-native-paper";
 import TextField from '../components/generate/TextField';
 import { AuthContext, AuthProvider } from '../context/AuthProvider';
 import { domainValidator } from '../helpers/domainValidator';
-import { storeData, getData } from '../helpers/storage';
+import { storeData, getData, removeData } from '../helpers/storage';
 import { LanguageContext } from "../components/Language";
 import useErrorDisplay from "../hooks/useErrorDisplay";
 
 export const DomainScreen = ({ navigation }) => {
+  // All hooks must be called unconditionally and before any return
   const { domain, setDomain, readDomain, intervalId } = useContext(AuthContext);
   const [inputDomain, setInputDomain] = useState({ value: domain || '', error: '' });
   const { dictionary } = useContext(LanguageContext);
-
   const { errorDisplay, error, setError, clearError } = useErrorDisplay();
 
+  // Helper to read domain from storage
   const readData = async () => {
+    // await removeData("domain");
     try {
       const value = await getData("domain");
       setDomain(value);
@@ -25,6 +27,7 @@ export const DomainScreen = ({ navigation }) => {
     }
   };
 
+  // Handler for domain check
   const onCheckPressed = async () => {
     clearError();
 
@@ -33,17 +36,17 @@ export const DomainScreen = ({ navigation }) => {
       return;
     }
 
+    // domainValidator returns a string error or empty string
     const domainError = domainValidator(inputDomain.value.trim());
-    if (domainError) {
-      console.log('Domain validation error:', domainError);
+    if (domainError && typeof domainError === 'string' && domainError.length > 0) {
       setError({ type: "VALIDATION_ERROR", message: domainError });
       return;
     }
 
-    setDomain(inputDomain.value.trim());
+    // Only save and set valid domain
     await storeData("domain", inputDomain.value.trim());
+    setDomain(inputDomain.value.trim());
     await readDomain();
-
     navigation.navigate("Branch");
   };
 
@@ -57,6 +60,7 @@ export const DomainScreen = ({ navigation }) => {
     clearInterval(intervalId);
   }, []);
 
+  // No early return before hooks, all hooks above
   return (
     <Background>
       {errorDisplay}
@@ -89,5 +93,5 @@ export const DomainScreen = ({ navigation }) => {
         {dictionary['save']}
       </Button>
     </Background>
-  )
+  );
 };
