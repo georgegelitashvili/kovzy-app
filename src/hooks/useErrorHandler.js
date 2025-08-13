@@ -50,38 +50,34 @@ export default function useErrorHandler() {
    * გადასცემ ერორს როგორც ობიექტს, ან ტიპად + მესიჯად
    * options.persistent = true თუ გინდა რომ ერორი დარჩეს სანამ არ დააფრისდ
    */
+
   const setError = useCallback((errOrType, maybeMessage = null, options = {}) => {
     let type, message, persistentFlag;
 
-    // ✅ თუ გადმოცემულია ობიექტი (შეიძლება იყოს error object)
     if (typeof errOrType === "object" && errOrType?.type && errOrType?.message) {
       type = errOrType.type;
       message = errOrType.message;
       persistentFlag = errOrType.persistent === true || options?.persistent === true;
-    }
-    // ✅ თუ მხოლოდ ერთი არგუმენტია და ობიექტია
-    else if (typeof errOrType === "object" && maybeMessage === null) {
+    } else if (typeof errOrType === "object" && maybeMessage === null) {
       const extracted = extractError(errOrType);
       type = extracted.type;
       message = extracted.message;
       persistentFlag = options?.persistent === true;
-    }
-    // ✅ სხვა შემთხვევა — ტიპი და მესიჯი ცალკეა
-    else {
+    } else {
       type = errOrType;
       message = maybeMessage;
       persistentFlag = options?.persistent === true;
     }
 
-    console.log(`[useErrorHandler] Error triggered: ${type} - ${message}, persistentFlag: ${persistentFlag}`);
-
-    const show = shouldShowError(type, message);
-    if (!show) {
-      console.log(`[useErrorHandler] Suppressed error: ${type}`);
+    // Suppress NETWORK_ERROR completely: no logs, no state, no UI
+    if (type === 'NETWORK_ERROR') {
       return;
     }
 
-    console.log(`[useErrorHandler] Setting error state: ${type} - ${message}, persistent: ${persistentFlag}`);
+    const show = shouldShowError(type, message);
+    if (!show) {
+      return;
+    }
 
     setErrorState({ type, message, persistent: persistentFlag });
     setPersistent(persistentFlag);
@@ -92,10 +88,12 @@ export default function useErrorHandler() {
    */
   const setApiError = useCallback((apiError) => {
     const { type, message } = extractError(apiError);
+    // Suppress NETWORK_ERROR completely
+    if (type === 'NETWORK_ERROR') {
+      return;
+    }
     if (shouldShowError(type, message)) {
       setErrorState({ type, message });
-    } else {
-      console.log(`[useErrorHandler] Suppressed API error: ${type}`);
     }
   }, []);
 
@@ -103,7 +101,20 @@ export default function useErrorHandler() {
    * კლავს ერორს
    */
   const clearError = useCallback(() => {
-    console.log('[useErrorHandler] clearError called');
+    setErrorState((prev) => {
+      if (prev?.persistent) {
+        // თუ persistent, არ გაასუფთავო ავტომატურად
+        return prev;
+      }
+      return null;
+    });
+    setPersistent(false);
+  }, []);
+
+  /**
+   * ფორსირებულად კლავს ყველა ერორს, persistent ჩათვლით
+   */
+  const forceClearError = useCallback(() => {
     setErrorState(null);
     setPersistent(false);
   }, []);
@@ -114,5 +125,6 @@ export default function useErrorHandler() {
     setError,
     setApiError,
     clearError,
+    forceClearError,
   };
 }

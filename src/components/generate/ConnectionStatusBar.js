@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Animated } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
 
 const ConnectionStatusBar = ({ dictionary }) => {
+  // ALWAYS call ALL hooks at the top level - NEVER conditionally
   const [isConnected, setIsConnected] = useState(true);
   const [isVisible, setIsVisible] = useState(false);
   const animatedValue = new Animated.Value(0);
@@ -42,6 +43,7 @@ const ConnectionStatusBar = ({ dictionary }) => {
     };
   }, [isConnected]);
 
+  // Return null only after all hooks have been called
   if (!isVisible) return null;
 
   return (

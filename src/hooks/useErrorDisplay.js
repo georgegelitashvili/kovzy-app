@@ -26,6 +26,6 @@ export default function useErrorDisplay({ showInline = true, style = {} } = {}) 
     setApiError,
     clearError,
     errorDisplay,
-    persistent // ✅ <<< ეს დაგავიწყდა!
+    persistent
   };
 }

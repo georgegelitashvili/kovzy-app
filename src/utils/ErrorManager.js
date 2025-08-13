@@ -11,6 +11,10 @@ class ErrorManager {  /**
    * @returns {boolean} Whether the error should be shown
    */
   static shouldShowError(type, message) {
+    // Suppress NETWORK_ERROR completely
+    if (type === 'NETWORK_ERROR') {
+      return false;
+    }
     return shouldShowError(type, message);
   }
 
@@ -20,19 +24,20 @@ class ErrorManager {  /**
    * @param {string} message The error message to display
    */
   static showError(type, message) {
-    // Always log all errors for debugging purposes
-    console.log(`[ErrorManager] Error occurred: ${type} - ${message}`);
-    
-    // Check if this error type should be shown to users
-    if (!this.shouldShowError(type, message)) {
-      console.log(`[ErrorManager] Suppressing error display for: ${type}`);
-      return; // Don't show anything to the user
+    // Suppress all errors if user is logged out
+    if (global.isLoggedOut) {
+      return;
     }
-    
-    // For user-safe errors, proceed with displaying them
+    // Suppress NETWORK_ERROR completely: no logs, no UI
+    if (type === 'NETWORK_ERROR') {
+      return;
+    }
+    if (!this.shouldShowError(type, message)) {
+      return;
+    }
     if (global.errorHandler) {
       global.errorHandler.setError(type, message);
-    } else {      // Fallback to toast if global error handler is not available
+    } else {
       eventEmitter.emit('showToast', {
         type: 'failed',
         title: 'Error',
@@ -55,13 +60,13 @@ class ErrorManager {  /**
    * @param {Object} error The error object from an API request
    */
   static handleApiError(error) {
-    // Always log the full technical error for developers
-    console.error('[ErrorManager] API Error Details:', error);
-    
+    // Suppress all errors if user is logged out
+    if (global.isLoggedOut) {
+      return;
+    }
     let errorType = 'UNKNOWN';
     let errorMessage = '';
-    
-    // Extract error details
+
     if (error.type && error.message) {
       errorType = error.type;
       errorMessage = error.message;
@@ -77,14 +82,14 @@ class ErrorManager {  /**
     } else {
       errorMessage = error.message || 'An unexpected error occurred';
     }
-    
-    // Check if this error should be shown to users
-    if (!this.shouldShowError(errorType, errorMessage)) {
-      console.log(`[ErrorManager] Suppressing API error display for: ${errorType}`);
-      return; // Don't show anything to the user
+
+    // Suppress NETWORK_ERROR completely: no logs, no UI
+    if (errorType === 'NETWORK_ERROR') {
+      return;
     }
-    
-    // For user-safe errors, proceed with displaying them
+    if (!this.shouldShowError(errorType, errorMessage)) {
+      return;
+    }
     if (global.errorHandler) {
       global.errorHandler.setError(errorType, errorMessage);
     }
