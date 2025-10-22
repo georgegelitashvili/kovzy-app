@@ -25,6 +25,7 @@ const SettingsScreen = ({ navigation }) => {
     const { domain, setDeliveronEnabled, deliveronEnabled } = useContext(AuthContext);
     const { dictionary } = useContext(LanguageContext);
     const [postponeOrderShow, setPostponeOrderShow] = useState(false);
+    const [showCancelButton, setShowCancelButton] = useState(false);
     
     const [form, setForm] = useState({
         darkMode: false,
@@ -76,7 +77,19 @@ const SettingsScreen = ({ navigation }) => {
             }
         };
 
+        const loadCancelButtonSetting = async () => {
+            try {
+                const storedValue = await AsyncStorage.getItem('showCancelButton');
+                if (storedValue !== null) {
+                    setShowCancelButton(JSON.parse(storedValue));
+                }
+            } catch (error) {
+                console.error('Failed to load cancel button setting', error);
+            }
+        };
+
         loadPostponeOrder();
+        loadCancelButtonSetting();
     }, []);
 
     // Save the value in AsyncStorage whenever the state changes
@@ -89,11 +102,24 @@ const SettingsScreen = ({ navigation }) => {
             }
         };
 
+        const saveCancelButtonSetting = async () => {
+            try {
+                await AsyncStorage.setItem('showCancelButton', JSON.stringify(showCancelButton));
+            } catch (error) {
+                console.error('Failed to save cancel button setting', error);
+            }
+        };
+
         savePostponeOrder();
-    }, [postponeOrderShow]);
+        saveCancelButtonSetting();
+    }, [postponeOrderShow, showCancelButton]);
 
     const togglePostponeOrder = () => {
         setPostponeOrderShow(prevState => !prevState);
+    };
+
+    const toggleCancelButton = () => {
+        setShowCancelButton(prevState => !prevState);
     };
     
       const toggleDeliveron = () => {
@@ -349,6 +375,18 @@ const SettingsScreen = ({ navigation }) => {
                                         style={styles.switch}
                                         value={postponeOrderShow}
                                         onValueChange={togglePostponeOrder}
+                                    />
+                                </View>
+                            </TouchableRipple>
+                        </View>
+                        <View style={[styles.section, styles.sectionContainer]}>
+                            <TouchableRipple onPress={toggleCancelButton}>
+                                <View style={[styles.row, styles.rowWrapper]}>
+                                    <Text style={styles.rowLabel}>{dictionary["st.showCancelButton"] || "Show Cancel Button"}</Text>
+                                    <Switch
+                                        style={styles.switch}
+                                        value={showCancelButton}
+                                        onValueChange={toggleCancelButton}
                                     />
                                 </View>
                             </TouchableRipple>
