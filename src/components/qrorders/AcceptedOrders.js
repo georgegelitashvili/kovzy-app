@@ -27,6 +27,7 @@ import OrdersDetail from "../OrdersDetail";
 import OrdersModal from "../modal/OrdersModalQr";
 import printRows from "../../PrintRows";
 import { useOrderDetails } from "../../hooks/useOrderDetails";
+import { getShowCancelButtonSetting } from "../../helpers/settings";
 
 const initialWidth = Dimensions.get("window").width;
 const getColumnsByScreenSize = (screenWidth) => {
@@ -73,6 +74,7 @@ export const AcceptedOrdersList = () => {
   const [width, setWidth] = useState(Dimensions.get('window').width);
   const [numColumns, setNumColumns] = useState(getColumnsByScreenSize(width));
   const [cardSize, setCardSize] = useState(getCardSize(width, numColumns));
+  const [showCancelButton, setShowCancelButton] = useState(false);
 
   const { dictionary, languageId } = useContext(LanguageContext);
 
@@ -115,6 +117,14 @@ export const AcceptedOrdersList = () => {
 
     const subscription = Dimensions.addEventListener('change', updateLayout);
     return () => subscription?.remove();
+  }, []);
+
+  useEffect(() => {
+    const loadCancelButtonSetting = async () => {
+      const setting = await getShowCancelButtonSetting();
+      setShowCancelButton(setting);
+    };
+    loadCancelButtonSetting();
   }, []);
 
   const fetchAcceptedOrders = async () => {
@@ -303,15 +313,17 @@ export const AcceptedOrdersList = () => {
                 <MaterialCommunityIcons name="check-decagram-outline" size={30} color="white" />
               </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.buttonReject}
-                onPress={() => {
-                  setItemId(item.id);
-                  showModal("reject");
-                }}
-              >
-                <MaterialCommunityIcons name="close-circle-outline" size={30} color="white" />
-              </TouchableOpacity>
+              {showCancelButton && (
+                <TouchableOpacity
+                  style={styles.buttonReject}
+                  onPress={() => {
+                    setItemId(item.id);
+                    showModal("reject");
+                  }}
+                >
+                  <MaterialCommunityIcons name="close-circle-outline" size={30} color="white" />
+                </TouchableOpacity>
+              )}
             </Card.Actions>
 
           </Card.Content>
