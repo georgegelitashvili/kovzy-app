@@ -581,8 +581,8 @@ export const AuthProvider = ({ isConnected, children }) => {
         const savedLang = await getData("rcml-lang");
         if (!savedLang) {
           // Prioritize English as the default language
-          const englishLang = languages.find((l) => l.lang === 'en');
-          const defaultLang = englishLang || languages.find((l) => l.default === 1);
+          const englishLang = languages.find((langObj) => langObj.lang === 'en');
+          const defaultLang = englishLang || languages.find((langObj) => langObj.default === 1);
           
           if (defaultLang) {
             await storeData("rcml-lang", defaultLang.lang);
