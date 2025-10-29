@@ -493,10 +493,14 @@
     "errors.NETWORK_ERROR": "Проблема с подключением к сети",
     "errors.REQUEST_ERROR": "Ошибка запроса или таймаут",
     "errors.NGROK_ERROR": "Ошибка подключения Ngrok",
+    "errors.INVALID_DOMAIN": "Неверный домен. Пожалуйста, попробуйте снова.",
+    "errors.FETCH_BRANCH_ERROR": "Не удалось загрузить список филиалов",
+    "errors.GENERAL": "Произошла ошибка. Пожалуйста, попробуйте снова.",
     "errors.UNKNOWN": "Произошла неизвестная ошибка",
     "errors.LOGIN_ERROR": "Ошибка входа в систему",
     "errors.LOGOUT_ERROR": "Ошибка выхода из системы",
     "errors.SESSION_EXPIRED": "Ваша сессия истекла. Пожалуйста, войдите снова.",    "errors.CLEANUP_ERROR": "Ошибка очистки данных сессии",
     "errors.UPDATE_ERROR": "Ошибка проверки обновлений",
-    "errors.USER_FRIENDLY": "Что-то пошло не так. Пожалуйста, попробуйте позже."
+    "errors.USER_FRIENDLY": "Что-то пошло не так. Пожалуйста, попробуйте позже.",
+    "auth.ALREADY_AUTHORIZED": "Пользователь уже авторизован"
 }

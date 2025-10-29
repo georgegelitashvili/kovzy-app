@@ -17,6 +17,7 @@ import {
 } from "../../utils/ErrorConstants";
 
 const Toast = ({ type, title, subtitle, animate, addStyles, onDismiss, persistent = false }) => {
+  // ALWAYS call ALL hooks at the top level - NEVER conditionally
   const { dictionary } = useContext(LanguageContext);
   const insets = useSafeAreaInsets();
   const slideAnim = useRef(new Animated.Value(-120)).current;
@@ -38,17 +39,6 @@ const Toast = ({ type, title, subtitle, animate, addStyles, onDismiss, persisten
   const statusBarHeight = insets.top || StatusBar.currentHeight || 0;
   const topPosition = statusBarHeight + 10;
 
-  // ❌ suppress technical errors
-  if (type === "failed") {
-    const containsTechnicalDetails = TECHNICAL_ERROR_PATTERNS.some((pattern) =>
-      pattern.test(subtitle || "")
-    );
-    if (containsTechnicalDetails) {
-      console.log("Suppressing toast with technical error:", subtitle);
-      return null;
-    }
-  }
-
   const getLocalizedMessage = (message, type) => {
     if (type === "failed" && dictionary) {
       if (message && typeof message === "string") {
@@ -65,11 +55,30 @@ const Toast = ({ type, title, subtitle, animate, addStyles, onDismiss, persisten
   };
 
   const processedMessage = getLocalizedMessage(subtitle, type);
-  if (processedMessage === null) return null;
 
-  // Animation effect
+  // Check conditions that would suppress the toast
+  const lowerType = typeof type === 'string' ? type.toLowerCase() : '';
+  const lowerSubtitle = typeof subtitle === 'string' ? subtitle.toLowerCase() : '';
+  const shouldSuppressNetworkError = (
+    lowerType.includes('network_error') ||
+    lowerType.includes('network error') ||
+    lowerType.includes('ქსელთან კავშირის პრობლემა') ||
+    lowerSubtitle.includes('network_error') ||
+    lowerSubtitle.includes('network error') ||
+    lowerSubtitle.includes('ქსელთან კავშირის პრობლემა')
+  );
+
+  const shouldSuppressTechnicalError = type === "failed" && TECHNICAL_ERROR_PATTERNS.some((pattern) =>
+    pattern.test(subtitle || "")
+  );
+
+  const shouldSuppressMessage = processedMessage === null;
+
+  const shouldHide = shouldSuppressNetworkError || shouldSuppressTechnicalError || shouldSuppressMessage;
+
+  // Animation effect - ALWAYS call useEffect hooks
   useEffect(() => {
-    if (!animate) return;
+    if (!animate || shouldHide) return;
 
     Animated.timing(slideAnim, {
       toValue: 0,
@@ -78,7 +87,6 @@ const Toast = ({ type, title, subtitle, animate, addStyles, onDismiss, persisten
     }).start();
 
     if (persistent) {
-      // თუ persistentა, არ ვაყენებთ timeout-ს
       return;
     }
 
@@ -96,9 +104,8 @@ const Toast = ({ type, title, subtitle, animate, addStyles, onDismiss, persisten
     }, duration);
 
     return () => clearTimeout(timeout);
-  }, [animate, persistent]);
+  }, [animate, persistent, shouldHide, slideAnim, type, onDismiss]);
   
-
   // Handle dismiss action
   const handleDismiss = () => {
     Animated.timing(slideAnim, {
@@ -109,6 +116,11 @@ const Toast = ({ type, title, subtitle, animate, addStyles, onDismiss, persisten
       if (onDismiss) onDismiss();
     });
   };
+
+  // Return null if we should hide the toast (after all hooks are called)
+  if (shouldHide) {
+    return null;
+  }
 
   return (
     <Animated.View
@@ -142,10 +154,10 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 0,
     right: 0,
-    zIndex: 1000, // ნაკლები zIndex, რომ ტოსტერი მაინც არ გადაეფაროს მუდმივად header მენიუს
+    zIndex: 1000,
     paddingHorizontal: 16,
     alignItems: "center",
-    pointerEvents: "box-none", // ✅ ტოსტერი არ დაბლოკავს touch-ს
+    pointerEvents: "box-none",
   },
   toastBox: {
     flexDirection: "row",

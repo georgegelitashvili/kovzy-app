@@ -2,7 +2,7 @@ import React, { useEffect, useContext, useRef, useImperativeHandle, forwardRef }
 import { View, AppState, Alert } from 'react-native';
 import { Audio } from 'expo-av';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { String, LanguageContext } from "../components/Language";
+import { String, LanguageContext } from '../components/Language';
 import * as Sentry from '@sentry/react-native';
 
 const musicList = [
@@ -21,13 +21,11 @@ const NotificationSound = forwardRef((props, ref) => {
     const soundRef = useRef(null);
     const repeatIntervalRef = useRef(null);
     const appState = useRef(AppState.currentState);
+    const isSoundPlaying = useRef(false); // Track if a sound is currently playing
 
     useEffect(() => {
         const subscription = AppState.addEventListener('change', nextAppState => {
-            if (
-                appState.current.match(/inactive|background/) &&
-                nextAppState === 'active'
-            ) {
+            if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
                 // App has come to foreground
                 onStopPlaySound();
             }
@@ -36,25 +34,116 @@ const NotificationSound = forwardRef((props, ref) => {
 
         return () => {
             subscription.remove();
+            // Cleanup sound on unmount
+            onStopPlaySound();
         };
-    }, [appState]);
+    }, []);
 
     const onStopPlaySound = async () => {
-        if (soundRef.current) {
-            try {
+        try {
+            if (soundRef.current) {
                 await soundRef.current.stopAsync();
                 await soundRef.current.unloadAsync();
                 soundRef.current = null;
-                if (repeatIntervalRef.current) {
-                    clearInterval(repeatIntervalRef.current);
-                    repeatIntervalRef.current = null;
-                }
-            } catch (error) {
-                // Just log audio errors, don't show to user
-                console.log('Audio stop error (suppressed):', error);
-                Sentry.captureException(error);
             }
+            if (repeatIntervalRef.current) {
+                clearInterval(repeatIntervalRef.current);
+                repeatIntervalRef.current = null;
+            }
+            isSoundPlaying.current = false;
+            console.log('🔈 Notification sound stopped and unloaded');
+        } catch (error) {
+            isSoundPlaying.current = false;
+            console.log('Audio stop error (suppressed):', error);
+            Sentry.captureException(error);
         }
+    };
+
+    const onPlaySound = async (repeat = false, selectedSound = '1', volume = 1.0) => {
+        try {
+            if (isSoundPlaying.current) {
+                console.log('🔈 Sound already playing, skipping new sound');
+                return;
+            }
+
+            await onStopPlaySound();
+
+            const music = musicList.find(m => m.id === selectedSound) || musicList[0];
+            const { sound } = await Audio.Sound.createAsync(
+                music.source,
+                { volume, shouldPlay: true }
+            );
+
+            soundRef.current = sound;
+            isSoundPlaying.current = true;
+
+            // Add timeout to stop sound after 10 seconds
+            const timeout = setTimeout(async () => {
+                await onStopPlaySound();
+                console.log('🔈 Sound stopped due to timeout');
+            }, 10000);
+
+            if (repeat) {
+                sound.setOnPlaybackStatusUpdate(async status => {
+                    if (status.didJustFinish && isSoundPlaying.current) {
+                        try {
+                            await sound.replayAsync();
+                            console.log('🔈 Sound replayed');
+                        } catch (error) {
+                            isSoundPlaying.current = false;
+                            console.log('Audio replay error (suppressed):', error);
+                            Sentry.captureException(error);
+                        }
+                    }
+                });
+            }
+
+            sound.setOnPlaybackStatusUpdate(status => {
+                if (status.didJustFinish && !repeat) {
+                    isSoundPlaying.current = false;
+                    console.log('🔈 Sound playback finished naturally');
+                    clearTimeout(timeout);
+                }
+            });
+
+            console.log('🔈 Playing notification sound:', music.title);
+        } catch (error) {
+            isSoundPlaying.current = false;
+            console.log('Audio play error (suppressed):', error);
+            Sentry.captureException(error);
+        }
+    };
+
+    const loadAndPlaySavedMusic = async () => {
+        try {
+            const savedMusicId = await AsyncStorage.getItem('selectedMusicId');
+            const repeat = (await AsyncStorage.getItem('repeatSound')) === 'true';
+            const volume = parseFloat(await AsyncStorage.getItem('soundVolume')) || 1.0;
+            await onPlaySound(repeat, savedMusicId || '1', volume);
+        } catch (error) {
+            console.log('Error loading saved music:', error);
+            Sentry.captureException(error);
+            // Fallback to default sound
+            await onPlaySound(false, '1', 1.0);
+        }
+    };
+
+    const orderReceived = async () => {
+        await loadAndPlaySavedMusic();
+        Alert.alert(
+            dictionary?.['general.alerts'] || 'შეტყობინება',
+            dictionary?.['orders.orderReceivedTitle'] || 'ახალი შეკვეთა მიღებულია',
+            [
+                {
+                    text: dictionary?.['okay'] || 'კარგი',
+                    onPress: async () => {
+                        await onStopPlaySound();
+                        console.log('🔈 Stopped sound on alert dismissal');
+                    },
+                },
+            ],
+            { cancelable: false }
+        );
     };
 
     useImperativeHandle(ref, () => ({
@@ -64,79 +153,7 @@ const NotificationSound = forwardRef((props, ref) => {
         },
         stopSound: async () => {
             await onStopPlaySound();
-        }
-    }));
-
-    const onPlaySound = async (repeat = false, selectedSound = '1', volume = 1.0) => {
-        try {
-            // Stop any existing sound first
-            await onStopPlaySound();
-
-            // Find the selected sound
-            const music = musicList.find(m => m.id === selectedSound) || musicList[0];
-
-            // Load and play sound
-            const { sound } = await Audio.Sound.createAsync(
-                music.source,
-                { volume, shouldPlay: true }
-            );
-
-            soundRef.current = sound;
-            
-            // Configure repeat if needed
-            if (repeat) {
-                // Set up a repeat interval that waits for the sound to finish before playing again
-                sound.setOnPlaybackStatusUpdate(async (status) => {
-                    if (status.didJustFinish) {
-                        try {
-                            // Replay the sound
-                            await sound.replayAsync();
-                        } catch (error) {
-                            // Silently log audio errors
-                            console.log('Audio replay error (suppressed):', error);
-                            Sentry.captureException(error);
-                        }
-                    }
-                });
-            }
-        } catch (error) {
-            // Just log audio errors, don't show to user
-            console.log('Audio play error (suppressed):', error);
-            Sentry.captureException(error);
-        }
-    };
-
-    const loadAndPlaySavedMusic = async () => {
-        try {
-            const savedMusicId = await AsyncStorage.getItem('selectedMusicId');
-            if (savedMusicId) {
-                await onPlaySound(true, savedMusicId);
-            } else {
-                await onPlaySound('1');
-            }
-        } catch (error) {
-            console.log('Error loading saved music:', error);
-        }
-    };
-
-    const orderReceived = async () => {
-        await loadAndPlaySavedMusic();
-        Alert.alert(
-            dictionary["general.alerts"],
-            dictionary["orders.orderReceivedTitle"],
-            [
-                {
-                    text: dictionary["okay"],
-                    onPress: async () => {
-                        await onStopPlaySound();
-                    },
-                },
-            ],
-            { cancelable: false }
-        );
-    };
-
-    useImperativeHandle(ref, () => ({
+        },
         orderReceived,
     }));
 

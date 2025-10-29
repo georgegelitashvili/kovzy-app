@@ -10,10 +10,11 @@ import Toast from '../components/generate/Toast';
 const BACKGROUND_NOTIFICATION_TASK = 'background-notification-task';
 Notifications.setNotificationHandler({
     handleNotification: async () => ({
-        shouldShowAlert: true,
-        shouldPlaySound: true,
-        shouldSetBadge: true,
-        priority: Notifications.AndroidNotificationPriority.HIGH
+    shouldShowBanner: true,
+    shouldShowList: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+    priority: Notifications.AndroidNotificationPriority.HIGH
     }),
 });
 
@@ -40,29 +41,45 @@ class ToastNotificationManager {
 
 // React component that displays toasts
 export const ToastManager = () => {
+  // Clear toasts when user is authorized or loginError is cleared
+  try {
+    // Lazy import to avoid circular dependency
+    // eslint-disable-next-line
+    var { useContext } = require('react');
+    var { AuthContext } = require('../context/AuthProvider');
+    var authCtx = useContext(AuthContext);
+    useEffect(() => {
+      if (authCtx && (authCtx.user || !authCtx.loginError)) {
+        setToasts([]);
+        if (toastLock && toastLock.current) toastLock.current = false;
+      }
+    }, [authCtx && authCtx.user, authCtx && authCtx.loginError]);
+  } catch (e) {}
   const [toasts, setToasts] = useState([]);
   const toastIdCounter = useRef(0);
-  
+  const toastLock = useRef(false);
+
   useEffect(() => {
-    // Listen for toast events
     const listenerId = eventEmitter.addEventListener('showToast', (toastData) => {
-      // Create a unique ID for this toast
+      if (toastLock.current) return; // Prevent multiple toasts at once
+      toastLock.current = true;
+
       const newToast = {
         ...toastData,
         id: toastIdCounter.current++,
         animate: true
       };
-      
-      // Add the new toast to the stack
-      setToasts(currentToasts => [...currentToasts, newToast]);
-      
-      // Automatically remove toast after its duration
+
+      setToasts([]);
+      setTimeout(() => setToasts([newToast]), 50);
+
       const duration = toastData.duration || (toastData.type === 'failed' ? 5000 : 3000);
       setTimeout(() => {
         setToasts(currentToasts => currentToasts.filter(t => t.id !== newToast.id));
-      }, duration + 700); // Add extra time for animation
+        toastLock.current = false; // Unlock after toast is gone
+      }, duration + 800);
     });
-      return () => {
+    return () => {
       eventEmitter.removeEventListener(listenerId);
     };
   }, []);
@@ -107,11 +124,12 @@ const notificationManager = {
 
     async registerForPushNotificationsAsync() {
         if (Platform.OS === 'android') {
-            await Notifications.setNotificationChannelAsync('myNotificationChannel', {
-                name: 'Default Notification Channel',
+            await Notifications.setNotificationChannelAsync('kovzyOrders', {
+                name: 'kovzyOrders',
                 importance: Notifications.AndroidImportance.MAX,
+                sound: 'plucky.mp3',
                 vibrationPattern: [0, 250, 250, 250],
-                lightColor: '#FF231F7C',
+                lightColor: '#ffffff',
             });
         }
 
@@ -143,7 +161,7 @@ const notificationManager = {
 
         console.log('Expo Push Token:', pushToken);
         return pushToken;
-    },
+  },
 
     async savePushTokenToBackend(token, options, branchid) {
         const deviceId = await Application.getAndroidId();

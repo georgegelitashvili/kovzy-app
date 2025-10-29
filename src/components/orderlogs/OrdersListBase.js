@@ -5,7 +5,8 @@ import {
   View,
   TouchableOpacity,
   ActivityIndicator,
-  FlatList
+  FlatList,
+  Linking
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { Text, Divider, Card } from "react-native-paper";
@@ -14,6 +15,7 @@ import { MaterialCommunityIcons, SimpleLineIcons } from "@expo/vector-icons";
 
 import { AuthContext } from "../../context/AuthProvider";
 import Loader from "../generate/loader";
+// Suppress NETWORK_ERROR toast in this component
 import { LanguageContext } from "../Language";
 import axiosInstance from "../../apiConfig/apiRequests";
 import OrdersDetail from "../OrdersDetail";
@@ -32,6 +34,7 @@ const initialColumns = getColumnsByScreenSize(initialWidth);
 const getCardSize = (width, columns) => width / columns - (columns > 1 ? 15 : 30);
 
 export const OrdersListBase = ({ orderType }) => {
+  // No longer block grid on allDetailsLoaded; let each card handle its own loader
   const [filters, setFilters] = useState({
     orderType: "all",
     orderStatus: "2",
@@ -53,16 +56,16 @@ export const OrdersListBase = ({ orderType }) => {
     orderDetails,
     loadingDetails,
     fetchBatchOrderDetails,
-    fetchOrderDetailsLazy,
     clearOrderDetails,
-    getOrderDetails
+    getOrderDetails,
+    isOrderDetailsLoaded,
+    isOrderLoading
   } = useOrderDetails();
 
   useEffect(() => {
   }, [orderDetails]);
 
   const [optionsIsLoaded, setOptionsIsLoaded] = useState(false);
-  const [isOpen, setOpenState] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingOptions, setLoadingOptions] = useState(false);
 
@@ -88,19 +91,18 @@ export const OrdersListBase = ({ orderType }) => {
     }
   };
 
+  // State for expanded/collapsed order cards
+  const [isOpen, setOpenState] = useState([]);
+  // Memoize toggleContent to prevent unnecessary re-renders
   const toggleContent = useCallback((value) => {
-    if (isOpen.includes(value)) {
-      setOpenState(isOpen.filter((i) => i !== value));
-    } else {
-      setOpenState([...isOpen, value]);
-      // Lazy load: fetch order details when expanding if not already loaded
-      if (!orderDetails[value]) {
-        fetchOrderDetailsLazy(value);
+    setOpenState(prev => {
+      if (prev.includes(value)) {
+        return prev.filter((i) => i !== value);
       } else {
-        console.log(`Order details for order ${value} already cached`);
+        return [...prev, value];
       }
-    }
-  }, [isOpen, orderDetails, fetchOrderDetailsLazy]);
+    });
+  }, []);
 
   const apiOptions = useCallback(() => {
     setOptions({
@@ -114,21 +116,18 @@ export const OrdersListBase = ({ orderType }) => {
     setFilters(newFilters);
     setOrders([]);
     setHasMore(true);
+    clearOrderDetails(); // Only clear details on filter change (true reset)
     fetchAcceptedOrders(newFilters, true);
   }, []);
 
   const fetchAcceptedOrders = async (appliedFilters = filters, reset = false) => {
     console.log(`🔄 fetchAcceptedOrders called - reset: ${reset}, orders count: ${orders.length}`);
     if (!user || !options.url_getOrdersLogs) return;
+    // Do NOT clearOrderDetails here; only do it in handleApplyFilters or initial load
 
-    // Only clear order details on reset (initial load), not on infinite scroll
-    if (reset) {
-      clearOrderDetails();
-    } else {
-      console.log('Keeping existing order details for infinite scroll');
-    }
-    
     try {
+      if (!reset) setLoadingMore(true); // Show loader for infinite scroll
+
       const requestFilters = {
         status: { exact: appliedFilters.orderStatus },
         type: { exact: orderType.toString() },
@@ -184,9 +183,7 @@ export const OrdersListBase = ({ orderType }) => {
           const orderIds = uniqueData.map(order => order.id);
           try {
             await fetchBatchOrderDetails(orderIds, true);
-            // Force a re-render by updating a state
             setLoading(prev => prev);
-            
           } catch (error) {
             console.log('Initial load: error fetching order details:', error);
           }
@@ -196,35 +193,47 @@ export const OrdersListBase = ({ orderType }) => {
           const newOrderIds = uniqueData
             .map(order => order.id)
             .filter(id => !existingOrderIds.includes(id));
-          
+
           if (newOrderIds.length > 0) {
             try {
               await fetchBatchOrderDetails(newOrderIds, true);
-              // Force a re-render by updating a state
-              setLoadingMore(prev => prev);
+              // Loader turns off ONLY after details are loaded for new orders
+              setLoadingMore(false);
             } catch (error) {
               console.log('Infinite scroll: error fetching order details:', error);
+              setLoadingMore(false);
             }
           } else {
+            setLoadingMore(false);
             console.log(' Infinite scroll: no new orders to fetch details for');
           }
         }
       } else {
+        setLoadingMore(false);
         console.log(' No orders to fetch details for');
       }
 
       setFees(feesData);
       setCurrency(resp.data.currency);
     } catch (error) {
-      console.log('Error fetching accepted orders:', error);
-      const statusCode = error?.status || 'Unknown';
-      console.log('Status code accepted orders:', statusCode);
+      // Suppress NETWORK_ERROR toast: do nothing, no log, no UI
+      if (
+        (error.type === 'NETWORK_ERROR') ||
+        (!error.response && (error.code === 'ERR_NETWORK' || (error.message && error.message.toLowerCase().includes('network'))))
+      ) {
+        // Do nothing: fully silent
+      } else {
+        console.log('Error fetching accepted orders:', error);
+        const statusCode = error?.status || 'Unknown';
+        console.log('Status code accepted orders:', statusCode);
+      }
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
+      setLoadingMore(false);
     } finally {
       setLoading(false);
-      setLoadingMore(false);
+      // setLoadingMore(false); // Loader turns off ONLY after details are loaded (now handled above)
     }
   };
 
@@ -264,7 +273,21 @@ export const OrdersListBase = ({ orderType }) => {
     return () => subscription?.remove();
   }, []);
 
-  const RenderEnteredOrdersList = ({ item, toggleContent, isOpen, dictionary, currency, fees }) => {
+  const debounceRef = useRef(null);
+
+  const handleEndReached = () => {
+    // Prevent runaway/infinite fetches
+    if (loadingMore || !hasMore) return;
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
+    debounceRef.current = setTimeout(() => {
+      fetchAcceptedOrders();
+    }, 500); // 0.5 წამი
+  };
+
+  // Remove memoization: always re-render for fresh orderDetails
+  const RenderEnteredOrdersList = ({ item, toggleContent, isOpen, dictionary, currency, fees, orderDetailsData, isOrderDetailsLoading }) => {
     const trackLink = [JSON.parse(item.deliveron_data)]?.map(link => {
       return link.trackLink ?? null;
     });
@@ -277,6 +300,9 @@ export const OrdersListBase = ({ orderType }) => {
       }
       return acc;
     }, []);
+    // Prevent flicker: only show loader if details are not loaded AND batch is still loading
+    const detailsLoaded = orderDetailsData && orderDetailsData.length > 0;
+    const showLoader = !detailsLoaded && isOrderDetailsLoading;
 
     return (
       <View style={{
@@ -336,18 +362,23 @@ export const OrdersListBase = ({ orderType }) => {
               <Text variant="titleSmall" style={styles.title} numberOfLines={2} ellipsizeMode="tail">
                 {dictionary["orders.paymentMethod"]}: {item.payment_type}
               </Text>
-              
+
               <Divider />
-              {(() => {
-                const orderData = getOrderDetails(item.id);
-                console.log(`🔍 Rendering order ${item.id} with ${orderData.length} details`);
-                return (
-                  <OrdersDetail 
-                    orderId={item.id} 
-                    orderData={orderData} 
-                  />
-                );
-              })()}
+
+              {/* Prevent flicker: only show loader if details are not loaded AND batch is still loading */}
+              {showLoader ? (
+                <View style={{ padding: 20, alignItems: 'center' }}>
+                  <ActivityIndicator size="small" color="#0000ff" />
+                  <Text style={{ marginTop: 8, color: '#666' }}>Loading order details...</Text>
+                </View>
+              ) : detailsLoaded ? (
+                <OrdersDetail orderId={item.id} orderData={orderDetailsData} />
+              ) : (
+                <View style={{ padding: 20, alignItems: 'center' }}>
+                  <Text style={{ color: 'red' }}>Order details not found</Text>
+                </View>
+              )}
+
               <Divider />
 
               <Text variant="titleMedium" style={styles.title}>
@@ -383,7 +414,11 @@ export const OrdersListBase = ({ orderType }) => {
     );
   };
 
-  const renderItem = ({ item }) => {
+  // Always pass fresh orderDetailsData and isOrderDetailsLoading
+  const renderItem = useCallback(({ item }) => {
+    const orderIdStr = String(item.id);
+    const orderDetailsData = getOrderDetails(orderIdStr);
+    const isOrderDetailsLoading = isOrderLoading(orderIdStr);
     return (
       <RenderEnteredOrdersList
         item={item}
@@ -392,9 +427,11 @@ export const OrdersListBase = ({ orderType }) => {
         dictionary={dictionary}
         currency={currency}
         fees={fees}
+        orderDetailsData={orderDetailsData}
+        isOrderDetailsLoading={isOrderDetailsLoading}
       />
     );
-  };
+  }, [toggleContent, isOpen, dictionary, currency, fees, getOrderDetails, isOrderLoading]);
 
   const getItemLayout = useCallback((data, index) => ({
     length: cardSize,
@@ -402,8 +439,9 @@ export const OrdersListBase = ({ orderType }) => {
     index,
   }), [cardSize]);
 
+  // Show main loader only for initial load
   if (loading) {
-    return <Loader show={loading} />;
+    return <Loader show={true} />;
   }
 
   return (
@@ -415,31 +453,33 @@ export const OrdersListBase = ({ orderType }) => {
       </View>
 
       <View style={{ flex: 1, width: "100%" }}>
-        <FlatGrid
-          key={`flat-grid-${numColumns}`}
-          adjustGridToStyles={true}
-          itemDimension={cardSize}
-          spacing={10}
-          data={orders}
-          keyExtractor={(item, index) => `${item.id}-${index + 1}`}
-          renderItem={renderItem}
-          getItemLayout={getItemLayout}
-          itemContainerStyle={{ justifyContent: 'space-between' }}
-          style={{ flex: 1, width: "100%" }}
-          onEndReached={() => {
-            if (!loadingMore && hasMore) {
-              setLoadingMore(true);
-              fetchAcceptedOrders();
+        {orders.length === 0 ? (
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+            <ActivityIndicator size="large" color="#0000ff" />
+            <Text style={{ marginTop: 12, color: '#666' }}>Loading orders...</Text>
+          </View>
+        ) : (
+          <FlatGrid
+            key={`flat-grid-${numColumns}`}
+            adjustGridToStyles={true}
+            itemDimension={cardSize}
+            spacing={10}
+            data={orders}
+            keyExtractor={(item, index) => `${item.id}-${index + 1}`}
+            renderItem={renderItem}
+            getItemLayout={getItemLayout}
+            itemContainerStyle={{ justifyContent: 'space-between' }}
+            style={{ flex: 1, width: "100%" }}
+            onEndReached={handleEndReached}
+            onEndReachedThreshold={0.5}
+            ListFooterComponent={
+              loadingMore ? <ActivityIndicator size="large" color="#0000ff" /> : null
             }
-          }}
-          onEndReachedThreshold={0.5}
-          ListFooterComponent={
-            loadingMore ? <ActivityIndicator size="large" color="#0000ff" /> : null
-          }
-          removeClippedSubviews={true}
-          initialNumToRender={10}
-          windowSize={21}
-        />
+            removeClippedSubviews={true}
+            initialNumToRender={10}
+            windowSize={21}
+          />
+        )}
       </View>
     </View>
   );

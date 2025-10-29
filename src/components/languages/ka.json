@@ -494,11 +494,15 @@
     "errors.NETWORK_ERROR": "ქსელთან კავშირის პრობლემა",
     "errors.REQUEST_ERROR": "მოთხოვნის შეცდომა ან დრო ამოიწურა",
     "errors.NGROK_ERROR": "Ngrok კავშირის პრობლემა",
+    "errors.INVALID_DOMAIN": "დომენი არასწორია ან არ არსებობს. გთხოვთ, სცადოთ ხელახლა.",
+    "errors.FETCH_BRANCH_ERROR": "ფილიალების ჩამოტვირთვა ვერ მოხერხდა",
+    "errors.GENERAL": "დაფიქსირდა შეცდომა. გთხოვთ, სცადოთ ხელახლა.",
     "errors.UNKNOWN": "დაფიქსირდა გაურკვეველი შეცდომა",
     "errors.LOGIN_ERROR": "ავტორიზაციის შეცდომა",
     "errors.LOGOUT_ERROR": "გასვლის შეცდომა",
     "errors.SESSION_EXPIRED": "თქვენი სესია ამოიწურა. გთხოვთ, შეხვიდეთ ხელახლა.",
     "errors.CLEANUP_ERROR": "სესიის მონაცემების გასუფთავების შეცდომა",
     "errors.UPDATE_ERROR": "განახლებების შემოწმების შეცდომა",
-    "errors.USER_FRIENDLY": "დაფიქსირდა შეცდომა. გთხოვთ, სცადოთ მოგვიანებით."
+    "errors.USER_FRIENDLY": "დაფიქსირდა შეცდომა. გთხოვთ, სცადოთ მოგვიანებით.",
+    "auth.ALREADY_AUTHORIZED": "ავტორიზებული იუზერი"
 }

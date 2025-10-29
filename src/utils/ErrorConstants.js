@@ -14,6 +14,13 @@ export const USER_VISIBLE_ERROR_TYPES = [
   'VALIDATION_ERROR',   // Only show validation errors
   'BRANCH_TEMPORARILY_CLOSED', // Only show when branch is temporarily closed
   'SESSION_EXPIRED',    // Show when session expires
+  'INVALID_DOMAIN',     // Show invalid domain errors
+  'FETCH_BRANCH_ERROR', // Show branch fetching errors
+  'GENERAL',            // Show general errors
+  'SERVER_ERROR',       // Show server errors
+  'UNAUTHORIZED',       // Show unauthorized errors
+  'FORBIDDEN',          // Show forbidden errors
+  'SERVICE_UNAVAILABLE' // Show service unavailable errors
 ];
 
 // Regex patterns to detect technical errors that should never be shown to users

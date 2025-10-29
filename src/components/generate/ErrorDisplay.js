@@ -4,30 +4,25 @@ import { LanguageContext } from '../Language';
 import { USER_VISIBLE_ERROR_TYPES, TECHNICAL_ERROR_PATTERNS } from '../../utils/ErrorConstants';
 
 const ErrorDisplay = ({ error, style, onDismiss }) => {
+  // ALWAYS call ALL hooks at the top level - NEVER conditionally
   const { dictionary } = useContext(LanguageContext);
 
-  if (!error) return null;
-
-  if (!USER_VISIBLE_ERROR_TYPES.includes(error.type)) {
-    console.log('Suppressing error display for error type:', error.type);
-    return null;
-  }
-
-  const containsTechnicalDetails = TECHNICAL_ERROR_PATTERNS.some(pattern =>
+  // Check all conditions but don't return early
+  const hasError = !!error;
+  const isNetworkError = error?.type === 'NETWORK_ERROR';
+  const isUserVisibleError = error ? USER_VISIBLE_ERROR_TYPES.includes(error.type) : false;
+  const containsTechnicalDetails = error ? TECHNICAL_ERROR_PATTERNS.some(pattern =>
     pattern.test(error.message || '')
-  );
+  ) : false;
 
-  if (containsTechnicalDetails) {
-    console.log('Suppressing error with technical details:', error.message);
-    return null;
-  }
+  // Determine if we should hide the error display
+  const shouldHide = !hasError || isNetworkError || !isUserVisibleError || containsTechnicalDetails;
 
   const getErrorMessage = (error) => {
-    console.log('[ErrorDisplay] Processing error:', error);
-    if (error.message) return error.message;
+    if (error?.message) return error.message;
 
-    if (dictionary?.[`errors.${error.type}`]) {
-      return dictionary[`errors.${error.type}`];
+    if (dictionary?.[`errors.${error?.type}`]) {
+      return dictionary[`errors.${error?.type}`];
     }
 
     return dictionary?.['errors.UNKNOWN'] || 'Something went wrong. Please try again later.';
@@ -36,8 +31,14 @@ const ErrorDisplay = ({ error, style, onDismiss }) => {
   const handleDismiss = () => {
     if (onDismiss) onDismiss();
   };
+
   console.log('[ErrorDisplay] error object:', JSON.stringify(error, null, 2));
   console.log('[ErrorDisplay] persistent flag:', error?.persistent);
+
+  // Return null only after all hooks have been called
+  if (shouldHide) {
+    return null;
+  }
 
   return (
     <Toast

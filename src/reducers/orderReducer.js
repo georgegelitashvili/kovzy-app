@@ -5,7 +5,7 @@ export const initialState = {
   scheduled: [],
   deliveryScheduled: null,
   postponeOrder: false,
-  loading: true,
+  loading: true, // Start with true for initial app load, will be managed conditionally
   loadingOptions: false,
   isDeliveronOptions: false,
   deliveronOptions: null,
@@ -38,13 +38,17 @@ export const orderReducer = (state, action) => {
         updatedIsOpen = [...state.isOpen, ...newOrderIds];
       }
       
+      // Only set loading to false if explicitly specified (for initial loads and language changes)
+      // For live updates, preserve the current loading state unless explicitly overridden
+      const newLoadingState = action.payload.hasOwnProperty('loading') ? action.payload.loading : state.loading;
+      
       return {
         ...state,
         orders: action.payload.orders,
         fees: action.payload.fees,
         currency: action.payload.currency,
         scheduled: action.payload.scheduled,
-        loading: false,
+        loading: newLoadingState,
         isOpen: updatedIsOpen
       };
     case 'TOGGLE_CONTENT':
@@ -111,6 +115,8 @@ export const orderReducer = (state, action) => {
         ...state,
         deliveryScheduled: action.payload
       };
+    case 'RESET_ALL_STATE':
+      return { ...initialState };
     default:
       return state;
   }

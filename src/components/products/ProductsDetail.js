@@ -10,6 +10,7 @@ import { LanguageContext } from "../Language";
 import axiosInstance from "../../apiConfig/apiRequests";
 import ErrorDisplay from "../generate/ErrorDisplay";
 import useErrorHandler from "../../hooks/useErrorHandler";
+import { eventEmitter } from "../../utils/EventEmitter";
 
 const width = Dimensions.get("window").width;
 
@@ -26,6 +27,7 @@ export default function ProductsDetail({ navigation, route }) {
   const [isOpen, setOpenState] = useState([]);
   const [value, setValue] = useState("");
   const [enabled, setEnabled] = useState("");
+  const [isToggling, setIsToggling] = useState(false);
   const { error, setError, setApiError, clearError } = useErrorHandler();
 
   useEffect(() => {
@@ -49,6 +51,8 @@ export default function ProductsDetail({ navigation, route }) {
     if (!domain || !branchid) return;
     
     clearError();
+    setLoading(true);
+    
     try {
       const response = await axiosInstance.post(
         `https://${domain}/api/v1/admin/getCustomizablePack`,
@@ -63,25 +67,37 @@ export default function ProductsDetail({ navigation, route }) {
         setCustomizable(response.data.customizable);
       } else {
         setCustomizable([]);
-        setError('NOT_FOUND', 'No customizable packs found');
+        // Don't show error for empty results - this might be normal
+        console.log('No customizable packs found for this product');
       }
     } catch (error) {
       console.error('Error fetching customizable packs:', error);
       setCustomizable([]);
       
-      if (error.response?.status === 404) {
-        setError('NOT_FOUND', 'No customizable packs available');
+      // Handle different error types more specifically
+      if (error.type && error.message) {
+        // This is a formatted API error from our interceptor
+        setApiError(error);
+      } else if (error.response?.status === 404) {
+        // 404 might be normal if no customizables exist for this product
+        console.log('No customizable packs available for this product');
+        setCustomizable([]);
       } else if (error.response?.status === 401) {
         setIsDataSet(false);
         setError('UNAUTHORIZED', 'Authentication failed. Please login again.');
+      } else if (error.response?.status === 403) {
+        setError('FORBIDDEN', 'You do not have permission to view customizable packs.');
+      } else if (error.response?.status >= 500) {
+        setError('SERVER_ERROR', 'Server error occurred while fetching customizable packs.');
+      } else if (error.code === 'NETWORK_ERROR' || error.message?.includes('Network Error')) {
+        setError('NETWORK_ERROR', 'Network connection issue. Please check your internet connection.');
       } else {
-        // If we get a formatted error from our API interceptor
-        if (error.type && error.message) {
-          setApiError(error);
-        } else {
-          setError('SERVER_ERROR', 
-            error.response?.data?.error?.message || 'Failed to fetch customizable packs');
-        }
+        // Generic error handling
+        const errorMessage = error.response?.data?.error?.message || 
+                           error.response?.data?.message || 
+                           error.message || 
+                           'Failed to fetch customizable packs. Please try again.';
+        setError('SERVER_ERROR', errorMessage);
       }
     } finally {
       setLoading(false);
@@ -90,7 +106,7 @@ export default function ProductsDetail({ navigation, route }) {
     if (!domain || !branchid || !value) return;
     
     clearError();
-    setLoading(true);
+    setIsToggling(true);
     
     try {
       const response = await axiosInstance.post(
@@ -103,24 +119,76 @@ export default function ProductsDetail({ navigation, route }) {
           enabled: enabled,
         }
       );
-      setProductEnabled(response.data.data);
-      fetchData(); // Refresh data after toggle
+
+      // Check if response is successful and has expected data structure
+      if (response && response.data) {
+        // Update local state immediately for better UX
+        setCustomizable(prevCustomizable => 
+          prevCustomizable.map(customizable => ({
+            ...customizable,
+            packs: customizable.packs.map(pack => 
+              pack.id === value 
+                ? { ...pack, enabled: enabled === 1 }
+                : pack
+            )
+          }))
+        );
+        
+        setProductEnabled(response.data.data);
+        
+        // Show success notification
+        const successMessage = enabled === 1 
+          ? (dictionary["prod.customizableEnabled"] || "Customizable pack enabled successfully")
+          : (dictionary["prod.customizableDisabled"] || "Customizable pack disabled successfully");
+        
+        eventEmitter.emit("showToast", {
+          type: "success",
+          title: dictionary?.["info.success"] || "Success",
+          subtitle: successMessage
+        });
+        
+        // Only refresh data if the response doesn't contain the updated data
+        if (!response.data.customizable) {
+          fetchData();
+        }
+      } else {
+        // If response is empty or malformed, refresh data
+        fetchData();
+      }
+      
       setCustomizableId("");
     } catch (error) {
       console.error('Error toggling pack:', error);
       
-      // Handle formatted API errors
+      // Handle different types of errors more gracefully
       if (error.type && error.message) {
+        // This is a formatted API error from our interceptor
         setApiError(error);
       } else if (error.response?.status === 401) {
         setError('UNAUTHORIZED', 'Authentication failed. Please login again.');
         setIsDataSet(false);
+      } else if (error.response?.status === 404) {
+        setError('NOT_FOUND', 'Customizable pack not found. Please refresh and try again.');
+      } else if (error.response?.status === 403) {
+        setError('FORBIDDEN', 'You do not have permission to modify this customizable pack.');
+      } else if (error.response?.status >= 500) {
+        setError('SERVER_ERROR', 'Server error occurred. Please try again later.');
+      } else if (error.code === 'NETWORK_ERROR' || error.message?.includes('Network Error')) {
+        // Network errors are handled by the interceptor, but we can add a fallback
+        setError('NETWORK_ERROR', 'Network connection issue. Please check your internet connection.');
       } else {
-        setError('SERVER_ERROR', 
-          error.response?.data?.error?.message || 'Failed to update customizable pack');
+        // Generic error handling
+        const errorMessage = error.response?.data?.error?.message || 
+                           error.response?.data?.message || 
+                           error.message || 
+                           'Failed to update customizable pack. Please try again.';
+        setError('SERVER_ERROR', errorMessage);
       }
+      
+      // Refresh data on error to ensure UI is in sync
+      fetchData();
     } finally {
-      setLoading(false);
+      setIsToggling(false);
       setValue("");
     }
   };
@@ -162,10 +230,14 @@ export default function ProductsDetail({ navigation, route }) {
                   textColor="white"
                   buttonColor={child.enabled? "#f14c4c" : "#2fa360"}
                   style={styles.button}
+                  loading={isToggling && value === child.id}
+                  disabled={isToggling || loading}
                   onPress={() => {
-                    setCustomizableId(item.id);
-                    setValue(child.id);
-                    setEnabled(child.enabled ? 0 : 1);
+                    if (!isToggling && !loading) {
+                      setCustomizableId(item.id);
+                      setValue(child.id);
+                      setEnabled(child.enabled ? 0 : 1);
+                    }
                   }}
                 >
                   {child.enabled ? dictionary["prod.disableProduct"] : dictionary["prod.enableProduct"]}
