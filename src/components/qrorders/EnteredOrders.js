@@ -166,6 +166,19 @@ export const EnteredOrdersList = () => {
       setShowCancelButton(setting);
     };
     loadCancelButtonSetting();
+
+    // Listen for storage changes
+    const handleSettingChange = (event) => {
+      if (event && typeof event.showCancelButton === 'boolean') {
+        setShowCancelButton(event.showCancelButton);
+      }
+    };
+
+    const listener = eventEmitter.addEventListener('cancelButtonSettingChanged', handleSettingChange);
+
+    return () => {
+      eventEmitter.removeEventListener(listener);
+    };
   }, []);
 
   const initializeNotifications = async () => {

@@ -17,6 +17,7 @@ import { TouchableRipple } from 'react-native-paper'; // Corrected import
 import { String, LanguageContext } from "./components/Language";
 import { AuthContext, AuthProvider } from "./context/AuthProvider";
 import axiosInstance from "./apiConfig/apiRequests";
+import eventEmitter from "./utils/EventEmitter";
 
 // import { Drawer, Text, TouchableRipple, Switch } from "react-native-paper";
 
@@ -97,6 +98,8 @@ const SettingsScreen = ({ navigation }) => {
         const savePostponeOrder = async () => {
             try {
                 await AsyncStorage.setItem('postponeOrderShow', JSON.stringify(postponeOrderShow));
+                // Emit event to notify other components
+                eventEmitter.emit('postponeOrderSettingChanged', { postponeOrderShow });
             } catch (error) {
                 console.error('Failed to save value', error);
             }
@@ -105,6 +108,8 @@ const SettingsScreen = ({ navigation }) => {
         const saveCancelButtonSetting = async () => {
             try {
                 await AsyncStorage.setItem('showCancelButton', JSON.stringify(showCancelButton));
+                // Emit event to notify other components
+                eventEmitter.emit('cancelButtonSettingChanged', { showCancelButton });
             } catch (error) {
                 console.error('Failed to save cancel button setting', error);
             }
