@@ -5,6 +5,7 @@ import { MaterialCommunityIcons, SimpleLineIcons } from '@expo/vector-icons';
 import OrdersDetail from '../OrdersDetail';
 import { String, LanguageContext } from "../Language";
 import { getShowCancelButtonSetting } from "../../helpers/settings";
+import eventEmitter from "../../utils/EventEmitter";
 
 const OrderCard = (props) => {
   // Ensure all props exist before destructuring
@@ -57,6 +58,19 @@ const OrderCard = (props) => {
       setShowCancelButton(setting);
     };
     loadCancelButtonSetting();
+
+    // Listen for storage changes
+    const handleSettingChange = (event) => {
+      if (event && typeof event.showCancelButton === 'boolean') {
+        setShowCancelButton(event.showCancelButton);
+      }
+    };
+
+    const listener = eventEmitter.addEventListener('cancelButtonSettingChanged', handleSettingChange);
+
+    return () => {
+      eventEmitter.removeEventListener(listener);
+    };
   }, []);
 
   // Calculate responsive button dimensions

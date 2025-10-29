@@ -28,6 +28,7 @@ import OrdersModal from "../modal/OrdersModalQr";
 import printRows from "../../PrintRows";
 import { useOrderDetails } from "../../hooks/useOrderDetails";
 import { getShowCancelButtonSetting } from "../../helpers/settings";
+import eventEmitter from "../../utils/EventEmitter";
 
 const initialWidth = Dimensions.get("window").width;
 const getColumnsByScreenSize = (screenWidth) => {
@@ -125,6 +126,19 @@ export const AcceptedOrdersList = () => {
       setShowCancelButton(setting);
     };
     loadCancelButtonSetting();
+
+    // Listen for storage changes
+    const handleSettingChange = (event) => {
+      if (event && typeof event.showCancelButton === 'boolean') {
+        setShowCancelButton(event.showCancelButton);
+      }
+    };
+
+    const listener = eventEmitter.addEventListener('cancelButtonSettingChanged', handleSettingChange);
+
+    return () => {
+      eventEmitter.removeEventListener(listener);
+    };
   }, []);
 
   const fetchAcceptedOrders = async () => {
