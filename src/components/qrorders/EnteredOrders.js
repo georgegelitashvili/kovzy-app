@@ -27,6 +27,7 @@ import NotificationSound from '../../utils/NotificationSound';
 import NotificationManager from '../../utils/NotificationManager';
 import { useOrderDetails } from "../../hooks/useOrderDetails";
 import eventEmitter from "../../utils/EventEmitter";
+import { getShowCancelButtonSetting } from "../../helpers/settings";
 
 const initialWidth = Dimensions.get("window").width;
 const getColumnsByScreenSize = (screenWidth) => {
@@ -78,6 +79,7 @@ export const EnteredOrdersList = () => {
   const [cardSize, setCardSize] = useState(getCardSize(width, numColumns));
   const [previousOrderCount, setPreviousOrderCount] = useState(0);
   const [retryCount, setRetryCount] = useState(0);
+  const [showCancelButton, setShowCancelButton] = useState(false);
 
   const prevLanguageIdRef = useRef(null);
   const isLanguageChangeInProgressRef = useRef(false);
@@ -156,6 +158,27 @@ export const EnteredOrdersList = () => {
 
     const subscription = Dimensions.addEventListener('change', updateLayout);
     return () => subscription?.remove();
+  }, []);
+
+  useEffect(() => {
+    const loadCancelButtonSetting = async () => {
+      const setting = await getShowCancelButtonSetting();
+      setShowCancelButton(setting);
+    };
+    loadCancelButtonSetting();
+
+    // Listen for storage changes
+    const handleSettingChange = (event) => {
+      if (event && typeof event.showCancelButton === 'boolean') {
+        setShowCancelButton(event.showCancelButton);
+      }
+    };
+
+    const listener = eventEmitter.addEventListener('cancelButtonSettingChanged', handleSettingChange);
+
+    return () => {
+      eventEmitter.removeEventListener(listener);
+    };
   }, []);
 
   const initializeNotifications = async () => {
@@ -524,20 +547,22 @@ export const EnteredOrdersList = () => {
                     color="white"
                   />
                 </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.buttonReject}
-                  onPress={() => {
-                    setItemId(item.id);
-                    setItemTakeAway(null);
-                    showModal('reject');
-                  }}
-                >
-                  <MaterialCommunityIcons
-                    name="close-circle-outline"
-                    size={30}
-                    color="white"
-                  />
-                </TouchableOpacity>
+                {showCancelButton && (
+                  <TouchableOpacity
+                    style={styles.buttonReject}
+                    onPress={() => {
+                      setItemId(item.id);
+                      setItemTakeAway(null);
+                      showModal('reject');
+                    }}
+                  >
+                    <MaterialCommunityIcons
+                      name="close-circle-outline"
+                      size={30}
+                      color="white"
+                    />
+                  </TouchableOpacity>
+                )}
               </Card.Actions>
             </Card.Content>
           )}
