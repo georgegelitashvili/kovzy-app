@@ -4,16 +4,16 @@ import { dictionaryList, languageList } from './languages';
 import { set } from 'lodash';
 
 export const LanguageContext = createContext({
-  userLanguage: 'ka',
-  dictionary: dictionaryList.ka,
+  userLanguage: 'en',
+  dictionary: dictionaryList.en,
   userLanguageChange: () => { },
   languageId: null,
   languages: []
 });
 
 export function LanguageProvider({ children }) {
-  const [userLanguage, setUserLanguage] = useState('ka');
-  const [dictionary, setDictionary] = useState(dictionaryList.ka);
+  const [userLanguage, setUserLanguage] = useState('en');
+  const [dictionary, setDictionary] = useState(dictionaryList.en);
   const [isReady, setIsReady] = useState(false);
   const [languages, setLanguages] = useState(null);
   const [languageId, setLanguageId] = useState(null);
@@ -64,7 +64,7 @@ export function LanguageProvider({ children }) {
     // Only set language if not already initialized to avoid overriding user selection
     if (!hasInitialized) {
       const savedLanguage = await getData('rcml-lang');
-      const lang = (savedLanguage && languageList[savedLanguage]) ? savedLanguage : 'ka';
+      const lang = (savedLanguage && languageList[savedLanguage]) ? savedLanguage : 'en';
       console.log('🔧 Initial language setup:', lang);
       setUserLanguage(lang);
       setDictionary(dictionaryList[lang]);
