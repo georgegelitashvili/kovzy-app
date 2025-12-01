@@ -78,18 +78,6 @@ export const OrdersListBase = ({ orderType }) => {
 
   const { dictionary, languageId } = useContext(LanguageContext);
 
-  const openURLInBrowser = async (url) => {
-    try {
-      const supported = await Linking.canOpenURL(url);
-      if (supported) {
-        await Linking.openURL(url);
-      } else {
-        console.log('Cannot open URL:', url);
-      }
-    } catch (error) {
-      console.log('Error opening URL:', error);
-    }
-  };
 
   // State for expanded/collapsed order cards
   const [isOpen, setOpenState] = useState([]);
