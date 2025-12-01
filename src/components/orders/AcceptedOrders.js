@@ -26,7 +26,6 @@ import OrdersDetail from "../OrdersDetail";
 import OrdersModal from "../modal/OrdersModal";
 import printRows from "../../PrintRows";
 import { useOrderDetails } from "../../hooks/useOrderDetails";
-import eventEmitter from "../../utils/EventEmitter";
 
 // This will be replaced with a dynamic calculation based on screen size
 const initialWidth = Dimensions.get("window").width;
@@ -182,20 +181,6 @@ export const AcceptedOrdersList = () => {
       // Clear order details cache when switching domains/branches
       clearOrderDetails();
     }
-    // Listen for forceLogout event to clear all orders and state
-    const logoutListener = () => {
-      setOrders([]);
-      setFees([]);
-      setCurrency("");
-      setOpenState([]);
-      setVisible(false);
-      setItemId(null);
-      setModalType("");
-    };
-    eventEmitter.addEventListener('forceLogout', logoutListener);
-    return () => {
-      eventEmitter.removeEventListener(logoutListener);
-    };
   }, [domain, branchid, apiOptions, clearOrderDetails]);
   
   // Optimize useFocusEffect to prevent excessive API calls
