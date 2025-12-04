@@ -11,8 +11,9 @@ import useErrorDisplay from "../hooks/useErrorDisplay";
 
 export const DomainScreen = ({ navigation }) => {
   // All hooks must be called unconditionally and before any return
-  const { domain, setDomain, readDomain, intervalId } = useContext(AuthContext);
+  const { domain, setDomain, readDomain, intervalId, checkDomain, isLoading, setIsLoading } = useContext(AuthContext);
   const [inputDomain, setInputDomain] = useState({ value: domain || '', error: '' });
+  const [isChecking, setIsChecking] = useState(false);
   const { dictionary } = useContext(LanguageContext);
   const { errorDisplay, error, setError, clearError } = useErrorDisplay();
 
@@ -31,23 +32,47 @@ export const DomainScreen = ({ navigation }) => {
   const onCheckPressed = async () => {
     clearError();
 
-    if (!inputDomain.value.trim()) {
-      setError({ type: "VALIDATION_ERROR", message: "Domain is required" });
+    const trimmedDomain = inputDomain.value.trim();
+
+    if (!trimmedDomain) {
+      setError({ type: "VALIDATION_ERROR", message: dictionary?.['errors.DOMAIN_REQUIRED'] || "Domain is required" });
       return;
     }
 
     // domainValidator returns a string error or empty string
-    const domainError = domainValidator(inputDomain.value.trim());
+    const domainError = domainValidator(trimmedDomain);
     if (domainError && typeof domainError === 'string' && domainError.length > 0) {
       setError({ type: "VALIDATION_ERROR", message: domainError });
       return;
     }
 
-    // Only save and set valid domain
-    await storeData("domain", inputDomain.value.trim());
-    setDomain(inputDomain.value.trim());
-    await readDomain();
-    navigation.navigate("Branch");
+    // Validate domain exists in the backend system
+    setIsChecking(true);
+    try {
+      const result = await checkDomain(trimmedDomain);
+      
+      if (!result.success) {
+        // Domain not found or validation failed
+        setError({
+          type: result.error?.type || "WEBSITE_NOT_FOUND",
+          message: result.error?.message || dictionary?.['errors.WEBSITE_NOT_FOUND'] || "Website not found"
+        });
+        return;
+      }
+
+      // Domain is valid - save and navigate
+      await storeData("domain", trimmedDomain);
+      setDomain(trimmedDomain);
+      await readDomain();
+      navigation.navigate("Branch");
+    } catch (err) {
+      setError({
+        type: "DOMAIN_CHECK_ERROR",
+        message: err.message || dictionary?.['errors.DOMAIN_CHECK_ERROR'] || "Failed to verify domain"
+      });
+    } finally {
+      setIsChecking(false);
+    }
   };
 
   useEffect(() => {
@@ -88,9 +113,10 @@ export const DomainScreen = ({ navigation }) => {
         textColor="white"
         buttonColor="#000"
         onPress={onCheckPressed}
-        disabled={!inputDomain.value.trim()}
+        disabled={!inputDomain.value.trim() || isChecking}
+        loading={isChecking}
       >
-        {dictionary['save']}
+        {isChecking ? (dictionary?.['checking'] || 'Checking...') : (dictionary?.['save'] || 'Save')}
       </Button>
     </Background>
   );

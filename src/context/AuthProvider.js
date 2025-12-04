@@ -45,6 +45,16 @@ export const AuthProvider = ({ isConnected, children }) => {
   // ყველა Context Hook ერთდროულად
   const { setAvailableLanguages, userLanguageChange, dictionary } = useContext(LanguageContext);
 
+  // Helper to build API URL for a specific domain (used for domain validation before setting domain state)
+  const buildApiUrl = useCallback((domainValue, endpoint) => {
+    try {
+      const url = new URL(`https://${domainValue}`);
+      return `${url.origin}/api/v1/admin/${endpoint}`;
+    } catch {
+      return null;
+    }
+  }, []);
+
   // apiUrls useMemo ადრე, რომ useFetchLanguages-სთვის მზად იყოს
   const apiUrls = useMemo(() => {
     if (!domain) return null;
@@ -57,6 +67,7 @@ export const AuthProvider = ({ isConnected, children }) => {
         deliveronStatus: `${url.origin}/api/v1/admin/deliveronStatus`,
         authUser: `${url.origin}/api/v1/admin/auth/authorized`,
         languages: `${url.origin}/api/v1/admin/languages`,
+        checkDomain: `${url.origin}/api/v1/admin/checkDomain`,
       };
     } catch {
       return null;
@@ -122,6 +133,48 @@ export const AuthProvider = ({ isConnected, children }) => {
       return false;
     }
   }, [handleError]);
+
+  // Validate domain exists in the backend system before saving
+  const checkDomain = useCallback(async (domainValue) => {
+    try {
+      const checkDomainUrl = buildApiUrl(domainValue, 'checkDomain');
+      if (!checkDomainUrl) {
+        return { success: false, error: { type: 'INVALID_DOMAIN', message: 'Invalid domain format' } };
+      }
+
+      const response = await axiosInstance.post(checkDomainUrl, { domain: domainValue });
+      
+      // Success response: { message: "Ok" }
+      if (response?.data?.message === 'Ok') {
+        return { success: true };
+      }
+      
+      return { success: false, error: { type: 'DOMAIN_CHECK_ERROR', message: 'Unexpected response' } };
+    } catch (error) {
+      // Handle API error response: { error: { message, code, status } }
+      const apiError = error.response?.data?.error;
+      if (apiError) {
+        return {
+          success: false,
+          error: {
+            type: apiError.code || 'DOMAIN_CHECK_ERROR',
+            message: apiError.message || dictionary?.['errors.WEBSITE_NOT_FOUND'] || 'Website not found',
+            status: apiError.status
+          }
+        };
+      }
+      
+      // Handle network/other errors
+      const errorMessage = error.message || dictionary?.['errors.DOMAIN_CHECK_ERROR'] || 'Domain check failed';
+      return {
+        success: false,
+        error: {
+          type: error.type || 'DOMAIN_CHECK_ERROR',
+          message: errorMessage
+        }
+      };
+    }
+  }, [buildApiUrl, dictionary]);
 
   const readRestData = useCallback(async () => {
     try {
@@ -323,6 +376,7 @@ export const AuthProvider = ({ isConnected, children }) => {
     readRestData,
     handleError,
     languages,
+    checkDomain,
   }), [
     domain,
     user,
@@ -342,6 +396,7 @@ export const AuthProvider = ({ isConnected, children }) => {
     handleError,
     languages,
     clearErrors,
+    checkDomain,
   ]);
 
   return (
