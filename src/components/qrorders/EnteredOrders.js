@@ -26,6 +26,7 @@ import printRows from "../../PrintRows";
 import NotificationSound from '../../utils/NotificationSound';
 import NotificationManager from '../../utils/NotificationManager';
 import { useOrderDetails } from "../../hooks/useOrderDetails";
+import eventEmitter from "../../utils/EventEmitter";
 
 const initialWidth = Dimensions.get("window").width;
 const getColumnsByScreenSize = (screenWidth) => {
@@ -73,7 +74,8 @@ export const EnteredOrdersList = () => {
   const [isOpen, setOpenState] = useState([]);
   const [modalType, setModalType] = useState("");
   const [loading, setLoading] = useState(true);
-  const [loadingOptions, setLoadingOptions] = useState(false);  const [isPickerVisible, setPickerVisible] = useState(false);
+  const [loadingOptions, setLoadingOptions] = useState(false);
+  const [isPickerVisible, setPickerVisible] = useState(false);
   const [width, setWidth] = useState(Dimensions.get('window').width);
   const [numColumns, setNumColumns] = useState(getColumnsByScreenSize(width));
   const [cardSize, setCardSize] = useState(getCardSize(width, numColumns));
@@ -100,19 +102,20 @@ export const EnteredOrdersList = () => {
   };
 
   const toggleContent = useCallback((value) => {
-    if (isOpen.includes(value)) {
-      // Currently collapsed - expand it by removing from the closed list
-      setOpenState(isOpen.filter((i) => i !== value));
-      
-      // Lazy load: fetch order details when expanding if not already loaded
-      if (!orderDetails[value]) {
-        fetchOrderDetailsLazy(value);
+    setOpenState(prev => {
+      if (prev.includes(value)) {
+        // Currently collapsed - expand it by removing from the closed list
+        return prev.filter((i) => i !== value);
+      } else {
+        // Currently expanded - collapse it by adding to the closed list
+        // Lazy load: fetch order details when expanding if not already loaded
+        if (!orderDetails[value]) {
+          fetchOrderDetailsLazy(value);
+        }
+        return [...prev, value];
       }
-    } else {
-      // Currently expanded - collapse it by adding to the closed list
-      setOpenState([...isOpen, value]);
-    }
-  }, [isOpen, orderDetails, fetchOrderDetailsLazy]);
+    });
+  }, [orderDetails, fetchOrderDetailsLazy]);
 
   const handleReload = async () => {
     await Updates.reloadAsync();

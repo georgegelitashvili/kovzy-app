@@ -26,6 +26,7 @@ import OrdersDetail from "../OrdersDetail";
 import OrdersModal from "../modal/OrdersModal";
 import printRows from "../../PrintRows";
 import { useOrderDetails } from "../../hooks/useOrderDetails";
+import eventEmitter from "../../utils/EventEmitter";
 
 // This will be replaced with a dynamic calculation based on screen size
 const initialWidth = Dimensions.get("window").width;
@@ -82,17 +83,18 @@ export const AcceptedOrdersList = () => {
   const decrement = () => { setPage(page - 1); setLoading(true) };
 
   const toggleContent = useCallback((value) => {
-    if (isOpen.includes(value)) {
-      setOpenState(isOpen.filter((i) => i !== value));
-    } else {
-      setOpenState([...isOpen, value]);
-      
-      // Lazy load: fetch order details when expanding if not already loaded
-      if (!getOrderDetails(value) || getOrderDetails(value).length === 0) {
-        fetchOrderDetailsLazy(value);
+    setOpenState(prev => {
+      if (prev.includes(value)) {
+        return prev.filter((i) => i !== value);
+      } else {
+        // Lazy load: fetch order details when expanding if not already loaded
+        if (!getOrderDetails(value) || getOrderDetails(value).length === 0) {
+          fetchOrderDetailsLazy(value);
+        }
+        return [...prev, value];
       }
-    }
-  }, [isOpen, getOrderDetails, fetchOrderDetailsLazy]);
+    });
+  }, [getOrderDetails, fetchOrderDetailsLazy]);
 
   useEffect(() => {
     const updateLayout = () => {
@@ -181,6 +183,21 @@ export const AcceptedOrdersList = () => {
       // Clear order details cache when switching domains/branches
       clearOrderDetails();
     }
+    
+    // Listen for forceLogout event to clear all orders and state
+    const logoutListener = () => {
+      setOrders([]);
+      setFees([]);
+      setCurrency("");
+      setOpenState([]);
+      setVisible(false);
+      setItemId(null);
+      clearOrderDetails();
+    };
+    eventEmitter.addEventListener('forceLogout', logoutListener);
+    return () => {
+      eventEmitter.removeEventListener(logoutListener);
+    };
   }, [domain, branchid, apiOptions, clearOrderDetails]);
   
   // Optimize useFocusEffect to prevent excessive API calls
