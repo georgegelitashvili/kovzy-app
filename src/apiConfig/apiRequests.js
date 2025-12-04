@@ -388,7 +388,10 @@ const handleApiError = async (error, dictionary) => {
       const apiError = error.response.data.error;
       errorMessage = apiError.message || '';
       errorType = apiError.code || 'API_ERROR';
-      statusCode = apiError.status || statusCode;
+      // Only override statusCode if apiError.status is a valid number
+      if (typeof apiError.status === 'number' && apiError.status > 0) {
+        statusCode = apiError.status;
+      }
       
       // Determine if this error should be shown to user based on status code
       if ([404, 422, 503].includes(statusCode)) {
@@ -556,7 +559,7 @@ axiosInstance.interceptors.response.use(
       
       // Check errorMsg for session expired vs invalid credentials (supports new error format)
       const errorMsg = error.response?.data?.error?.message || error.response?.error?.message || "";
-      const errorCode = error.response?.data?.error?.code || "";
+      const errorCode = error.response?.data?.error?.code || null;
       
       // If errorMsg contains 'სესია' or 'session' and does NOT contain 'match', 'credentials', 'user', treat as session expired
       if (
