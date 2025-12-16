@@ -5,7 +5,8 @@ import {
   View,
   TouchableOpacity,
   ActivityIndicator,
-  FlatList
+  FlatList,
+  Linking
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { Text, Divider, Card } from "react-native-paper";
@@ -61,6 +62,9 @@ export const OrdersListBase = ({ orderType }) => {
     isOrderLoading
   } = useOrderDetails();
 
+  useEffect(() => {
+  }, [orderDetails]);
+
   const [optionsIsLoaded, setOptionsIsLoaded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadingOptions, setLoadingOptions] = useState(false);
@@ -73,6 +77,7 @@ export const OrdersListBase = ({ orderType }) => {
   const [cardSize, setCardSize] = useState(getCardSize(width, numColumns));
 
   const { dictionary, languageId } = useContext(LanguageContext);
+
 
   // State for expanded/collapsed order cards
   const [isOpen, setOpenState] = useState([]);
@@ -104,6 +109,7 @@ export const OrdersListBase = ({ orderType }) => {
   }, []);
 
   const fetchAcceptedOrders = async (appliedFilters = filters, reset = false) => {
+    console.log(`🔄 fetchAcceptedOrders called - reset: ${reset}, orders count: ${orders.length}`);
     if (!user || !options.url_getOrdersLogs) return;
     // Do NOT clearOrderDetails here; only do it in handleApplyFilters or initial load
 
@@ -221,9 +227,15 @@ export const OrdersListBase = ({ orderType }) => {
 
   useFocusEffect(
     React.useCallback(() => {
-      fetchAcceptedOrders(filters, true);
+      // Only fetch on initial load or if orders are empty
+      if (orders.length === 0) {
+        console.log('🔄 Screen focused, fetching initial orders');
+        fetchAcceptedOrders(filters, true);
+      } else {
+        console.log('🔄 Screen focused, orders already loaded, skipping fetch');
+      }
       return () => { };
-    }, [options, branchid, languageId, filters])
+    }, [options, branchid, languageId, filters, orders.length])
   );
 
   useEffect(() => {
