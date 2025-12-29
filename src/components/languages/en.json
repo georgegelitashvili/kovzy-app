@@ -482,6 +482,7 @@
     "dv.deliveronOff": "Please note that you will be disconnecting from courier services, and you will need to organize the delivery of the order yourself.",
     "settings": "Settings",
     "st.postponeOrder": "Planned orders",
+    "st.showCancelButton": "Show Cancel Button",
     "pr.warrning": "First check one of these checkboxes",
     "info.warning": "Warning",
     "selectMonth": "Select Month",

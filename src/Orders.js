@@ -13,6 +13,7 @@ import { PostponeOrders } from "./components/orders/PostponeOrders";
 import { AcceptedOrdersList } from "./components/orders/AcceptedOrders";
 import { LanguageContext } from "./components/Language";
 import { TabBarItem } from "./components/TabBarItem";
+import eventEmitter from "./utils/EventEmitter";
 
 const Tab = createMaterialTopTabNavigator();
 
@@ -66,6 +67,19 @@ export default function TabContent() {
     };
 
     loadStoredValue();
+
+    // Listen for storage changes
+    const handleSettingChange = (event) => {
+      if (event && typeof event.postponeOrderShow === 'boolean') {
+        setPostponeOrderShow(event.postponeOrderShow);
+      }
+    };
+
+    const listener = eventEmitter.addEventListener('postponeOrderSettingChanged', handleSettingChange);
+
+    return () => {
+      eventEmitter.removeEventListener(listener);
+    };
   }, []);
 
   const renderTabBar = props => {
