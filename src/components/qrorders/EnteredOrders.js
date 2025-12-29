@@ -88,7 +88,6 @@ export const EnteredOrdersList = () => {
   const isLanguageChangeInProgressRef = useRef(false);
   const isComponentMountedRef = useRef(false);
 
-  const [retryCount, setRetryCount] = useState(0);
   const MAX_RETRIES = 3;
   const RETRY_DELAY = 5000;
 
