@@ -383,39 +383,53 @@ const handleApiError = async (error, dictionary) => {
   }
   // Handle response errors
   else if (error.response) {
-    switch (statusCode) {
-      case 400:
-        errorType = 'BAD_REQUEST';
-        break;
-      case 401:
-        errorType = 'UNAUTHORIZED';
-        break;
-      case 403:
-        errorType = 'FORBIDDEN';
-        break;
-      case 404:
-        errorType = 'NOT_FOUND';
+    // Check for new API error format: { error: { message, code, status } }
+    if (error.response?.data?.error) {
+      const apiError = error.response.data.error;
+      errorMessage = apiError.message || '';
+      errorType = apiError.code || 'API_ERROR';
+      // Only override statusCode if apiError.status is a valid number
+      if (typeof apiError.status === 'number' && apiError.status > 0) {
+        statusCode = apiError.status;
+      }
+      
+      // Determine if this error should be shown to user based on status code
+      if ([404, 422, 503].includes(statusCode)) {
         showToUser = true;
-        break;
-      case 422:
-        errorType = 'VALIDATION_ERROR';
-        showToUser = true;
-        break;
-      case 500:
-        errorType = 'SERVER_ERROR';
-        break;
-      case 502:
-        errorType = error.config?.url?.includes('ngrok') ? 'NGROK_ERROR' : 'BAD_GATEWAY';
-        break;
-      case 503:
-        errorType = 'SERVICE_UNAVAILABLE';
-        showToUser = true;
-        break;
-      default:
-        if (error.response?.data?.error) {
-          errorType = 'API_ERROR';
-          errorMessage = error.response.data.error;
-        }
+      }
+    } else {
+      // Fallback to status code mapping for old format
+      switch (statusCode) {
+        case 400:
+          errorType = 'BAD_REQUEST';
+          break;
+        case 401:
+          errorType = 'UNAUTHORIZED';
+          break;
+        case 403:
+          errorType = 'FORBIDDEN';
+          break;
+        case 404:
+          errorType = 'NOT_FOUND';
+          showToUser = true;
+          break;
+        case 422:
+          errorType = 'VALIDATION_ERROR';
+          showToUser = true;
+          break;
+        case 500:
+          errorType = 'SERVER_ERROR';
+          break;
+        case 502:
+          errorType = error.config?.url?.includes('ngrok') ? 'NGROK_ERROR' : 'BAD_GATEWAY';
+          break;
+        case 503:
+          errorType = 'SERVICE_UNAVAILABLE';
+          showToUser = true;
+          break;
+        default:
+          errorType = 'UNKNOWN_ERROR';
+      }
     }
   }
 
@@ -543,8 +557,10 @@ axiosInstance.interceptors.response.use(
         return Promise.reject(error);
       }
       
-      // Check errorMsg for session expired vs invalid credentials
+      // Check errorMsg for session expired vs invalid credentials (supports new error format)
       const errorMsg = error.response?.data?.error?.message || error.response?.error?.message || "";
+      const errorCode = error.response?.data?.error?.code || null;
+      
       // If errorMsg contains 'სესია' or 'session' and does NOT contain 'match', 'credentials', 'user', treat as session expired
       if (
         typeof errorMsg === 'string' &&
@@ -554,6 +570,7 @@ axiosInstance.interceptors.response.use(
         try {
           await SecureStore.deleteItemAsync('token');
           await SecureStore.deleteItemAsync('user');
+          await SecureStore.deleteItemAsync('credentials');
           eventEmitter.emit('sessionExpired');
         } catch (e) {
           console.error('Error clearing auth data:', e);

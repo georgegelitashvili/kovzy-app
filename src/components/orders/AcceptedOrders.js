@@ -85,17 +85,18 @@ export const AcceptedOrdersList = () => {
   const decrement = () => { setPage(page - 1); setLoading(true) };
 
   const toggleContent = useCallback((value) => {
-    if (isOpen.includes(value)) {
-      setOpenState(isOpen.filter((i) => i !== value));
-    } else {
-      setOpenState([...isOpen, value]);
-      
-      // Lazy load: fetch order details when expanding if not already loaded
-      if (!getOrderDetails(value) || getOrderDetails(value).length === 0) {
-        fetchOrderDetailsLazy(value);
+    setOpenState(prev => {
+      if (prev.includes(value)) {
+        return prev.filter((i) => i !== value);
+      } else {
+        // Lazy load: fetch order details when expanding if not already loaded
+        if (!getOrderDetails(value) || getOrderDetails(value).length === 0) {
+          fetchOrderDetailsLazy(value);
+        }
+        return [...prev, value];
       }
-    }
-  }, [isOpen, getOrderDetails, fetchOrderDetailsLazy]);
+    });
+  }, [getOrderDetails, fetchOrderDetailsLazy]);
 
   useEffect(() => {
     const updateLayout = () => {
@@ -205,6 +206,7 @@ export const AcceptedOrdersList = () => {
       // Clear order details cache when switching domains/branches
       clearOrderDetails();
     }
+    
     // Listen for forceLogout event to clear all orders and state
     const logoutListener = () => {
       setOrders([]);
@@ -213,7 +215,7 @@ export const AcceptedOrdersList = () => {
       setOpenState([]);
       setVisible(false);
       setItemId(null);
-      setModalType("");
+      clearOrderDetails();
     };
     eventEmitter.addEventListener('forceLogout', logoutListener);
     return () => {
