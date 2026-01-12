@@ -1,9 +1,11 @@
-import React, { useContext } from "react";
+import React, { useContext, useState, useEffect } from "react";
 import { StyleSheet, View, TouchableOpacity, useWindowDimensions } from 'react-native';
 import { Text, Card, Divider } from 'react-native-paper';
 import { MaterialCommunityIcons, SimpleLineIcons } from '@expo/vector-icons';
 import OrdersDetail from '../OrdersDetail';
 import { String, LanguageContext } from "../Language";
+import { getShowCancelButtonSetting } from "../../helpers/settings";
+import eventEmitter from "../../utils/EventEmitter";
 
 const OrderCard = (props) => {
   // Ensure all props exist before destructuring
@@ -48,6 +50,28 @@ const OrderCard = (props) => {
 
   const { dictionary, languageId } = useContext(LanguageContext);
   const isScheduled = item.take_away ? scheduled.scheduled_takeaway : scheduled.scheduled_delivery;
+  const [showCancelButton, setShowCancelButton] = useState(false);
+
+  useEffect(() => {
+    const loadCancelButtonSetting = async () => {
+      const setting = await getShowCancelButtonSetting();
+      setShowCancelButton(setting);
+    };
+    loadCancelButtonSetting();
+
+    // Listen for storage changes
+    const handleSettingChange = (event) => {
+      if (event && typeof event.showCancelButton === 'boolean') {
+        setShowCancelButton(event.showCancelButton);
+      }
+    };
+
+    const listener = eventEmitter.addEventListener('cancelButtonSettingChanged', handleSettingChange);
+
+    return () => {
+      eventEmitter.removeEventListener(listener);
+    };
+  }, []);
 
   // Calculate responsive button dimensions
   const isSmallScreen = width < 400;
@@ -100,21 +124,23 @@ const OrderCard = (props) => {
           </TouchableOpacity>
         )}
 
-        <TouchableOpacity
-          style={[
-            styles.buttonReject, 
-            { 
-              width: buttonWidth, 
-              height: buttonHeight,
-              marginHorizontal: buttonMargin 
-            },
-            loading && styles.buttonDisabled
-          ]}
-          onPress={() => !loading && onReject(item.id)}
-          disabled={loading}
-        >
-          <MaterialCommunityIcons name="close-circle-outline" size={iconSize} color="white" />
-        </TouchableOpacity>
+        {showCancelButton && (
+          <TouchableOpacity
+            style={[
+              styles.buttonReject, 
+              { 
+                width: buttonWidth, 
+                height: buttonHeight,
+                marginHorizontal: buttonMargin 
+              },
+              loading && styles.buttonDisabled
+            ]}
+            onPress={() => !loading && onReject(item.id)}
+            disabled={loading}
+          >
+            <MaterialCommunityIcons name="close-circle-outline" size={iconSize} color="white" />
+          </TouchableOpacity>
+        )}
       </View>
     );
   };

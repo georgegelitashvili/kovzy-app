@@ -27,6 +27,7 @@ import OrdersModal from "../modal/OrdersModal";
 import printRows from "../../PrintRows";
 import { useOrderDetails } from "../../hooks/useOrderDetails";
 import eventEmitter from "../../utils/EventEmitter";
+import { getShowCancelButtonSetting } from "../../helpers/settings";
 
 // This will be replaced with a dynamic calculation based on screen size
 const initialWidth = Dimensions.get("window").width;
@@ -76,6 +77,7 @@ export const AcceptedOrdersList = () => {
   const [width, setWidth] = useState(Dimensions.get('window').width);
   const [numColumns, setNumColumns] = useState(getColumnsByScreenSize(width));
   const [cardSize, setCardSize] = useState(getCardSize(width, numColumns));
+  const [showCancelButton, setShowCancelButton] = useState(false);
 
   const { dictionary, languageId } = useContext(LanguageContext);
 
@@ -107,6 +109,27 @@ export const AcceptedOrdersList = () => {
 
     const subscription = Dimensions.addEventListener('change', updateLayout);
     return () => subscription?.remove();
+  }, []);
+
+  useEffect(() => {
+    const loadCancelButtonSetting = async () => {
+      const setting = await getShowCancelButtonSetting();
+      setShowCancelButton(setting);
+    };
+    loadCancelButtonSetting();
+
+    // Listen for storage changes
+    const handleSettingChange = (event) => {
+      if (event && typeof event.showCancelButton === 'boolean') {
+        setShowCancelButton(event.showCancelButton);
+      }
+    };
+
+    const listener = eventEmitter.addEventListener('cancelButtonSettingChanged', handleSettingChange);
+
+    return () => {
+      eventEmitter.removeEventListener(listener);
+    };
   }, []);
 
   const apiOptions = useCallback(() => {
@@ -362,15 +385,17 @@ export const AcceptedOrdersList = () => {
                   <MaterialCommunityIcons name="check-decagram-outline" size={30} color="white" />
                 </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={styles.buttonReject}
-                  onPress={() => {
-                    setItemId(item.id);
-                    showModal("reject");
-                  }}
-                >
-                  <MaterialCommunityIcons name="close-circle-outline" size={30} color="white" />
-                </TouchableOpacity>
+                {showCancelButton && (
+                  <TouchableOpacity
+                    style={styles.buttonReject}
+                    onPress={() => {
+                      setItemId(item.id);
+                      showModal("reject");
+                    }}
+                  >
+                    <MaterialCommunityIcons name="close-circle-outline" size={30} color="white" />
+                  </TouchableOpacity>
+                )}
               </Card.Actions>
 
             </Card.Content>
