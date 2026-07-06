@@ -13,18 +13,13 @@ const useInAppUpdates = ({
     playStoreUrl = "https://play.google.com/store/apps/details?id=com.kovzy.app"
 } = {}) => {
     useEffect(() => {
-        if (__DEV__) {
-            showLogs && console.log("⏭ Skipping update check in dev mode");
+        if (__DEV__ || !Updates.isEnabled) {
+            showLogs && console.log("⏭ Skipping update check (dev mode or updates disabled)");
             return;
         }
 
         if (Platform.OS !== "android") {
             showLogs && console.log("⏭ Not Android, skipping update check");
-            return;
-        }
-
-        if (!Updates || typeof Updates.checkForUpdateAsync !== "function") {
-            showLogs && console.log("❌ expo-updates not available");
             return;
         }
 

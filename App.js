@@ -60,17 +60,20 @@ function App() {
     }
   }, [netInfo.isConnected]);
 
-  // Update checker
+  // OTA update checker — not supported in Expo Go or dev mode
   useEffect(() => {
+    if (__DEV__ || !Updates.isEnabled) {
+      return;
+    }
+
     const checkForUpdates = async () => {
       try {
         const update = await Updates.checkForUpdateAsync();
         if (update.isAvailable) {
           await Updates.fetchUpdateAsync();
-          Updates.reloadAsync();
+          await Updates.reloadAsync();
         }
       } catch (error) {
-        // Don't show update errors to user
         console.error('Error checking for updates:', error);
         Sentry.captureException(error);
       }
