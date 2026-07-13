@@ -4,12 +4,29 @@ import { removeData } from "../helpers/storage";
 import eventEmitter from "../utils/EventEmitter";
 import { getSecureData } from '../helpers/storage';
 import NetInfo from '@react-native-community/netinfo';
+import {
+  USER_VISIBLE_ERROR_TYPES,
+  shouldShowError,
+} from '../utils/ErrorConstants';
+import {
+  reportConnectionFailure,
+  reportConnectionSuccess,
+} from '../utils/connectionMonitor';
+
+const shouldSkipConnectionMonitor = (url = '') =>
+  /\/auth\/login|checkDomain|\/branches(?:\?|$)/i.test(url);
 
 const cache = new Map();
 const CACHE_DURATION = 5 * 60 * 1000;
 const RETRY_DELAY = 200;
 const MAX_RETRIES = 1;
 const INITIAL_TIMEOUT = 5000;
+
+const devLog = (...args) => {
+  if (__DEV__) {
+    console.log(...args);
+  }
+};
 
 // Enhanced domain validation
 const isValidDomain = (url) => {
@@ -38,16 +55,16 @@ const isValidDomain = (url) => {
 
 // Enhanced error detection function
 const detectSpecificError = async (error, url) => {
-  console.log('=== DETAILED ERROR ANALYSIS ===');
-  console.log('Error object keys:', Object.keys(error));
-  console.log('Error message:', error.message);
-  console.log('Error code:', error.code);
-  console.log('Error cause:', error.cause);
-  console.log('Error errno:', error.errno);
-  console.log('Error syscall:', error.syscall);
-  console.log('Error hostname:', error.hostname);
-  console.log('Error stack (first 500 chars):', error.stack?.substring(0, 500));
-  console.log('Config URL:', error.config?.url);
+  devLog('=== DETAILED ERROR ANALYSIS ===');
+  devLog('Error object keys:', Object.keys(error));
+  devLog('Error message:', error.message);
+  devLog('Error code:', error.code);
+  devLog('Error cause:', error.cause);
+  devLog('Error errno:', error.errno);
+  devLog('Error syscall:', error.syscall);
+  devLog('Error hostname:', error.hostname);
+  devLog('Error stack (first 500 chars):', error.stack?.substring(0, 500));
+  devLog('Config URL:', error.config?.url);
 
   const errorInfo = {
     type: 'NETWORK_ERROR',
@@ -57,7 +74,7 @@ const detectSpecificError = async (error, url) => {
 
   // 1. Pre-validate domain format
   if (url && !isValidDomain(url)) {
-    console.log('❌ Invalid domain format detected');
+    devLog('❌ Invalid domain format detected');
     return {
       type: 'INVALID_DOMAIN',
       isSpecific: true,
@@ -73,7 +90,7 @@ const detectSpecificError = async (error, url) => {
   const errorSyscall = (error.syscall || '').toLowerCase();
   const errorHostname = error.hostname || '';
 
-  console.log('Checking error patterns in:', {
+  devLog('Checking error patterns in:', {
     message: errorMessage,
     stack: errorStack.substring(0, 200),
     cause: errorCause,
@@ -109,7 +126,7 @@ const detectSpecificError = async (error, url) => {
   const isDnsError = dnsPatterns.some(pattern => pattern.test(allErrorText));
 
   if (isDnsError) {
-    console.log('🔍 DNS error pattern matched:', dnsPatterns.find(p => p.test(allErrorText)));
+    devLog('🔍 DNS error pattern matched:', dnsPatterns.find(p => p.test(allErrorText)));
     return {
       type: 'INVALID_DOMAIN',
       isSpecific: true,
@@ -119,7 +136,7 @@ const detectSpecificError = async (error, url) => {
 
   // 3. Check for specific syscalls that indicate DNS issues
   if (errorSyscall === 'getaddrinfo') {
-    console.log('🔍 getaddrinfo syscall detected - likely DNS issue');
+    devLog('🔍 getaddrinfo syscall detected - likely DNS issue');
     return {
       type: 'INVALID_DOMAIN',
       isSpecific: true,
@@ -135,7 +152,7 @@ const detectSpecificError = async (error, url) => {
   ];
 
   if (connectionRefusedPatterns.some(pattern => pattern.test(allErrorText))) {
-    console.log('🔍 Connection refused pattern matched');
+    devLog('🔍 Connection refused pattern matched');
     return {
       type: 'CONNECTION_REFUSED',
       isSpecific: true,
@@ -155,7 +172,7 @@ const detectSpecificError = async (error, url) => {
   ];
 
   if (sslPatterns.some(pattern => pattern.test(allErrorText))) {
-    console.log('🔍 SSL error pattern matched');
+    devLog('🔍 SSL error pattern matched');
     return {
       type: 'SSL_ERROR',
       isSpecific: true,
@@ -171,7 +188,7 @@ const detectSpecificError = async (error, url) => {
   ];
 
   if (errorCode === 'ECONNABORTED' || timeoutPatterns.some(pattern => pattern.test(allErrorText))) {
-    console.log('🔍 Timeout pattern matched');
+    devLog('🔍 Timeout pattern matched');
     return {
       type: 'REQUEST_TIMEOUT',
       isSpecific: true,
@@ -182,9 +199,9 @@ const detectSpecificError = async (error, url) => {
   // 7. Check network connectivity
   try {
     const netInfo = await NetInfo.fetch();
-    console.log('Network info:', netInfo);
+    devLog('Network info:', netInfo);
     if (!netInfo.isConnected || !netInfo.isInternetReachable) {
-      console.log('🔍 No internet connection detected');
+      devLog('🔍 No internet connection detected');
       return {
         type: 'NO_INTERNET',
         isSpecific: true,
@@ -192,7 +209,7 @@ const detectSpecificError = async (error, url) => {
       };
     }
   } catch (netError) {
-    console.log('NetInfo check failed:', netError);
+    devLog('NetInfo check failed:', netError);
   }
 
   // 8. Enhanced domain analysis for ERR_NETWORK without external dependencies
@@ -201,7 +218,7 @@ const detectSpecificError = async (error, url) => {
       const urlObj = new URL(url);
       const domain = urlObj.hostname;
 
-      console.log('🔍 Analyzing domain:', domain);
+      devLog('🔍 Analyzing domain:', domain);
 
       // Check if it's a localhost or development domain that should work
       const developmentPatterns = [
@@ -217,7 +234,7 @@ const detectSpecificError = async (error, url) => {
       const isDevelopmentDomain = developmentPatterns.some(pattern => pattern.test(domain));
 
       if (isDevelopmentDomain) {
-        console.log('🏠 Development domain detected, likely connection issue rather than invalid domain');
+        devLog('🏠 Development domain detected, likely connection issue rather than invalid domain');
         return {
           type: 'CONNECTION_REFUSED',
           isSpecific: true,
@@ -240,7 +257,7 @@ const detectSpecificError = async (error, url) => {
       const isSuspiciousDomain = suspiciousPatterns.some(pattern => pattern.test(domain));
 
       if (isSuspiciousDomain) {
-        console.log('⚠️ Suspicious domain pattern detected, likely invalid:', domain);
+        devLog('⚠️ Suspicious domain pattern detected, likely invalid:', domain);
         return {
           type: 'INVALID_DOMAIN',
           isSpecific: true,
@@ -252,7 +269,7 @@ const detectSpecificError = async (error, url) => {
       // ERR_NETWORK is most likely an invalid domain
       if (domain.includes('.com') || domain.includes('.org') || domain.includes('.net') ||
         domain.includes('.io') || domain.includes('.co')) {
-        console.log('🌐 Production domain with ERR_NETWORK likely means invalid domain');
+        devLog('🌐 Production domain with ERR_NETWORK likely means invalid domain');
         return {
           type: 'INVALID_DOMAIN',
           isSpecific: true,
@@ -261,44 +278,15 @@ const detectSpecificError = async (error, url) => {
       }
 
     } catch (urlError) {
-      console.log('❌ URL parsing failed:', urlError);
+      devLog('❌ URL parsing failed:', urlError);
     }
   }
 
-  console.log('❓ Could not determine specific error type');
+  devLog('❓ Could not determine specific error type');
   return errorInfo;
 };
 
 // Remove the DNS test function since it's causing issues
-
-// ONLY these errors should be shown to users
-const USER_VISIBLE_ERROR_TYPES = [
-  'NETWORK_ERROR',
-  'NOT_FOUND',
-  'INVALID_DOMAIN',
-  'CONNECTION_REFUSED',
-  'SSL_ERROR',
-  'REQUEST_TIMEOUT',
-  'NO_INTERNET'
-];
-
-// Updated technical error patterns
-const TECHNICAL_ERROR_PATTERNS = [
-  /failed to load/i,
-  /music/i,
-  /audio/i,
-  /sound/i,
-  /cannot read/i,
-  /undefined/i,
-  /null/i,
-  /function/i,
-  /error code/i,
-  /exception/i,
-  /stack/i,
-  /syntax/i,
-  /reference/i,
-  /type error/i
-];
 
 const axiosInstance = axios.create({
   timeout: INITIAL_TIMEOUT,
@@ -325,25 +313,13 @@ const checkInternetConnection = async () => {
   return netInfo.isConnected && netInfo.isInternetReachable;
 };
 
-const shouldShowError = (errorType, errorMessage) => {
-  if (!USER_VISIBLE_ERROR_TYPES.includes(errorType)) {
-    return false;
-  }
-
-  if (errorMessage && TECHNICAL_ERROR_PATTERNS.some(pattern => pattern.test(errorMessage))) {
-    return false;
-  }
-
-  return true;
-};
-
 const handleApiError = async (error, dictionary) => {
   let errorType = 'UNKNOWN';
   let errorMessage = '';
   let statusCode = error.response?.status;
   let showToUser = false;
 
-  console.log('Raw error:', error);
+  devLog('Raw error:', error);
 
   // Use enhanced error detection for network errors
   if (!error.response && error.code === 'ERR_NETWORK') {
@@ -355,30 +331,30 @@ const handleApiError = async (error, dictionary) => {
     // Set appropriate error messages
     switch (errorType) {
       case 'INVALID_DOMAIN':
-        errorMessage = dictionary?.['errors.INVALID_DOMAIN'] || 'დომენი არასწორია ან არ არსებობს';
+        errorMessage = dictionary?.['errors.INVALID_DOMAIN'] || 'Invalid domain entered. Please try again.';
         break;
       case 'CONNECTION_REFUSED':
-        errorMessage = dictionary?.['errors.CONNECTION_REFUSED'] || 'სერვერი კავშირს უარყოფს';
+        errorMessage = dictionary?.['errors.CONNECTION_REFUSED'] || 'Unable to connect to the server. Please check the domain and try again.';
         break;
       case 'SSL_ERROR':
-        errorMessage = dictionary?.['errors.SSL_ERROR'] || 'SSL სერტიფიკატის პრობლემა';
+        errorMessage = dictionary?.['errors.SSL_ERROR'] || 'Secure connection failed. Please check the domain and try again.';
         break;
       case 'REQUEST_TIMEOUT':
-        errorMessage = dictionary?.['errors.REQUEST_TIMEOUT'] || 'მოთხოვნის დრო ამოიწურა';
+        errorMessage = dictionary?.['errors.REQUEST_TIMEOUT'] || 'The request timed out. Please try again.';
         break;
       case 'NO_INTERNET':
-        errorMessage = dictionary?.['errors.NO_INTERNET'] || 'ინტერნეტ კავშირი არ არის';
+        errorMessage = dictionary?.['errors.NO_INTERNET'] || 'No internet connection. Please check your network and try again.';
         break;
       default:
-        errorMessage = dictionary?.['errors.NETWORK_ERROR'] || 'ქსელთან კავშირის პრობლემა';
+        errorMessage = dictionary?.['errors.NETWORK_ERROR'] || 'Network connection problem';
     }
 
-    console.log(`Enhanced error detection: ${errorType} - ${specificError.details || 'No additional details'}`);
+    devLog(`Enhanced error detection: ${errorType} - ${specificError.details || 'No additional details'}`);
   }
   // Handle timeout errors specifically
   else if (!error.response && error.code === 'ECONNABORTED') {
     errorType = 'REQUEST_TIMEOUT';
-    errorMessage = dictionary?.['errors.REQUEST_TIMEOUT'] || 'მოთხოვნის დრო ამოიწურა';
+    errorMessage = dictionary?.['errors.REQUEST_TIMEOUT'] || 'The request timed out. Please try again.';
     showToUser = true;
   }
   // Handle response errors
@@ -451,18 +427,8 @@ const handleApiError = async (error, dictionary) => {
     response: error.response?.data
   });
 
-  // Only show errors to the user if they are explicitly allowed
-  if (showToUser) {
-    eventEmitter.emit('showToast', {
-      type: 'failed',
-      title: dictionary ? dictionary["info.warning"] : 'Error',
-      subtitle: errorMessage
-    });
-
-    if (global.errorHandler) {
-      global.errorHandler.setError(errorType, errorMessage);
-    }
-  }
+  // Callers and AuthProvider/screen ErrorDisplay handle user-facing UI.
+  // Avoid emitting showToast here to prevent duplicate toasts with local error handlers.
 
   return {
     type: errorType,
@@ -477,6 +443,8 @@ const handleApiError = async (error, dictionary) => {
 axiosInstance.interceptors.request.use(
   async (config) => {
     try {
+      clearCache();
+
       // Pre-validate domain before making request
       if (config.url && !isValidDomain(config.url)) {
         const customError = new Error('Invalid domain format');
@@ -506,7 +474,11 @@ axiosInstance.interceptors.request.use(
           dictionary = languageContext.dictionary;
         }
       } catch (e) { }
-      return Promise.reject(await handleApiError(error, dictionary));
+      const formattedError = await handleApiError(error, dictionary);
+      if (!shouldSkipConnectionMonitor(config?.url)) {
+        reportConnectionFailure(formattedError, { url: config?.url });
+      }
+      return Promise.reject(formattedError);
     }
   },
   async (error) => {
@@ -518,13 +490,19 @@ axiosInstance.interceptors.request.use(
         dictionary = languageContext.dictionary;
       }
     } catch (e) { }
-    return Promise.reject(await handleApiError(error, dictionary));
+    const formattedError = await handleApiError(error, dictionary);
+    reportConnectionFailure(formattedError);
+    return Promise.reject(formattedError);
   }
 );
 
 // Response interceptor
 axiosInstance.interceptors.response.use(
   (response) => {
+    if (!shouldSkipConnectionMonitor(response.config?.url)) {
+      reportConnectionSuccess();
+    }
+
     if (response.config.method === 'get') {
       const cacheKey = `${response.config.url}${JSON.stringify(response.config.params || {})}`;
       cache.set(cacheKey, {
@@ -553,7 +531,7 @@ axiosInstance.interceptors.response.use(
     if (error.response?.status === 401) {
       // Skip interceptor handling for login endpoints - let the login function handle it
       if (originalRequest.url && originalRequest.url.includes('/auth/login')) {
-        console.log('[API Interceptor] Skipping 401 handling for login endpoint, letting login function handle it');
+        devLog('[API Interceptor] Skipping 401 handling for login endpoint, letting login function handle it');
         return Promise.reject(error);
       }
       
@@ -588,11 +566,11 @@ axiosInstance.interceptors.response.use(
       originalRequest._retry = (originalRequest._retry || 0) + 1;
 
       if (originalRequest._retry <= MAX_RETRIES) {
-        console.log(`Retrying request (${originalRequest._retry}/${MAX_RETRIES})...`);
+        devLog(`Retrying request (${originalRequest._retry}/${MAX_RETRIES})...`);
 
         const isConnected = await checkInternetConnection();
         if (!isConnected) {
-          console.log('No internet connection, waiting before retry...');
+          devLog('No internet connection, waiting before retry...');
           await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * 2));
         }
 
@@ -606,6 +584,13 @@ axiosInstance.interceptors.response.use(
     }
 
     const formattedError = await handleApiError(error, dictionary);
+
+    if (!shouldSkipConnectionMonitor(originalRequest?.url || error.config?.url)) {
+      reportConnectionFailure(formattedError, {
+        url: originalRequest?.url || error.config?.url,
+      });
+    }
+
     return Promise.reject(formattedError);
   }
 );

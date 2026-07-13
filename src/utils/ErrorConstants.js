@@ -6,15 +6,21 @@
  * patterns for filtering technical errors, etc.
  */
 
-// ONLY these errors should be shown to users - any other error types will be completely ignored
+// ONLY these errors should be shown to users - any other error types will be completely ignored.
+// NETWORK_ERROR is intentionally omitted; it is suppressed in useErrorHandler and Toast.
 export const USER_VISIBLE_ERROR_TYPES = [
-  'NETWORK_ERROR',     // Only show network connectivity issues
   'NOT_FOUND',          // Only show when requested data is not found
   'LOGIN_ERROR',        // Show login errors to users
   'VALIDATION_ERROR',   // Only show validation errors
   'BRANCH_TEMPORARILY_CLOSED', // Only show when branch is temporarily closed
   'SESSION_EXPIRED',    // Show when session expires
   'INVALID_DOMAIN',     // Show invalid domain errors
+  'WEBSITE_NOT_FOUND',  // Show when domain/website is not found
+  'DOMAIN_CHECK_ERROR', // Show when domain verification fails
+  'CONNECTION_REFUSED', // Show connection refused errors
+  'SSL_ERROR',          // Show SSL/TLS errors
+  'REQUEST_TIMEOUT',    // Show request timeout errors
+  'NO_INTERNET',        // Show no internet errors
   'FETCH_BRANCH_ERROR', // Show branch fetching errors
   'GENERAL',            // Show general errors
   'SERVER_ERROR',       // Show server errors

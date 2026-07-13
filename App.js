@@ -8,7 +8,6 @@ import { useNetInfo } from '@react-native-community/netinfo';
 import { useKeepAwake } from 'expo-keep-awake';
 
 import Main from './src/Main';
-import { ToastManager } from './src/utils/NotificationManager';
 import ErrorWrapper from './src/components/generate/ErrorWrapper';
 import useErrorHandler from './src/hooks/useErrorHandler';
 import eventEmitter from './src/utils/EventEmitter';
@@ -107,7 +106,6 @@ function App() {
       <ErrorBoundary>
         <ErrorWrapper>
           <Main isConnected={isConnected} />
-          <ToastManager />
         </ErrorWrapper>
       </ErrorBoundary>
       

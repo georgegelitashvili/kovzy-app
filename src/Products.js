@@ -3,7 +3,6 @@ import { StyleSheet, View, TouchableOpacity, Dimensions, RefreshControl, useWind
 import NetInfo from "@react-native-community/netinfo";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Text, Button, Card, Checkbox } from "react-native-paper";
-import { useIsFocused } from '@react-navigation/native';
 import { FlatGrid } from "react-native-super-grid";
 import SelectOption from "./components/generate/SelectOption";
 import { AuthContext } from "./context/AuthProvider";
@@ -12,6 +11,36 @@ import TextField from './components/generate/TextField';
 import { LanguageContext } from "./components/Language";
 import axiosInstance from "./apiConfig/apiRequests";
 import throttle from 'lodash.throttle';
+import useErrorDisplay from "./hooks/useErrorDisplay";
+
+const normalizeProductsPayload = (response) => {
+  const payload = response?.data?.data ?? response?.data ?? {};
+  const category = payload.category ?? [];
+  const excluded = payload.excluded ?? [];
+  const productsSource = payload.products;
+
+  if (Array.isArray(productsSource)) {
+    return {
+      category,
+      excluded,
+      productList: productsSource,
+      total: productsSource.length,
+      perPage: productsSource.length || 1,
+    };
+  }
+
+  if (productsSource?.data) {
+    return {
+      category,
+      excluded,
+      productList: productsSource.data,
+      total: productsSource.total ?? productsSource.data.length,
+      perPage: productsSource.per_page ?? (productsSource.data.length || 1),
+    };
+  }
+
+  return { category, excluded, productList: [], total: 0, perPage: 1 };
+};
 
 const MemoizedProductCard = memo(({ item, isExcluded, isExcludedQr, isExcludedOnline, checkedItems, onCheckboxPress, onButtonPress, onNavigate, dictionary }) => {
   const buttonText = isExcluded ? dictionary["prod.enableProduct"] : dictionary["prod.disableProduct"];
@@ -82,9 +111,9 @@ const MemoizedProductCard = memo(({ item, isExcluded, isExcludedQr, isExcludedOn
 
 export default function Products({ navigation }) {
   const { width } = useWindowDimensions();
-  const { setIsDataSet, domain, branchid, user, intervalId, branchEnabled } = useContext(AuthContext);
-  const isFocused = useIsFocused();
+  const { domain, branchid, user, branchEnabled } = useContext(AuthContext);
   const { dictionary, userLanguage } = useContext(LanguageContext);
+  const { errorDisplay, setApiError, clearError } = useErrorDisplay({ showInline: true });
 
   const [products, setProducts] = useState([]);
   const [category, setCategory] = useState([]);
@@ -103,48 +132,62 @@ export default function Products({ navigation }) {
   // Calculate button width based on screen size
   const buttonWidth = Math.max(80, (width - 30) / 3); // Minimum 80px, but distribute space evenly
 
-  const fetchData = useCallback(async () => {
-    if (!user || !domain || !branchid || !branchEnabled) return;
+  const fetchData = useCallback(async (pageOverride) => {
+    if (!user || !domain || !branchid) {
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
+
+    const requestPage = pageOverride ?? page;
 
     try {
+      clearError();
       const response = await axiosInstance.post(
         `https://${domain}/api/v1/admin/getProducts`,
         {
           lang: userLanguage,
-          page: page,
-          categoryid: selected,
-          branchid: branchid,
-          like: searchQuery
+          page: requestPage,
+          categoryid: selected || null,
+          branchid: Number(branchid),
+          like: searchQuery || null,
         }
       );
 
-      setCategory(response.data.category);
-      const newExcluded = response.data.excluded || [];
+      const {
+        category: nextCategory,
+        excluded: newExcluded,
+        productList,
+        total,
+        perPage,
+      } = normalizeProductsPayload(response);
+
+      setCategory(nextCategory);
       setExcluded(newExcluded);
 
-      const updatedProducts = response.data.products.data.map(product => ({
+      const updatedProducts = productList.map((product) => ({
         ...product,
-        isExcluded: newExcluded.some(item => item.productid === product.id && item.disabled_by === ""),
-        isExcludedQr: newExcluded.some(item => item.productid === product.id && item.disabled_by === "qr-menu"),
-        isExcludedOnline: newExcluded.some(item => item.productid === product.id && item.disabled_by === "online"),
+        isExcluded: newExcluded.some((item) => item.productid === product.id && item.disabled_by === ""),
+        isExcludedQr: newExcluded.some((item) => item.productid === product.id && item.disabled_by === "qr-menu"),
+        isExcludedOnline: newExcluded.some((item) => item.productid === product.id && item.disabled_by === "online"),
       }));
-      
-      setProducts(updatedProducts);
 
-      setTotalPages(response.data.products.total / response.data.products.per_page);
+      setProducts(updatedProducts);
+      setTotalPages(total / perPage);
+
+      if (__DEV__) {
+        console.log(`[Products] Loaded ${updatedProducts.length} product(s) for branch ${branchid}`);
+      }
     } catch (error) {
       console.error('Error fetching products:', error);
-      if (error.status === 401) {
-        setProducts([]);
-        setExcluded([]);
-        setIsDataSet(false);
-        clearInterval(intervalId);
-      }
+      setProducts([]);
+      setExcluded([]);
+      setApiError(error);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [user, domain, branchid, branchEnabled, userLanguage, page, selected, searchQuery, setIsDataSet, intervalId]);
+  }, [user, domain, branchid, userLanguage, page, selected, searchQuery, clearError, setApiError]);
 
   useEffect(() => {
     const removeSubscription = NetInfo.addEventListener((state) => {
@@ -155,24 +198,26 @@ export default function Products({ navigation }) {
   }, []);
 
   useEffect(() => {
-    if (isConnected && (page || userLanguage || selected || searchQuery) && branchEnabled) {
-      setLoading(true);
-      setCategory([]);
-      fetchData();
+    if (!user || !domain || !branchid || !isConnected) {
+      setLoading(false);
+      return;
     }
-  }, [isConnected, page, userLanguage, selected, branchid, searchQuery, branchEnabled, fetchData]);
+
+    setLoading(true);
+    setCategory([]);
+    fetchData();
+  }, [isConnected, page, userLanguage, selected, branchid, searchQuery, fetchData, user, domain]);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
-      if (branchEnabled) {
-        setPage(1);
-        setRefreshing(true);
-        fetchData();
-      }
+      if (!user || !domain || !branchid) return;
+      setPage(1);
+      setRefreshing(true);
+      fetchData(1);
     });
 
     return unsubscribe;
-  }, [navigation, branchEnabled, fetchData]);
+  }, [navigation, fetchData, user, domain, branchid]);
 
   useEffect(() => {
     if (!showFilter) {
@@ -184,11 +229,10 @@ export default function Products({ navigation }) {
   }, [showFilter, showSearch]);
 
   const onRefresh = useCallback(async () => {
-    if (!branchEnabled) return;
     setRefreshing(true);
     await fetchData();
     setCheckedItems([]);
-  }, [branchEnabled, fetchData]);
+  }, [fetchData]);
 
   const handleSearchChange = useCallback(throttle((query) => {
     if (!branchEnabled) return;
@@ -315,6 +359,7 @@ export default function Products({ navigation }) {
 
   return (
     <>
+      {errorDisplay}
       <View style={styles.buttonContainer}>
         <View style={[styles.buttonWrapper, { width: buttonWidth }]}>
           <Button
@@ -398,11 +443,6 @@ export default function Products({ navigation }) {
         windowSize={5}
         updateCellsBatchingPeriod={50}
         removeClippedSubviews={true}
-        getItemLayout={(data, index) => ({
-          length: 200,
-          offset: 200 * index,
-          index,
-        })}
       />
 
       <View style={styles.paginationContainer}>

@@ -194,9 +194,9 @@ export const AcceptedOrdersList = () => {
       setItemId(null);
       clearOrderDetails();
     };
-    eventEmitter.addEventListener('forceLogout', logoutListener);
+    const logoutListenerId = eventEmitter.addEventListener('forceLogout', logoutListener);
     return () => {
-      eventEmitter.removeEventListener(logoutListener);
+      eventEmitter.removeEventListener(logoutListenerId);
     };
   }, [domain, branchid, apiOptions, clearOrderDetails]);
   

@@ -74,13 +74,17 @@
         {
           "icon": "./assets/icon.png",
           "color": "#ffffff",
-          "sounds": ["./src/assets/audio/plucky.mp3"],
+          "sounds": [
+            "./src/assets/audio/plucky.mp3"
+          ],
           "defaultChannel": "kovzyOrders",
           "enableBackgroundRemoteNotifications": true
         }
       ],
       "expo-asset",
-      "expo-font"
+      "expo-font",
+      "@react-native-community/datetimepicker",
+      "@sentry/react-native"
     ]
   }
 }

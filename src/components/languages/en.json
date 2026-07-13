@@ -495,6 +495,10 @@
     "errors.SERVICE_UNAVAILABLE": "Service unavailable",
     "errors.API_ERROR": "An error occurred",
     "errors.NETWORK_ERROR": "Network connection problem",
+    "errors.CONNECTION_REFUSED": "Unable to connect to the server. Please check the domain and try again.",
+    "errors.SSL_ERROR": "Secure connection failed. Please check the domain and try again.",
+    "errors.REQUEST_TIMEOUT": "The request timed out. Please try again.",
+    "errors.NO_INTERNET": "No internet connection. Please check your network and try again.",
     "errors.REQUEST_ERROR": "Request failed or timed out",
     "errors.NGROK_ERROR": "Ngrok connection error",
     "errors.INVALID_DOMAIN": "Invalid domain entered. Please try again.",
@@ -510,5 +514,10 @@
     "errors.CLEANUP_ERROR": "Error cleaning up session data",
     "errors.UPDATE_ERROR": "Error checking for updates",
     "errors.USER_FRIENDLY": "Something went wrong. Please try again later.",
+    "connection.lost": "No internet connection. Orders may be outdated.",
+    "connection.issue": "Connection problem. Orders may be outdated.",
+    "connection.retry": "Retry",
+    "connection.dismiss": "Dismiss",
+    "connection.restored": "Internet connection restored",
     "auth.ALREADY_AUTHORIZED": "User is already authorized"
 }

@@ -27,28 +27,20 @@ class ToastNotificationManager {
 
 // React component that displays toasts
 export const ToastManager = () => {
-  // Clear toasts when user is authorized or loginError is cleared
-  try {
-    // Lazy import to avoid circular dependency
-    // eslint-disable-next-line
-    var { useContext } = require('react');
-    var { AuthContext } = require('../context/AuthProvider');
-    var authCtx = useContext(AuthContext);
-    useEffect(() => {
-      if (authCtx && (authCtx.user || !authCtx.loginError)) {
-        setToasts([]);
-        if (toastLock && toastLock.current) toastLock.current = false;
-      }
-    }, [authCtx && authCtx.user, authCtx && authCtx.loginError]);
-  } catch (e) {}
   const [toasts, setToasts] = useState([]);
   const toastIdCounter = useRef(0);
-  const toastLock = useRef(false);
+  const dismissTimeoutRef = useRef(null);
+
+  const clearDismissTimeout = () => {
+    if (dismissTimeoutRef.current) {
+      clearTimeout(dismissTimeoutRef.current);
+      dismissTimeoutRef.current = null;
+    }
+  };
 
   useEffect(() => {
     const listenerId = eventEmitter.addEventListener('showToast', (toastData) => {
-      if (toastLock.current) return;
-      toastLock.current = true;
+      clearDismissTimeout();
 
       const newToast = {
         ...toastData,
@@ -56,17 +48,28 @@ export const ToastManager = () => {
         animate: true,
       };
 
-      setToasts([]);
-      setTimeout(() => setToasts([newToast]), 50);
+      setToasts([newToast]);
+
+      if (toastData.persistent) {
+        return;
+      }
 
       const duration = toastData.duration || (toastData.type === 'failed' ? 5000 : 3000);
-      setTimeout(() => {
-        setToasts((currentToasts) => currentToasts.filter((t) => t.id !== newToast.id));
-        toastLock.current = false;
+      dismissTimeoutRef.current = setTimeout(() => {
+        setToasts([]);
+        dismissTimeoutRef.current = null;
       }, duration + 800);
     });
+
+    const dismissListenerId = eventEmitter.addEventListener('dismissToast', () => {
+      clearDismissTimeout();
+      setToasts([]);
+    });
+
     return () => {
+      clearDismissTimeout();
       eventEmitter.removeEventListener(listenerId);
+      eventEmitter.removeEventListener(dismissListenerId);
     };
   }, []);
 
@@ -75,7 +78,7 @@ export const ToastManager = () => {
   };
 
   return (
-    <View style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 1000 }}>
+    <View style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 9999, elevation: 9999 }} pointerEvents="box-none">
       {toasts.map((toast) => (
         <Toast
           key={toast.id}
@@ -83,6 +86,7 @@ export const ToastManager = () => {
           title={toast.title}
           subtitle={toast.subtitle}
           animate={toast.animate}
+          persistent={toast.persistent}
           onDismiss={() => handleDismiss(toast.id)}
         />
       ))}

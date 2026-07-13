@@ -536,6 +536,10 @@
     "errors.SERVICE_UNAVAILABLE": "Ծառայությունն անհասանելի է",
     "errors.API_ERROR": "Տեղի ունեցավ սխալ",
     "errors.NETWORK_ERROR": "Ցանցային կապի խնդիր",
+    "errors.CONNECTION_REFUSED": "Չհաջողվեց միանալ սերվերին: Ստուգեք դոմենը և կրկին փորձեք:",
+    "errors.SSL_ERROR": "Անվտանգ կապը չհաջողվեց: Ստուգեք դոմենը և կրկին փորձեք:",
+    "errors.REQUEST_TIMEOUT": "Հարցման ժամանակը սպառվեց: Խնդրում ենք կրկին փորձել:",
+    "errors.NO_INTERNET": "Ինտերնետ կապ չկա: Ստուգեք ցանցը և կրկին փորձեք:",
     "errors.REQUEST_ERROR": "Հարցման սխալ կամ ժամանակը սպառվեց",
     "errors.NGROK_ERROR": "Ngrok կապի սխալ",
     "errors.INVALID_DOMAIN": "Անվավեր դոմեն: Խնդրում ենք կրկին փորձել:",
@@ -547,5 +551,10 @@
     "errors.CLEANUP_ERROR": "Սեսիայի տվյալների մաքրման սխալ",
     "errors.UPDATE_ERROR": "Թարմացումների ստուգման սխալ",
     "errors.USER_FRIENDLY": "Տեղի ունեցավ սխալ։ Խնդրում ենք փորձել կրկին։",
+    "connection.lost": "Ինտերնետ կապ չկա։ Պատվերները կարող են հնացած լինել։",
+    "connection.issue": "Կապի խնդիր։ Պատվերները կարող են հնացած լինել։",
+    "connection.retry": "Կրկնել",
+    "connection.dismiss": "Փակել",
+    "connection.restored": "Ինտերնետ կապը վերականգնվել է",
     "auth.ALREADY_AUTHORIZED": "Օգտատերը արդեն մուտք է գործել համակարգ"
 }

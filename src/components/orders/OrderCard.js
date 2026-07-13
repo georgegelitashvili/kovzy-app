@@ -354,4 +354,16 @@ const styles = StyleSheet.create({
   },
 });
 
-export default OrderCard;
+function arePropsEqual(prev, next) {
+  return (
+    prev.item?.id === next.item?.id &&
+    prev.isOpen === next.isOpen &&
+    prev.loading === next.loading &&
+    prev.currency === next.currency &&
+    prev.orderData === next.orderData &&
+    prev.fees === next.fees &&
+    prev.scheduled === next.scheduled
+  );
+}
+
+export default React.memo(OrderCard, arePropsEqual);

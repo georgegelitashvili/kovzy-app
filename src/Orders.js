@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext, useRef } from "react";
 import {
   Alert,
   View,
@@ -18,38 +18,28 @@ const Tab = createMaterialTopTabNavigator();
 
 export default function TabContent() {
   const lowPowerMode = Battery.useLowPowerMode();
+  const lowPowerAlertShownRef = useRef(false);
   const [postponeOrderShow, setPostponeOrderShow] = useState(false);
   const { dictionary } = useContext(LanguageContext);
 
   useEffect(() => {
-    if (lowPowerMode) {
-      const showAlert = () => {
-        Alert.alert(
-          'Low Power Mode is On',
-          'To receive notifications, please turn off Low Power Mode.',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            {
-              text: 'Go to Settings',
-              onPress: () => {
-                IntentLauncher.startActivityAsync(
-                  IntentLauncher.ActivityAction.IGNORE_BATTERY_OPTIMIZATION_SETTINGS
-                );
-              },
+    if (lowPowerMode && !lowPowerAlertShownRef.current) {
+      lowPowerAlertShownRef.current = true;
+      Alert.alert(
+        'Low Power Mode is On',
+        'To receive notifications, please turn off Low Power Mode.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Go to Settings',
+            onPress: () => {
+              IntentLauncher.startActivityAsync(
+                IntentLauncher.ActivityAction.IGNORE_BATTERY_OPTIMIZATION_SETTINGS
+              );
             },
-          ]
-        );
-      };
-
-      showAlert();
-
-      const intervalId = setInterval(() => {
-        if (lowPowerMode) {
-          showAlert();
-        }
-      }, 30000);
-
-      return () => clearInterval(intervalId);
+          },
+        ]
+      );
     }
   }, [lowPowerMode]);
 
@@ -74,12 +64,13 @@ export default function TabContent() {
         {Object.keys(props.descriptors).map(key => {
           const { options, route } = props.descriptors[key];
           const label = options.tabBarLabel || options.title || route.name;
+          const routes = props.state?.routes ?? props.navigationState?.routes ?? [];
           return (
             <TabBarItem
               key={key}
               label={label}
               onPress={() => props.navigation.navigate(route.name)}
-              active={props.state.index === props.navigationState.routes.findIndex(r => r.name === route.name)}
+              active={props.state.index === routes.findIndex((r) => r.name === route.name)}
               {...props.descriptors[key]}
             />
           );

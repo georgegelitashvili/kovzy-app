@@ -1,18 +1,16 @@
 import React, { useContext, useState, useEffect } from "react";
-import { View, StyleSheet } from "react-native";
 import { createDrawerNavigator } from "@react-navigation/drawer";
 import { AuthContext } from "./context/AuthProvider";
 import { OrdersNavigator, QrOrdersNavigator, ReportsNavigator, ProductsNavigator, AuthNavigator, SettingsNavigator } from "./components/Stack";
 import DrawerContent from "./components/DrawerContent";
 import { LanguageContext } from "./components/Language";
 import ErrorDisplay from "./components/generate/ErrorDisplay";
-import Loader from "./components/generate/loader";
 import eventEmitter from "./utils/EventEmitter";
 
 const Drawer = createDrawerNavigator();
 
 const RootNavigator = () => {
-  const { user, domain, branchid, isLoading, branchEnabled, error, justLoggedOut, clearJustLoggedOut } = useContext(AuthContext);
+  const { user, domain, branchid, error, justLoggedOut, clearJustLoggedOut, clearErrors } = useContext(AuthContext);
   const { dictionary } = useContext(LanguageContext);
   const [forceRoute, setForceRoute] = useState(null);
 
@@ -41,9 +39,7 @@ const RootNavigator = () => {
     }
   }, [justLoggedOut, clearJustLoggedOut]);
 
-  if (isLoading) {
-    return <Loader text={dictionary?.["loading"]} />;
-  }
+  // Loading overlay is rendered by AuthProvider so navigation stays mounted.
 
   // If there is a persistent LOGIN_ERROR, show AuthNavigator but keep error visible
   if (!user?.token) {
@@ -69,19 +65,18 @@ const RootNavigator = () => {
     // If no domain, stay on "Domain"
     
     console.log("[RootNavigator] Initial route determined:", initialRoute, "Domain:", domain, "Branch:", branchid);
-    
-    // Skip error display if we're forcing a route (during logout)
-    if (error && error.type === "LOGIN_ERROR" && !forceRoute) {
-      // Force login screen for login errors, don't redirect to domain
-      return (
-        <>
-          <ErrorDisplay error={error} />
-          <AuthNavigator initialRouteName="Login" />
-        </>
-      );
-    }
-    console.log("[RootNavigator] User not authenticated, showing AuthNavigator with route:", initialRoute);
-    return <AuthNavigator initialRouteName={initialRoute} />;
+
+    return (
+      <>
+        {error?.type === "LOGIN_ERROR" && !forceRoute ? (
+          <ErrorDisplay error={error} onDismiss={clearErrors} />
+        ) : null}
+        <AuthNavigator
+          key={forceRoute ? `auth-force-${forceRoute}` : "auth-flow"}
+          initialRouteName={initialRoute}
+        />
+      </>
+    );
   }
 
   return (
@@ -144,13 +139,5 @@ const RootNavigator = () => {
     </Drawer.Navigator>
   );
 };
-
-const styles = StyleSheet.create({
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    padding: 20,
-  }
-});
 
 export default RootNavigator;

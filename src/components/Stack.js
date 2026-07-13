@@ -3,6 +3,7 @@ import { createStackNavigator } from "@react-navigation/stack";
 import { Appbar, useTheme } from "react-native-paper";
 
 import { LanguageContext } from "./Language";
+import { AuthContext } from "../context/AuthProvider";
 import { DomainScreen } from "../startScreens/DomainScreen";
 import { BranchScreen } from "../startScreens/BranchScreen";
 import { LoginScreen } from "../startScreens/LoginScreen";
@@ -16,21 +17,58 @@ import NotificationScreen from './settings/NotificationScreen';
 
 const Stack = createStackNavigator();
 
-const Header = ({ options, navigation, route, showDrawer }) => {
+const Header = ({ options, navigation, route, showDrawer = false }) => {
   const theme = useTheme();
+  const { clearErrors } = useContext(AuthContext);
   const headerStyle = options?.headerStyle;
   const title = options?.headerTitle ?? options?.title ?? route?.name;
+  const canGoBack = navigation?.canGoBack?.() ?? false;
+
+  const handleBackPress = () => {
+    if (route?.name === "Login") {
+      navigation.reset({
+        index: 0,
+        routes: [{ name: "Branch" }],
+      });
+      clearErrors?.();
+      return;
+    }
+
+    if (route?.name === "Branch") {
+      navigation.reset({
+        index: 0,
+        routes: [{ name: "Domain" }],
+      });
+      return;
+    }
+
+    if (canGoBack) {
+      navigation.goBack();
+    }
+  };
+
+  const showBackButton =
+    canGoBack || route?.name === "Branch" || route?.name === "Login";
+
+  const openDrawer = () => {
+    if (typeof navigation.toggleDrawer === "function") {
+      navigation.toggleDrawer();
+      return;
+    }
+
+    navigation.getParent?.()?.toggleDrawer?.();
+  };
 
   return (
     <Appbar.Header
       theme={{ colors: { primary: theme.colors.surface } }}
       style={{ marginTop: headerStyle?.marginTop, backgroundColor: 'white' }}
     >
-      {navigation?.canGoBack() && (
-        <Appbar.BackAction onPress={navigation.goBack} />
+      {showBackButton && (
+        <Appbar.BackAction onPress={handleBackPress} />
       )}
-      {!navigation?.canGoBack() && showDrawer && (
-        <Appbar.Action icon="menu" onPress={() => navigation.toggleDrawer()} />
+      {!showBackButton && showDrawer && (
+        <Appbar.Action icon="menu" onPress={openDrawer} />
       )}
 
       <Appbar.Content
@@ -51,7 +89,7 @@ export const AuthNavigator = ({ initialRouteName }) => {
         headerMode: 'screen',
         header: (props) => {
           const { key, ...otherProps } = props;
-          return <Header {...otherProps} showDrawer={route.name !== 'Domain'} />;
+          return <Header {...otherProps} showDrawer={false} />;
         },
         ...route.params?.options, // Pass route params as options
       })}
@@ -60,7 +98,6 @@ export const AuthNavigator = ({ initialRouteName }) => {
         name="Domain"
         options={{
           headerTitle: dictionary["domains.addDomain"],
-          unmountOnBlur: true,
           headerLeft: () => null
         }}
         component={DomainScreen}
@@ -69,7 +106,6 @@ export const AuthNavigator = ({ initialRouteName }) => {
         name="Branch"
         options={{
           headerTitle: dictionary["branches.branches"],
-          unmountOnBlur: true
         }}
         component={BranchScreen}
       />
@@ -77,7 +113,6 @@ export const AuthNavigator = ({ initialRouteName }) => {
         name="Login"
         options={{
           headerTitle: dictionary["nav.auth"],
-          unmountOnBlur: true
         }}
         component={LoginScreen}
       />

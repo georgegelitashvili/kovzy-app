@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from "react";
-import { StyleSheet } from "react-native";
+import { View, StyleSheet } from "react-native";
 import Background from "../components/generate/Background";
 import Logo from "../components/generate/Logo";
 import Header from "../components/generate/Header";
@@ -62,6 +62,7 @@ export const LoginScreen = ({ navigation }) => {
   
 
   return (
+    <View style={styles.screen}>
     <Background>
       <Logo />
       <TextField
@@ -93,10 +94,14 @@ export const LoginScreen = ({ navigation }) => {
         {dictionary['login']}
       </Button>
     </Background>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+  },
   forgotPassword: {
     width: "100%",
     alignItems: "flex-end",

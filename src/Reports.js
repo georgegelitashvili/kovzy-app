@@ -16,12 +16,13 @@ export default function TabContent(props) {
         {Object.keys(props.descriptors).map(key => {
           const { options, route } = props.descriptors[key];
           const label = options.tabBarLabel || options.title || route.name;
+          const routes = props.state?.routes ?? props.navigationState?.routes ?? [];
           return (
             <TabBarItem
               key={key}
               label={label}
               onPress={() => props.navigation.navigate(route.name)}
-              active={props.state.index === props.navigationState.routes.findIndex(r => r.name === route.name)}
+              active={props.state.index === routes.findIndex((r) => r.name === route.name)}
               {...props.descriptors[key]}
             />
           );

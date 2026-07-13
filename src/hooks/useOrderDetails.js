@@ -1,5 +1,5 @@
-import { useState, useCallback, useContext, useRef, useEffect } from 'react';
-import { AuthContext } from '../context/AuthProvider';
+import { useState, useCallback, useRef, useEffect, useContext } from 'react';
+import { useAuthState } from '../context/AuthProvider';
 import { LanguageContext } from '../components/Language';
 import axiosInstance from '../apiConfig/apiRequests';
 
@@ -9,7 +9,7 @@ import axiosInstance from '../apiConfig/apiRequests';
  * Implements caching and request deduplication
  */
 export const useOrderDetails = () => {
-  const { domain } = useContext(AuthContext);
+  const { domain } = useAuthState();
   const { languageId } = useContext(LanguageContext);
 
   const [orderDetails, setOrderDetails] = useState({});
@@ -81,13 +81,17 @@ export const useOrderDetails = () => {
         const data = response.data.data;
         const orderData = Array.isArray(data) ? data : [];
 
-        console.log(`✅ Successfully fetched order ${orderId} details`);
+        if (__DEV__) {
+          console.log(`✅ Successfully fetched order ${orderId} details`);
+        }
 
         // FIXED: Use functional update to prevent race conditions
         setOrderDetails(prev => {
           const updated = { ...prev, [orderIdStr]: orderData };
           orderDetailsRef.current = updated; // Keep ref in sync immediately
-          console.log('[useOrderDetails] setOrderDetails: keys now', Object.keys(updated));
+          if (__DEV__) {
+            console.log('[useOrderDetails] setOrderDetails: keys now', Object.keys(updated));
+          }
           return updated;
         });
 
@@ -138,7 +142,9 @@ export const useOrderDetails = () => {
     );
 
     if (orderIdsToFetch.length === 0) {
-      console.log(`[fetchBatchOrderDetails] All ${orderIds.length} requested orders are either cached or being fetched`);
+      if (__DEV__) {
+        console.log(`[fetchBatchOrderDetails] All ${orderIds.length} requested orders are either cached or being fetched`);
+      }
       return;
     }
 
@@ -186,7 +192,9 @@ export const useOrderDetails = () => {
       }
     } catch (error) {
       if (error.name === 'CanceledError' || error.name === 'AbortError') {
-        console.log('Batch request cancelled');
+        if (__DEV__) {
+          console.log('Batch request cancelled');
+        }
       } else {
         console.error('❌ Error in batch fetching order details:', error);
       }
@@ -221,7 +229,9 @@ export const useOrderDetails = () => {
    * Clear all order details and reset loading states
    */
   const clearOrderDetails = useCallback(() => {
-    console.log('[useOrderDetails] clearOrderDetails called');
+    if (__DEV__) {
+      console.log('[useOrderDetails] clearOrderDetails called');
+    }
     setOrderDetails(prev => {
       return {};
     });
