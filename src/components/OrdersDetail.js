@@ -21,7 +21,7 @@ import { LanguageContext } from "./Language";
  * @param {Array} orderData - Pre-fetched order data from parent component
  * @param {Function} onDataLoaded - Optional callback when data is loaded
  */
-function OrdersDetail({ orderId, orderData, onDataLoaded }) {
+function OrdersDetail({ orderId, orderData, onDataLoaded, isLoading = false }) {
   // Debug: log received props on every render
   // console.log('[OrdersDetail] Rendered with orderId:', orderId, 'orderData:', orderData);
   const [expanded, setExpanded] = useState(true);
@@ -101,6 +101,16 @@ function OrdersDetail({ orderId, orderData, onDataLoaded }) {
     [dictionary]
   );
 
+  if (isLoading && !orderCart.length) {
+    return (
+      <View style={styles.emptyContainer}>
+        <Text style={styles.emptyText}>
+          {dictionary["loading"] || "Loading..."}
+        </Text>
+      </View>
+    );
+  }
+
   if (!orderCart.length) {
     return (
       <View style={styles.emptyContainer}>
@@ -133,9 +143,10 @@ function OrdersDetail({ orderId, orderData, onDataLoaded }) {
 
 // ✅ Enhanced memo wrapping with deeper comparison
 export default React.memo(OrdersDetail, (prevProps, nextProps) => {
-  // Only re-render if orderId or orderData actually changes
-  return prevProps.orderId === nextProps.orderId && 
-         prevProps.orderData === nextProps.orderData;
+  // Only re-render if orderId, orderData, or loading actually changes
+  return prevProps.orderId === nextProps.orderId &&
+         prevProps.orderData === nextProps.orderData &&
+         prevProps.isLoading === nextProps.isLoading;
 });
 
 const styles = StyleSheet.create({

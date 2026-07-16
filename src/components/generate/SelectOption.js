@@ -4,13 +4,17 @@ import RNPickerSelect from 'react-native-picker-select';
 import { theme } from '../../core/theme';
 
 export default function SelectOption({ errorText, description, placeholder = "", items, ...props }) {
+  // Always pass a labeled placeholder so empty string still reserves the placeholder slot
+  // (unlike undefined, which skips it, or {}, which disables it in RNPickerSelect).
+  const placeholderConfig = { label: placeholder, value: null };
+
   return (
     <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
       <View style={styles.container}>
         {items && items.length > 0 && (
           <RNPickerSelect
             useNativeAndroidPickerStyle={false}
-            placeholder={{ label: placeholder }}
+            placeholder={placeholderConfig}
             style={pickerSelectStyles}
             items={items.map(item => ({
               label: `${item.name || item.label || item.companyName || item.type || "Default Label"} ${item.dividedCost ? item.dividedCost.clientCost : (item.price_before_accept || '')}`,

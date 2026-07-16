@@ -2,7 +2,7 @@ import React, { useEffect, useContext, useRef, useImperativeHandle, forwardRef }
 import { View, AppState, Alert } from 'react-native';
 import { Audio } from 'expo-av';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { String, LanguageContext } from '../components/Language';
+import { LanguageContext } from '../components/Language';
 import * as Sentry from '@sentry/react-native';
 
 const musicList = [
@@ -19,36 +19,40 @@ const musicList = [
 const NotificationSound = forwardRef((props, ref) => {
     const { dictionary } = useContext(LanguageContext);
     const soundRef = useRef(null);
-    const repeatIntervalRef = useRef(null);
+    const timeoutRef = useRef(null);
     const appState = useRef(AppState.currentState);
-    const isSoundPlaying = useRef(false); // Track if a sound is currently playing
+    const isSoundPlaying = useRef(false);
+    const isAlertVisible = useRef(false);
 
     useEffect(() => {
         const subscription = AppState.addEventListener('change', nextAppState => {
             if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
-                // App has come to foreground
                 onStopPlaySound();
+                isAlertVisible.current = false;
             }
             appState.current = nextAppState;
         });
 
         return () => {
             subscription.remove();
-            // Cleanup sound on unmount
             onStopPlaySound();
         };
     }, []);
 
+    const clearStopTimeout = () => {
+        if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+            timeoutRef.current = null;
+        }
+    };
+
     const onStopPlaySound = async () => {
         try {
+            clearStopTimeout();
             if (soundRef.current) {
                 await soundRef.current.stopAsync();
                 await soundRef.current.unloadAsync();
                 soundRef.current = null;
-            }
-            if (repeatIntervalRef.current) {
-                clearInterval(repeatIntervalRef.current);
-                repeatIntervalRef.current = null;
             }
             isSoundPlaying.current = false;
             console.log('🔈 Notification sound stopped and unloaded');
@@ -71,42 +75,33 @@ const NotificationSound = forwardRef((props, ref) => {
             const music = musicList.find(m => m.id === selectedSound) || musicList[0];
             const { sound } = await Audio.Sound.createAsync(
                 music.source,
-                { volume, shouldPlay: true }
+                { volume, shouldPlay: true, isLooping: repeat }
             );
 
             soundRef.current = sound;
             isSoundPlaying.current = true;
 
-            // Add timeout to stop sound after 10 seconds
-            const timeout = setTimeout(async () => {
-                await onStopPlaySound();
-                console.log('🔈 Sound stopped due to timeout');
-            }, 10000);
-
-            if (repeat) {
-                sound.setOnPlaybackStatusUpdate(async status => {
-                    if (status.didJustFinish && isSoundPlaying.current) {
-                        try {
-                            await sound.replayAsync();
-                            console.log('🔈 Sound replayed');
-                        } catch (error) {
-                            isSoundPlaying.current = false;
-                            console.log('Audio replay error (suppressed):', error);
-                            Sentry.captureException(error);
-                        }
-                    }
-                });
-            }
-
             sound.setOnPlaybackStatusUpdate(status => {
+                if (!status.isLoaded) {
+                    return;
+                }
+
                 if (status.didJustFinish && !repeat) {
                     isSoundPlaying.current = false;
+                    clearStopTimeout();
                     console.log('🔈 Sound playback finished naturally');
-                    clearTimeout(timeout);
                 }
             });
 
-            console.log('🔈 Playing notification sound:', music.title);
+            // Non-looping sounds still get a safety timeout
+            if (!repeat) {
+                timeoutRef.current = setTimeout(async () => {
+                    await onStopPlaySound();
+                    console.log('🔈 Sound stopped due to timeout');
+                }, 10000);
+            }
+
+            console.log('🔈 Playing notification sound:', music.title, repeat ? '(looping)' : '');
         } catch (error) {
             isSoundPlaying.current = false;
             console.log('Audio play error (suppressed):', error);
@@ -114,22 +109,29 @@ const NotificationSound = forwardRef((props, ref) => {
         }
     };
 
-    const loadAndPlaySavedMusic = async () => {
+    const loadAndPlaySavedMusic = async (forceRepeat = false) => {
         try {
             const savedMusicId = await AsyncStorage.getItem('selectedMusicId');
-            const repeat = (await AsyncStorage.getItem('repeatSound')) === 'true';
+            const savedRepeat = (await AsyncStorage.getItem('repeatSound')) === 'true';
+            const repeat = forceRepeat || savedRepeat;
             const volume = parseFloat(await AsyncStorage.getItem('soundVolume')) || 1.0;
             await onPlaySound(repeat, savedMusicId || '1', volume);
         } catch (error) {
             console.log('Error loading saved music:', error);
             Sentry.captureException(error);
-            // Fallback to default sound
-            await onPlaySound(false, '1', 1.0);
+            await onPlaySound(forceRepeat, '1', 1.0);
         }
     };
 
     const orderReceived = async () => {
-        await loadAndPlaySavedMusic();
+        // Always loop until the alert is dismissed
+        await loadAndPlaySavedMusic(true);
+
+        if (isAlertVisible.current) {
+            return;
+        }
+
+        isAlertVisible.current = true;
         Alert.alert(
             dictionary?.['general.alerts'] || 'შეტყობინება',
             dictionary?.['orders.orderReceivedTitle'] || 'ახალი შეკვეთა მიღებულია',
@@ -137,6 +139,7 @@ const NotificationSound = forwardRef((props, ref) => {
                 {
                     text: dictionary?.['okay'] || 'კარგი',
                     onPress: async () => {
+                        isAlertVisible.current = false;
                         await onStopPlaySound();
                         console.log('🔈 Stopped sound on alert dismissal');
                     },

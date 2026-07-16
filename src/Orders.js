@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext, useRef } from "react";
+import React, { useState, useEffect, useContext, useCallback, useRef } from "react";
 import {
   Alert,
   View,
@@ -6,6 +6,7 @@ import {
 } from "react-native";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createMaterialTopTabNavigator } from "@react-navigation/material-top-tabs";
+import { useFocusEffect } from "@react-navigation/native";
 import * as Battery from 'expo-battery';
 import * as IntentLauncher from 'expo-intent-launcher';
 import { EnteredOrdersList } from "./components/orders/EnteredOrders";
@@ -18,13 +19,18 @@ const Tab = createMaterialTopTabNavigator();
 
 export default function TabContent() {
   const lowPowerMode = Battery.useLowPowerMode();
-  const lowPowerAlertShownRef = useRef(false);
+  const lowPowerModeRef = useRef(lowPowerMode);
+  lowPowerModeRef.current = lowPowerMode;
   const [postponeOrderShow, setPostponeOrderShow] = useState(false);
   const { dictionary } = useContext(LanguageContext);
 
   useEffect(() => {
-    if (lowPowerMode && !lowPowerAlertShownRef.current) {
-      lowPowerAlertShownRef.current = true;
+    if (!lowPowerMode) return;
+
+    const showAlert = () => {
+      // Guard against a tick firing after low power mode was turned off
+      if (!lowPowerModeRef.current) return;
+
       Alert.alert(
         'Low Power Mode is On',
         'To receive notifications, please turn off Low Power Mode.',
@@ -40,37 +46,57 @@ export default function TabContent() {
           },
         ]
       );
-    }
-  }, [lowPowerMode]);
-
-  useEffect(() => {
-    const loadStoredValue = async () => {
-      try {
-        const storedValue = await AsyncStorage.getItem('postponeOrderShow');
-        if (storedValue !== null) {
-          setPostponeOrderShow(JSON.parse(storedValue));
-        }
-      } catch (error) {
-        console.error('Failed to load stored value', error);
-      }
     };
 
-    loadStoredValue();
-  }, []);
+    showAlert();
+    const intervalId = setInterval(showAlert, 30000);
+    return () => clearInterval(intervalId);
+  }, [lowPowerMode]);
+
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      const loadStoredValue = async () => {
+        try {
+          const storedValue = await AsyncStorage.getItem('postponeOrderShow');
+          if (!active) return;
+          setPostponeOrderShow(storedValue !== null ? JSON.parse(storedValue) : false);
+        } catch (error) {
+          console.error('Failed to load stored value', error);
+        }
+      };
+
+      loadStoredValue();
+      return () => {
+        active = false;
+      };
+    }, [])
+  );
 
   const renderTabBar = props => {
+    const navState =
+      props.state ?? props.navigationState ?? props.navigation?.getState?.();
+    const routes = Array.isArray(navState?.routes) ? navState.routes : null;
+    const index = navState?.index;
+    const focusedRouteKey =
+      routes != null &&
+      Number.isInteger(index) &&
+      index >= 0 &&
+      index < routes.length
+        ? routes[index]?.key
+        : undefined;
+
     return (
       <View style={styles.tabBar}>
         {Object.keys(props.descriptors).map(key => {
           const { options, route } = props.descriptors[key];
           const label = options.tabBarLabel || options.title || route.name;
-          const routes = props.state?.routes ?? props.navigationState?.routes ?? [];
           return (
             <TabBarItem
               key={key}
               label={label}
               onPress={() => props.navigation.navigate(route.name)}
-              active={props.state.index === routes.findIndex((r) => r.name === route.name)}
+              active={focusedRouteKey != null && focusedRouteKey === route.key}
               {...props.descriptors[key]}
             />
           );

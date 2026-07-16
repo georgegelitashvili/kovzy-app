@@ -22,12 +22,12 @@ export default function Main({ isConnected }) {
       <PaperProvider theme={theme}>
         <LanguageProvider>
           <AuthProvider isConnected={isConnected}>
+            <ToastManager />
             <NavigationContainer ref={navigationRef}>
               <RootNavigator />
               <StatusBar style="auto" />
             </NavigationContainer>
             <ConnectionStatusBar />
-            <ToastManager />
           </AuthProvider>
         </LanguageProvider>
       </PaperProvider>

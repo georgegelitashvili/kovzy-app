@@ -115,6 +115,11 @@ export const orderReducer = (state, action) => {
         ...state,
         deliveryScheduled: action.payload
       };
+    case 'SET_POSTPONE_ORDER':
+      return {
+        ...state,
+        postponeOrder: action.payload
+      };
     case 'RESET_ALL_STATE':
       return { ...initialState };
     default:

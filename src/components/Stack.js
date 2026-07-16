@@ -3,7 +3,7 @@ import { createStackNavigator } from "@react-navigation/stack";
 import { Appbar, useTheme } from "react-native-paper";
 
 import { LanguageContext } from "./Language";
-import { AuthContext } from "../context/AuthProvider";
+import { useAuthActions } from "../context/AuthProvider";
 import { DomainScreen } from "../startScreens/DomainScreen";
 import { BranchScreen } from "../startScreens/BranchScreen";
 import { LoginScreen } from "../startScreens/LoginScreen";
@@ -19,7 +19,7 @@ const Stack = createStackNavigator();
 
 const Header = ({ options, navigation, route, showDrawer = false }) => {
   const theme = useTheme();
-  const { clearErrors } = useContext(AuthContext);
+  const { clearErrors } = useAuthActions();
   const headerStyle = options?.headerStyle;
   const title = options?.headerTitle ?? options?.title ?? route?.name;
   const canGoBack = navigation?.canGoBack?.() ?? false;

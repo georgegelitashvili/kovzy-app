@@ -12,6 +12,7 @@ import {
 export default function TextField({
   label,
   value,
+  error = false,
   errorText,
   description,
   onFocus,
@@ -23,6 +24,7 @@ export default function TextField({
   const [isFocused, setIsFocused] = useState(false);
   const animation = useRef(new Animated.Value(value ? 1 : 0)).current;
   const inputRef = useRef(null);
+  const hasError = Boolean(error) || Boolean(errorText);
 
   useEffect(() => {
     Animated.timing(animation, {
@@ -59,7 +61,7 @@ export default function TextField({
         style={[
           styles.inputContainer,
           {
-            borderColor: errorText
+            borderColor: hasError
               ? '#B00020'
               : isFocused
                 ? '#6200ee'
@@ -80,7 +82,7 @@ export default function TextField({
             style={[
               styles.label,
               {
-                color: errorText
+                color: hasError
                   ? '#B00020'
                   : isFocused
                     ? '#6200ee'
@@ -108,7 +110,9 @@ export default function TextField({
       {description && !errorText && (
         <Text style={styles.description}>{description}</Text>
       )}
-      {errorText && <Text style={styles.error}>{errorText}</Text>}
+      {typeof errorText === 'string' && errorText.trim() !== '' && (
+        <Text style={styles.error}>{errorText}</Text>
+      )}
     </View>
   );
 }

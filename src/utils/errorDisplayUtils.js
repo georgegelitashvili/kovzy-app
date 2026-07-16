@@ -10,7 +10,34 @@ export function shouldShowErrorToUser(error) {
 }
 
 export function getErrorMessage(error, dictionary) {
-  if (error?.message) return error.message;
+  const preferLocalizedTypes = [
+    'LOGIN_ERROR',
+    'VALIDATION_ERROR',
+    'UNAUTHORIZED',
+    'LOGIN_FAILED',
+    'INVALID_CREDENTIALS',
+  ];
+
+  if (
+    preferLocalizedTypes.includes(error?.type) &&
+    dictionary?.[`errors.${error.type}`]
+  ) {
+    return dictionary[`errors.${error.type}`];
+  }
+
+  const rawMessage = error?.message;
+
+  if (typeof rawMessage === 'string' && rawMessage.trim()) {
+    return rawMessage;
+  }
+
+  if (rawMessage && typeof rawMessage === 'object') {
+    const flattened = Object.values(rawMessage)
+      .flat()
+      .filter((item) => typeof item === 'string' && item.trim())
+      .join('\n');
+    if (flattened) return flattened;
+  }
 
   if (dictionary?.[`errors.${error?.type}`]) {
     return dictionary[`errors.${error.type}`];

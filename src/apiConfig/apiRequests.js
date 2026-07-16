@@ -359,17 +359,40 @@ const handleApiError = async (error, dictionary) => {
   }
   // Handle response errors
   else if (error.response) {
-    // Check for new API error format: { error: { message, code, status } }
-    if (error.response?.data?.error) {
-      const apiError = error.response.data.error;
-      errorMessage = apiError.message || '';
-      errorType = apiError.code || 'API_ERROR';
-      // Only override statusCode if apiError.status is a valid number
+    const responseData = error.response?.data;
+    const apiError = responseData?.error;
+
+    // New API error format: { error: { message, code, status } }
+    // Also support string code: { error: "DELIVERON_NOT_INTEGRATED", ... }
+    if (apiError && typeof apiError === 'object') {
+      const rawMessage = apiError.message;
+      if (typeof rawMessage === 'string') {
+        errorMessage = rawMessage;
+      } else if (rawMessage && typeof rawMessage === 'object') {
+        // Legacy validation payloads put MessageBag under error.message
+        errorMessage = Object.values(rawMessage)
+          .flat()
+          .filter((item) => typeof item === 'string' && item.trim())
+          .join('\n') || 'Validation error';
+      } else if (apiError.errors && typeof apiError.errors === 'object') {
+        errorMessage = Object.values(apiError.errors)
+          .flat()
+          .filter((item) => typeof item === 'string' && item.trim())
+          .join('\n') || 'Validation error';
+      } else {
+        errorMessage = '';
+      }
+      errorType = apiError.code || (statusCode === 422 ? 'VALIDATION_ERROR' : 'API_ERROR');
       if (typeof apiError.status === 'number' && apiError.status > 0) {
         statusCode = apiError.status;
       }
-      
-      // Determine if this error should be shown to user based on status code
+
+      if ([404, 422, 503].includes(statusCode)) {
+        showToUser = true;
+      }
+    } else if (typeof apiError === 'string') {
+      errorType = apiError;
+      errorMessage = responseData?.message || apiError;
       if ([404, 422, 503].includes(statusCode)) {
         showToUser = true;
       }
@@ -435,6 +458,11 @@ const handleApiError = async (error, dictionary) => {
     message: errorMessage,
     statusCode,
     originalError: error,
+    data: error.response?.data ?? null,
+    code:
+      (typeof error.response?.data?.error === 'string'
+        ? error.response.data.error
+        : error.response?.data?.error?.code) || errorType,
     showToUser
   };
 };

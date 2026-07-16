@@ -36,7 +36,7 @@ export default function useErrorDisplay({ showInline = false, style = {} } = {})
       duration: error.persistent ? 0 : 5000,
       persistent: !!error.persistent,
     });
-  }, [error, showInline, dictionary, eventEmitter]);
+  }, [error, showInline, dictionary]);
 
   const errorDisplay = useMemo(() => {
     if (!showInline || !shouldShowErrorToUser(error)) return null;

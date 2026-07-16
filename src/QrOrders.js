@@ -12,18 +12,29 @@ export default function TabContent() {
   const { dictionary } = useContext(LanguageContext);
 
     const renderTabBar = props => {
+      const navState =
+        props.state ?? props.navigationState ?? props.navigation?.getState?.();
+      const routes = Array.isArray(navState?.routes) ? navState.routes : null;
+      const index = navState?.index;
+      const focusedRouteKey =
+        routes != null &&
+        Number.isInteger(index) &&
+        index >= 0 &&
+        index < routes.length
+          ? routes[index]?.key
+          : undefined;
+
       return (
         <View style={styles.tabBar}>
           {Object.keys(props.descriptors).map(key => {
             const { options, route } = props.descriptors[key];
             const label = options.tabBarLabel || options.title || route.name;
-            const routes = props.state?.routes ?? props.navigationState?.routes ?? [];
             return (
               <TabBarItem
                 key={key}
                 label={label}
                 onPress={() => props.navigation.navigate(route.name)}
-                active={props.state.index === routes.findIndex((r) => r.name === route.name)}
+                active={focusedRouteKey != null && focusedRouteKey === route.key}
                 {...props.descriptors[key]}
               />
             );
