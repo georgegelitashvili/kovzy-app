@@ -1,30 +1,40 @@
 // useFetchLanguages.js
 import { useState, useEffect } from 'react';
 import axiosInstance from '../apiConfig/apiRequests';
-import { storeData } from '../helpers/storage';
 
 export const useFetchLanguages = (apiUrls) => {
   const [languages, setLanguages] = useState([]);
 
   useEffect(() => {
+    let cancelled = false;
+
     const fetchLanguages = async () => {
       if (!apiUrls?.languages) {
+        setLanguages([]);
         return;
       }
 
+      // Clear previous domain languages while loading the new domain list.
+      setLanguages([]);
+
       try {
         const response = await axiosInstance.post(apiUrls.languages);
-        if (response.data?.languages) {
-          const fetchedLanguages = response.data.languages;
-          setLanguages(fetchedLanguages);
+        if (!cancelled && response.data?.languages) {
+          setLanguages(response.data.languages);
         }
       } catch (error) {
         console.error('Error fetching languages:', error);
-        setLanguages([]);
+        if (!cancelled) {
+          setLanguages([]);
+        }
       }
     };
 
     fetchLanguages();
+
+    return () => {
+      cancelled = true;
+    };
   }, [apiUrls]);
 
   return { languages };

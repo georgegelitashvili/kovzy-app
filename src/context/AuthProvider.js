@@ -58,6 +58,7 @@ export const AuthProvider = ({ isConnected, children }) => {
 
   const isMounted = useRef(true);
   const autoLoginAttempted = useRef(false);
+  const languageDomainRef = useRef(null);
 
   // ყველა Context Hook ერთდროულად
   const { setAvailableLanguages, userLanguageChange, dictionary } = useContext(LanguageContext);
@@ -111,10 +112,15 @@ export const AuthProvider = ({ isConnected, children }) => {
 
   const handleError = useCallback(
     (errorParam, type = "UNKNOWN", options = {}) => {
-      // ზოგადი ერორების დამუშავება
-      const errorMessage = errorParam?.message || dictionary?.["errors.UNKNOWN"] || "Unknown error";
+      const rawMessage = errorParam?.message;
+      const errorMessage =
+        typeof rawMessage === "string"
+          ? rawMessage
+          : rawMessage && typeof rawMessage === "object"
+            ? Object.values(rawMessage).flat().filter((item) => typeof item === "string").join("\n")
+            : dictionary?.["errors.UNKNOWN"] || "Unknown error";
       console.log(`[AuthProvider handleError] Calling setError with:`, { type, errorMessage, options });
-      setError(type, errorMessage, options);
+      setError(type, errorMessage || dictionary?.["errors.UNKNOWN"] || "Unknown error", options);
       eventEmitter.emit("apiError", { type, message: errorMessage });
     },
     [dictionary, setError]
@@ -287,10 +293,35 @@ export const AuthProvider = ({ isConnected, children }) => {
         ]);
         if (isMounted.current) setUser(userResponse);
       } catch (error) {
-        // Support new error format: { error: { message, code, status } }
-        const errorMessage = error.response?.data?.error?.message || error.response?.data?.message || error.message;
-        setLoginError(errorMessage);
-        handleError(error, "LOGIN_ERROR", { persistent: true }); // persistent=true რომ დარჩეს სანამ დახურავ
+        // Always show localized login messages; never surface raw English API text.
+        const statusCode =
+          error?.statusCode ||
+          error?.originalError?.response?.status ||
+          error?.response?.status;
+        const payload = error?.data || error?.originalError?.response?.data || error?.response?.data;
+        const validationErrors =
+          payload?.error?.errors ||
+          (payload?.error?.message && typeof payload.error.message === 'object'
+            ? payload.error.message
+            : null);
+
+        const localizedLoginError =
+          dictionary?.["errors.INVALID_CREDENTIALS"] ||
+          dictionary?.["errors.LOGIN_ERROR"] ||
+          "Login failed";
+
+        // Only clear username when API says username itself is invalid (422 + username field).
+        // Wrong password (401) must keep the username.
+        const usernameInvalid =
+          statusCode === 422 && Boolean(validationErrors?.username);
+
+        setLoginError({
+          clearUsername: usernameInvalid,
+          highlightUsername: usernameInvalid,
+          highlightPassword: true,
+        });
+
+        handleError({ message: localizedLoginError }, "LOGIN_ERROR", { persistent: true });
       } finally {
         setIsLoading(false);
       }
@@ -377,13 +408,17 @@ export const AuthProvider = ({ isConnected, children }) => {
     };
   }, []);
 
+  const appStateRef = useRef(appState);
+  appStateRef.current = appState;
+
   useEffect(() => {
     if (!apiUrls?.deliveronStatus || !apiUrls?.branchStatus) return;
 
     fetchAllStatus();
 
     const handleAppStateChange = (nextAppState) => {
-      if (appState.match(/inactive|background/) && nextAppState === "active") {
+      const wasBackground = appStateRef.current.match(/inactive|background/);
+      if (wasBackground && nextAppState === "active") {
         fetchAllStatus();
         if (!user && isConnected && apiUrls?.authUser) loadUser();
       }
@@ -392,7 +427,8 @@ export const AuthProvider = ({ isConnected, children }) => {
 
     const subscription = AppState.addEventListener("change", handleAppStateChange);
     return () => subscription.remove();
-  }, [appState, apiUrls, isConnected, user, fetchAllStatus, loadUser]);
+    // Intentionally omit appState — including it re-fetched status on every state change and could snap switches back
+  }, [apiUrls, isConnected, user, fetchAllStatus, loadUser]);
 
   useEffect(() => {
     if (!isConnected) {
@@ -426,23 +462,35 @@ export const AuthProvider = ({ isConnected, children }) => {
   }, [user, apiUrls?.authUser, isConnected, loadUser]);
 
   useEffect(() => {
-    if (languages.length === 0 || !apiUrls) return;
+    if (languages.length === 0 || !apiUrls || !domain) return;
 
     (async () => {
       try {
         const defaultLang = languages.find((l) => l.default === 1);
         const savedLang = await getData("rcml-lang");
-        if (!savedLang && defaultLang) {
-          await storeData("rcml-lang", defaultLang.lang);
-          userLanguageChange(defaultLang.lang);
+        const domainChanged = languageDomainRef.current !== domain;
+
+        if (defaultLang) {
+          // On domain change, always switch to that domain's default language.
+          // On same domain, only set default when nothing was saved yet.
+          if (domainChanged || !savedLang) {
+            if (savedLang !== defaultLang.lang) {
+              await storeData("rcml-lang", defaultLang.lang);
+              await userLanguageChange(defaultLang.lang);
+            } else if (!savedLang) {
+              await storeData("rcml-lang", defaultLang.lang);
+            }
+          }
         }
+
+        languageDomainRef.current = domain;
         await storeData("languages", languages);
         setAvailableLanguages(languages);
       } catch (error) {
         handleError(error, "LANGUAGE_INIT_ERROR");
       }
     })();
-  }, [languages, apiUrls, userLanguageChange, setAvailableLanguages, handleError]);
+  }, [languages, apiUrls, domain, userLanguageChange, setAvailableLanguages, handleError]);
 
   useEffect(() => {
     const listener = eventEmitter.addEventListener("sessionExpired", () => {
@@ -519,11 +567,12 @@ export const AuthProvider = ({ isConnected, children }) => {
           />
 
           <View style={styles.appRoot}>
+            {children}
             {isLoading ? (
-              <Loader text={dictionary?.["loading"]} />
-            ) : (
-              children
-            )}
+              <View style={styles.loadingOverlay} pointerEvents="auto">
+                <Loader text={dictionary?.["loading"]} />
+              </View>
+            ) : null}
             {errorDisplay && error?.type !== "LOGIN_ERROR" ? (
               <View style={styles.errorOverlay} pointerEvents="box-none">
                 {errorDisplay}
@@ -539,6 +588,14 @@ export const AuthProvider = ({ isConnected, children }) => {
 const styles = StyleSheet.create({
   appRoot: {
     flex: 1,
+  },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 10001,
+    elevation: 10001,
+    backgroundColor: "rgba(255,255,255,0.72)",
+    justifyContent: "center",
+    alignItems: "center",
   },
   errorOverlay: {
     position: "absolute",

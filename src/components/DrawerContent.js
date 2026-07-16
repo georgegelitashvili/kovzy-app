@@ -59,7 +59,7 @@ export default function DrawerContent(props) {
           { timeout: 5000 }
         ),
         axiosInstance.post(`https://${domain}/api/v1/admin/getUnansweredOrders`,
-          { type: 0, branchid, postponeOrder: false },
+          { type: 0, branchid, postponeOrder: false, excludeDeliveryScheduled: true },
           { timeout: 5000 }
         )
       ]);
@@ -78,8 +78,11 @@ export default function DrawerContent(props) {
     }
   }, [branchid, clearPollingInterval, domain]);
 
+  const fetchUnansweredOrdersRef = useRef(fetchUnansweredOrders);
+  fetchUnansweredOrdersRef.current = fetchUnansweredOrders;
+
   useEffect(() => {
-    fetchUnansweredOrders();
+    fetchUnansweredOrdersRef.current();
 
     const badgeListener = eventEmitter.addEventListener('orderBadgeUpdate', ({ type, count }) => {
       if (type === 0) {
@@ -90,7 +93,7 @@ export default function DrawerContent(props) {
     });
 
     const retryListener = eventEmitter.addEventListener(CONNECTION_EVENTS.RETRY, () => {
-      fetchUnansweredOrders();
+      fetchUnansweredOrdersRef.current();
     });
 
     const logoutListener = () => {
@@ -107,21 +110,22 @@ export default function DrawerContent(props) {
       eventEmitter.removeEventListener(retryListener);
       eventEmitter.removeEventListener(logoutListenerId);
     };
-  }, [branchid, clearPollingInterval, domain, fetchUnansweredOrders]);
+  }, [branchid, clearPollingInterval, domain]);
 
   useEffect(() => {
     clearPollingInterval();
 
-    if (!domain || !branchid || isOrderScreenActive) {
-      return;
+    if (domain && branchid && !isOrderScreenActive) {
+      intervalRef.current = setInterval(
+        () => fetchUnansweredOrdersRef.current(),
+        FALLBACK_POLL_INTERVAL
+      );
     }
-
-    intervalRef.current = setInterval(fetchUnansweredOrders, FALLBACK_POLL_INTERVAL);
 
     return () => {
       clearPollingInterval();
     };
-  }, [branchid, clearPollingInterval, domain, fetchUnansweredOrders, isOrderScreenActive]);
+  }, [branchid, clearPollingInterval, domain, isOrderScreenActive]);
 
   const onLogoutPressed = () => {
     setIsLoading(true);
@@ -145,18 +149,18 @@ export default function DrawerContent(props) {
         `https://${domain}/api/v1/admin/branchActivity`,
         {
           branchid,
-          enabled: newStatus ? 0 : 1,
+          enabled: newStatus ? 1 : 0,
         }
       );
 
       const result = resp?.data?.data;
 
       if (typeof result === "boolean") {
-        const isEnabled = result;
-        setBranchEnabled(isEnabled);
-        setIsVisible(!isEnabled);
+        // API returns open status: true = open/enabled, false = closed
+        setBranchEnabled(result);
+        setIsVisible(!result);
 
-        if (!isEnabled) {
+        if (!result) {
           handleError(
             { message: dictionary?.["orders.branchDisabled"] || "Branch is temporarily closed" },
             "BRANCH_TEMPORARILY_CLOSED",

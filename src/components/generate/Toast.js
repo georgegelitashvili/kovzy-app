@@ -42,6 +42,7 @@ const Toast = ({ type, title, subtitle, animate, addStyles, onDismiss, persisten
       useNativeDriver: true,
     }).start(() => {
       onDismissRef.current?.();
+      isDismissingRef.current = false;
     });
   }, [slideAnim]);
 
@@ -92,6 +93,15 @@ const Toast = ({ type, title, subtitle, animate, addStyles, onDismiss, persisten
   const topPosition = statusBarHeight + 10;
 
   const getLocalizedMessage = (message, toastType) => {
+    if (message == null) return "";
+    if (typeof message === "object") {
+      const flattened = Object.values(message)
+        .flat()
+        .filter((item) => typeof item === "string" && item.trim())
+        .join("\n");
+      return flattened || dictionary?.["errors.USER_FRIENDLY"] || "Something went wrong";
+    }
+
     if (toastType === "failed" && dictionary) {
       if (message && typeof message === "string") {
         if (USER_VISIBLE_ERROR_TYPES.includes(message)) {
@@ -103,7 +113,7 @@ const Toast = ({ type, title, subtitle, animate, addStyles, onDismiss, persisten
         return message;
       }
     }
-    return message;
+    return String(message);
   };
 
   const processedMessage = getLocalizedMessage(subtitle, type);
@@ -161,6 +171,7 @@ const Toast = ({ type, title, subtitle, animate, addStyles, onDismiss, persisten
 
   return (
     <Animated.View
+      pointerEvents="box-none"
       style={[
         styles.animatedContainer,
         {
@@ -169,9 +180,11 @@ const Toast = ({ type, title, subtitle, animate, addStyles, onDismiss, persisten
           paddingHorizontal: horizontalPadding,
         },
       ]}
-      {...panResponder.panHandlers}
     >
-      <View style={[styles.toastBox, addStyles, { maxWidth: toastMaxWidth }]}>
+      <View
+        {...panResponder.panHandlers}
+        style={[styles.toastBox, addStyles, { maxWidth: toastMaxWidth }]}
+      >
         <View style={[styles.uiLine, { backgroundColor: COLOR }]} />
         <View style={styles.textContainer}>
           <Text style={styles.toastTitle}>{title}</Text>

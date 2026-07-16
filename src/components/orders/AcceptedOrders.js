@@ -27,6 +27,7 @@ import OrdersModal from "../modal/OrdersModal";
 import printRows from "../../PrintRows";
 import { useOrderDetails } from "../../hooks/useOrderDetails";
 import eventEmitter from "../../utils/EventEmitter";
+import { OrderActionIcon, OrderActionRow } from "./OrderActionButtons";
 
 // This will be replaced with a dynamic calculation based on screen size
 const initialWidth = Dimensions.get("window").width;
@@ -352,25 +353,24 @@ export const AcceptedOrdersList = () => {
               </Text>
 
               <Card.Actions>
-                <TouchableOpacity
-                  style={styles.buttonAccept}
-                  onPress={() => {
-                    setItemId(item.id);
-                    showModal("status");
-                  }}
-                >
-                  <MaterialCommunityIcons name="check-decagram-outline" size={30} color="white" />
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.buttonReject}
-                  onPress={() => {
-                    setItemId(item.id);
-                    showModal("reject");
-                  }}
-                >
-                  <MaterialCommunityIcons name="close-circle-outline" size={30} color="white" />
-                </TouchableOpacity>
+                <OrderActionRow>
+                  <OrderActionIcon
+                    variant="accept"
+                    icon="check-decagram-outline"
+                    onPress={() => {
+                      setItemId(item.id);
+                      showModal("status");
+                    }}
+                  />
+                  <OrderActionIcon
+                    variant="reject"
+                    icon="close-circle-outline"
+                    onPress={() => {
+                      setItemId(item.id);
+                      showModal("reject");
+                    }}
+                  />
+                </OrderActionRow>
               </Card.Actions>
 
             </Card.Content>
@@ -488,28 +488,6 @@ const styles = StyleSheet.create({
   rightIcon: {
     marginRight: 15,
     fontSize: 25,
-  },
-  buttonAccept: {
-    width: 85,
-    height: 45,
-    borderRadius: 21,
-    borderWidth: 1,
-    borderColor: "#2fa360",
-    backgroundColor: "#2fa360",
-    justifyContent: "center",
-    alignItems: "center",
-    marginHorizontal: 5,
-  },
-  buttonReject: {
-    width: 85,
-    height: 45,
-    borderRadius: 21,
-    borderWidth: 1,
-    borderColor: "#f14c4c",
-    backgroundColor: "#f14c4c",
-    justifyContent: "center",
-    alignItems: "center",
-    marginHorizontal: 5,
   },
   title: {
     paddingVertical: 8,

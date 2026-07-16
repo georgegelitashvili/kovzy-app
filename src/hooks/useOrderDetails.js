@@ -15,6 +15,7 @@ export const useOrderDetails = () => {
   const [orderDetails, setOrderDetails] = useState({});
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [loadingFinished, setLoadingFinished] = useState(false);
+  const [loadingOrderIds, setLoadingOrderIds] = useState(() => new Set());
 
   // Use refs to keep track of current state and prevent race conditions
   const orderDetailsRef = useRef({});
@@ -22,6 +23,27 @@ export const useOrderDetails = () => {
   const pendingRequestsRef = useRef(new Map()); // Track pending requests by orderId
   const batchLoadingRef = useRef(false); // Track if batch loading is in progress
   const abortControllersRef = useRef(new Map()); // Track abort controllers by orderId
+
+  const markOrderLoading = useCallback((orderIdStr, isLoading) => {
+    if (isLoading) {
+      loadingOrdersRef.current.add(orderIdStr);
+      setLoadingOrderIds(prev => {
+        if (prev.has(orderIdStr)) return prev;
+        const next = new Set(prev);
+        next.add(orderIdStr);
+        return next;
+      });
+      return;
+    }
+
+    loadingOrdersRef.current.delete(orderIdStr);
+    setLoadingOrderIds(prev => {
+      if (!prev.has(orderIdStr)) return prev;
+      const next = new Set(prev);
+      next.delete(orderIdStr);
+      return next;
+    });
+  }, []);
 
   // Keep ref in sync with state - FIXED: Use functional update to prevent race conditions
   useEffect(() => {
@@ -33,6 +55,7 @@ export const useOrderDetails = () => {
     setOrderDetails({});
     orderDetailsRef.current = {};
     loadingOrdersRef.current.clear();
+    setLoadingOrderIds(new Set());
     pendingRequestsRef.current.clear();
     batchLoadingRef.current = false;
     abortControllersRef.current.forEach(ctrl => ctrl.abort());
@@ -43,26 +66,25 @@ export const useOrderDetails = () => {
    * Fetch details for a single order
    * Implements request deduplication and caching
    */
-  const fetchSingleOrderDetails = useCallback(async (orderId, abortSignal) => {
+  const fetchSingleOrderDetails = useCallback(async (orderId, abortSignal, options = {}) => {
+    const { force = false } = options;
     // Always use string orderId for all cache and map operations
     const orderIdStr = String(orderId);
-    // Check if already cached using ref for current state
-    if (orderDetailsRef.current[orderIdStr]) {
-      // console.log(`🔵 Order ${orderIdStr} details already cached, skipping`);
+
+    // Cached only when we have a successful response (including empty cart)
+    if (!force && orderDetailsRef.current[orderIdStr] !== undefined) {
       return orderDetailsRef.current[orderIdStr];
     }
 
     // Check if this order is already being fetched
     if (loadingOrdersRef.current.has(orderIdStr)) {
-      // console.log(`⏳ Order ${orderIdStr} details are already being fetched, waiting...`);
       return pendingRequestsRef.current.get(orderIdStr);
     }
 
     // Create a new promise for this request
     const requestPromise = (async () => {
       try {
-        loadingOrdersRef.current.add(orderIdStr);
-        // console.log(`🔴 Fetching order ${orderId} details with languageId: ${languageId}`);
+        markOrderLoading(orderIdStr, true);
 
         // Create AbortController if not provided
         let localAbortController;
@@ -75,53 +97,57 @@ export const useOrderDetails = () => {
         const response = await axiosInstance.post(
           `https://${domain}/api/v1/admin/getOrderCart`,
           { Orderid: orderIdStr, Languageid: languageId },
-          { timeout: 3000, signal: signalToUse }
+          { timeout: 10000, signal: signalToUse }
         );
 
-        const data = response.data.data;
-        const orderData = Array.isArray(data) ? data : [];
-
-        if (__DEV__) {
-          console.log(`✅ Successfully fetched order ${orderId} details`);
+        // OMA wraps cart as { data: [...] }; tolerate a raw array too
+        const raw = response?.data?.data ?? response?.data;
+        let orderData = [];
+        if (Array.isArray(raw)) {
+          orderData = raw;
+        } else if (Array.isArray(raw?.data)) {
+          orderData = raw.data;
+        } else if (raw && typeof raw === 'object' && raw.status != null && raw.status < 0) {
+          // API error payload — do not cache as empty success
+          throw new Error(raw.message || 'Failed to load order cart');
         }
 
-        // FIXED: Use functional update to prevent race conditions
+        if (__DEV__) {
+          console.log(`✅ Successfully fetched order ${orderId} details (${orderData.length} items)`);
+        }
+
         setOrderDetails(prev => {
           const updated = { ...prev, [orderIdStr]: orderData };
-          orderDetailsRef.current = updated; // Keep ref in sync immediately
-          if (__DEV__) {
-            console.log('[useOrderDetails] setOrderDetails: keys now', Object.keys(updated));
-          }
+          orderDetailsRef.current = updated;
           return updated;
         });
 
         return orderData;
 
       } catch (err) {
-        // if (err.name === 'CanceledError' || err.name === 'AbortError') {
-        //   console.log(`⛔️ Request for order ${orderId} was cancelled.`);
-        // } else {
-        //   console.log(`❌ Error fetching order ${orderId} details:`, err);
-        // }
-        const emptyArray = [];
-        setOrderDetails(prev => {
-          const updated = { ...prev, [orderIdStr]: emptyArray };
-          orderDetailsRef.current = updated;
-          // console.log('[useOrderDetails] setOrderDetails (error): keys now', Object.keys(updated));
-          return updated;
-        });
-        return emptyArray;
+        const isCancelled =
+          err?.name === 'CanceledError' ||
+          err?.name === 'AbortError' ||
+          err?.code === 'ERR_CANCELED';
+
+        if (__DEV__ && !isCancelled) {
+          console.warn(`❌ Error fetching order ${orderId} details:`, err?.message || err);
+        }
+
+        // Do NOT cache failures as [] — that blocked retries forever
+        // (empty array is truthy, so expand/batch would never refetch)
+        return [];
       } finally {
-        loadingOrdersRef.current.delete(orderIdStr);
+        markOrderLoading(orderIdStr, false);
         pendingRequestsRef.current.delete(orderIdStr);
         abortControllersRef.current.delete(orderIdStr);
       }
     })();
 
     // Store the promise so other calls can wait for it
-    pendingRequestsRef.current.set(orderId, requestPromise);
+    pendingRequestsRef.current.set(orderIdStr, requestPromise);
     return requestPromise;
-  }, [domain, languageId]);
+  }, [domain, languageId, markOrderLoading]);
 
   /**
    * Fetch details for multiple orders in batch
@@ -138,7 +164,7 @@ export const useOrderDetails = () => {
     // Filter out duplicates and already cached orders
     const orderIdsStr = orderIds.map(id => String(id));
     const orderIdsToFetch = [...new Set(orderIdsStr)].filter(orderId =>
-      !orderDetailsRef.current[orderId] && !loadingOrdersRef.current.has(orderId)
+      orderDetailsRef.current[orderId] === undefined && !loadingOrdersRef.current.has(orderId)
     );
 
     if (orderIdsToFetch.length === 0) {
@@ -215,14 +241,13 @@ export const useOrderDetails = () => {
    * Fetch details for a single order (lazy loading version)
    * Only fetches if not already loaded
    */
-  const fetchOrderDetailsLazy = useCallback(async (orderId) => {
-    // Check if already cached using ref
+  const fetchOrderDetailsLazy = useCallback(async (orderId, force = false) => {
     const orderIdStr = String(orderId);
-    if (orderDetailsRef.current[orderIdStr]) {
+    if (!force && orderDetailsRef.current[orderIdStr] !== undefined) {
       return orderDetailsRef.current[orderIdStr];
     }
 
-    return await fetchSingleOrderDetails(orderIdStr);
+    return await fetchSingleOrderDetails(orderIdStr, undefined, { force });
   }, [fetchSingleOrderDetails]);
 
   /**
@@ -239,11 +264,32 @@ export const useOrderDetails = () => {
     setLoadingDetails(false); // FIXED: Also reset loading state
     orderDetailsRef.current = {};
     loadingOrdersRef.current.clear();
+    setLoadingOrderIds(new Set());
     pendingRequestsRef.current.clear();
     batchLoadingRef.current = false; // FIXED: Reset batch loading flag
     abortControllersRef.current.forEach(ctrl => ctrl.abort());
     abortControllersRef.current.clear();
   }, []);
+
+  /**
+   * Invalidate cached details for a single order so the next fetch reloads them
+   */
+  const invalidateOrderDetails = useCallback((orderId) => {
+    const orderIdStr = String(orderId);
+    setOrderDetails(prev => {
+      const updated = { ...prev };
+      delete updated[orderIdStr];
+      orderDetailsRef.current = updated;
+      return updated;
+    });
+    markOrderLoading(orderIdStr, false);
+    pendingRequestsRef.current.delete(orderIdStr);
+    const ctrl = abortControllersRef.current.get(orderIdStr);
+    if (ctrl) {
+      ctrl.abort();
+      abortControllersRef.current.delete(orderIdStr);
+    }
+  }, [markOrderLoading]);
 
   /**
    * Check if order details are loaded for a specific order
@@ -264,8 +310,8 @@ export const useOrderDetails = () => {
    * Check if order details are currently being fetched
    */
   const isOrderLoading = useCallback((orderId) => {
-    return loadingOrdersRef.current.has(String(orderId));
-  }, []);
+    return loadingOrderIds.has(String(orderId));
+  }, [loadingOrderIds]);
 
   // Cancel all requests on unmount
   useEffect(() => {
@@ -283,6 +329,7 @@ export const useOrderDetails = () => {
     fetchBatchOrderDetails,
     fetchOrderDetailsLazy,
     clearOrderDetails,
+    invalidateOrderDetails,
     isOrderDetailsLoaded,
     isOrderLoading,
     getOrderDetails,

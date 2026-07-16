@@ -26,7 +26,8 @@ export const USER_VISIBLE_ERROR_TYPES = [
   'SERVER_ERROR',       // Show server errors
   'UNAUTHORIZED',       // Show unauthorized errors
   'FORBIDDEN',          // Show forbidden errors
-  'SERVICE_UNAVAILABLE' // Show service unavailable errors
+  'SERVICE_UNAVAILABLE', // Show service unavailable errors
+  'DELIVERON_NOT_INTEGRATED', // Show when Deliveron credentials are missing
 ];
 
 // Regex patterns to detect technical errors that should never be shown to users
