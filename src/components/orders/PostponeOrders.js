@@ -25,7 +25,7 @@ import OrdersModal from "../modal/OrdersModal";
 import printRows from "../../PrintRows";
 import NotificationSound from '../../utils/NotificationSound';
 import eventEmitter from '../../utils/EventEmitter';
-import { OrderActionIcon, OrderActionRow } from "./OrderActionButtons";
+import OrderCardActions from "./OrderCardActions";
 
 const initialWidth = Dimensions.get("window").width;
 const getColumnsByScreenSize = (screenWidth) => {
@@ -346,28 +346,18 @@ export const PostponeOrders = () => {
                             <Text variant="titleMedium" style={styles.title}>
                                 {dictionary["orders.totalcost"]}: {item.total_cost} {currency}
                             </Text>
-                            <Card.Actions>
-                                <OrderActionRow>
-                                    <OrderActionIcon
-                                        variant="accept"
-                                        icon="check-decagram-outline"
-                                        onPress={() => {
-                                            setItemId(item.id);
-                                            setItemTakeAway(item.take_away);
-                                            showModal("accept");
-                                        }}
-                                    />
-                                    <OrderActionIcon
-                                        variant="reject"
-                                        icon="close-circle-outline"
-                                        onPress={() => {
-                                            setItemId(item.id);
-                                            setItemTakeAway(null);
-                                            showModal("reject");
-                                        }}
-                                    />
-                                </OrderActionRow>
-                            </Card.Actions>
+                            <OrderCardActions
+                                onAccept={() => {
+                                    setItemId(item.id);
+                                    setItemTakeAway(item.take_away);
+                                    showModal("accept");
+                                }}
+                                onReject={() => {
+                                    setItemId(item.id);
+                                    setItemTakeAway(null);
+                                    showModal("reject");
+                                }}
+                            />
 
                         </Card.Content>
                     ) : null}

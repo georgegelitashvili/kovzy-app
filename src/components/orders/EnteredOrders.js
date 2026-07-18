@@ -3,7 +3,6 @@ import {
   StyleSheet,
   Dimensions,
   View,
-  Modal,
   Alert,
   AppState,
   FlatList,
@@ -17,11 +16,11 @@ import NetInfo from '@react-native-community/netinfo';
 
 import { useAuthState } from "../../context/AuthProvider";
 import Loader from "../generate/loader";
-import TimePicker from "../generate/TimePicker";
 import { LanguageContext } from "../Language";
 import axiosInstance from "../../apiConfig/apiRequests";
 import OrdersModal from "../modal/OrdersModal";
 import OrdersModalEdit from "../modal/OrdersModalEdit";
+import OrdersModalTimePicker from "../modal/OrdersModalTimePicker";
 import ErrorDisplay from "../generate/ErrorDisplay";
 import useErrorHandler from "../../hooks/useErrorHandler";
 import eventEmitter from "../../utils/EventEmitter";
@@ -936,30 +935,22 @@ export const EnteredOrdersList = () => {
             updateUrl={options.url_updateOrderCart}
             onUpdated={handleOrderUpdated}
           />
-          <Modal
-            transparent={true}
+          <OrdersModalTimePicker
             visible={isPickerVisible}
-            animationType="fade"
-            onRequestClose={() => {
+            initialMinutes={30}
+            loading={state.loadingOptions}
+            title={
+              pickerMode === "schedule"
+                ? dictionary["orders.scheduleOrder"]
+                : dictionary["orders.postponeOrder"] || dictionary["orders.scheduleOrder"]
+            }
+            onConfirm={handleDelaySetWrapper}
+            onClose={() => {
               setPickerVisible(false);
-              setPickerMode('postpone');
-              dispatch({ type: 'SET_LOADING_OPTIONS', payload: false });
+              setPickerMode("postpone");
+              dispatch({ type: "SET_LOADING_OPTIONS", payload: false });
             }}
-          >
-            <View style={styles.modalContainer}>
-              <TimePicker
-                scheduled={state.scheduled}
-                showButton={true}
-                initialMinutes={30}
-                onDelaySet={handleDelaySetWrapper}
-                onClose={() => {
-                  setPickerVisible(false);
-                  setPickerMode('postpone');
-                  dispatch({ type: 'SET_LOADING_OPTIONS', payload: false });
-                }}
-              />
-            </View>
-          </Modal>
+          />
           <FlatList
             key={`flat-list-${numColumns}`}
             data={state.orders}

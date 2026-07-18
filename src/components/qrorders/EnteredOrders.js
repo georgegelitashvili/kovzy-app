@@ -22,7 +22,7 @@ import axiosInstance from "../../apiConfig/apiRequests";
 import OrdersDetail from "../OrdersDetail";
 import OrdersModal from "../modal/OrdersModalQr";
 import printRows from "../../PrintRows";
-import { OrderActionIcon, OrderActionRow } from "../orders/OrderActionButtons";
+import OrderCardActions from "../orders/OrderCardActions";
 
 import NotificationSound from '../../utils/NotificationSound';
 import NotificationManager from '../../utils/NotificationManager';
@@ -540,28 +540,18 @@ export const EnteredOrdersList = () => {
               <Text variant="titleMedium" style={styles.title}>
                 {dictionary["orders.totalcost"]}: {item.total_cost} {currency}
               </Text>
-              <Card.Actions>
-                <OrderActionRow>
-                  <OrderActionIcon
-                    variant="accept"
-                    icon="check-decagram-outline"
-                    onPress={() => {
-                      setItemId(item.id);
-                      setItemTakeAway(item.take_away);
-                      showModal("accept");
-                    }}
-                  />
-                  <OrderActionIcon
-                    variant="reject"
-                    icon="close-circle-outline"
-                    onPress={() => {
-                      setItemId(item.id);
-                      setItemTakeAway(null);
-                      showModal("reject");
-                    }}
-                  />
-                </OrderActionRow>
-              </Card.Actions>
+              <OrderCardActions
+                onAccept={() => {
+                  setItemId(item.id);
+                  setItemTakeAway(item.take_away);
+                  showModal("accept");
+                }}
+                onReject={() => {
+                  setItemId(item.id);
+                  setItemTakeAway(null);
+                  showModal("reject");
+                }}
+              />
 
             </Card.Content>
           ) : null}

@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useMemo, useContext, useEffect } from "react";
-import { StyleSheet, View, Modal, Text, useWindowDimensions } from "react-native";
+import { StyleSheet, View, Modal, Text, TouchableOpacity, useWindowDimensions } from "react-native";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import OrdersModalAccept from "./OrdersModalQrAccept";
 import OrdersModalReject from "./OrdersModalQrReject";
 import OrdersModalStatus from "./OrdersModalQrStatus";
@@ -94,6 +95,15 @@ export default function OrdersModal({
           }
         ]}>
           {type === "accept" && (
+            <TouchableOpacity
+              style={styles.closeIconButton}
+              onPress={hideModal}
+              hitSlop={10}
+            >
+              <MaterialCommunityIcons name="close" size={24} color="#6c757d" />
+            </TouchableOpacity>
+          )}
+          {type === "accept" && (
             <View style={styles.headerContent}>
               <Text style={[styles.contentTitle, { fontSize: titleFontSize }]}>
                 {dictionary["orders.approvingWarning"]}
@@ -130,9 +140,18 @@ const styles = StyleSheet.create({
     },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
+    position: "relative",
+  },
+  closeIconButton: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    zIndex: 2,
+    padding: 4,
   },
   headerContent: {
     marginBottom: 10,
+    marginTop: 12,
   },
   contentTitle: {
     marginVertical: 10,

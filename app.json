@@ -6,7 +6,7 @@
     "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": false,
+    "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash-icon-dark.png",
       "resizeMode": "cover",
@@ -84,7 +84,14 @@
       "expo-asset",
       "expo-font",
       "@react-native-community/datetimepicker",
-      "@sentry/react-native"
+      [
+        "@sentry/react-native/expo",
+        {
+          "url": "https://us.sentry.io/",
+          "organization": "4506904411439104",
+          "project": "4506904415764480"
+        }
+      ]
     ]
   }
 }

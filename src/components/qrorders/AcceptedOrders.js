@@ -27,7 +27,7 @@ import OrdersDetail from "../OrdersDetail";
 import OrdersModal from "../modal/OrdersModalQr";
 import printRows from "../../PrintRows";
 import { useOrderDetails } from "../../hooks/useOrderDetails";
-import { OrderActionIcon, OrderActionRow } from "../orders/OrderActionButtons";
+import OrderCardActions from "../orders/OrderCardActions";
 
 const initialWidth = Dimensions.get("window").width;
 const getColumnsByScreenSize = (screenWidth) => {
@@ -293,26 +293,17 @@ export const AcceptedOrdersList = () => {
               {dictionary["orders.totalcost"]}: {item.total_cost} {currency}
             </Text>
 
-            <Card.Actions>
-              <OrderActionRow>
-                <OrderActionIcon
-                  variant="accept"
-                  icon="check-decagram-outline"
-                  onPress={() => {
-                    setItemId(item.id);
-                    showModal("status");
-                  }}
-                />
-                <OrderActionIcon
-                  variant="reject"
-                  icon="close-circle-outline"
-                  onPress={() => {
-                    setItemId(item.id);
-                    showModal("reject");
-                  }}
-                />
-              </OrderActionRow>
-            </Card.Actions>
+            <OrderCardActions
+              acceptLabel={dictionary["orders.finish"] || dictionary["orders.accept"]}
+              onAccept={() => {
+                setItemId(item.id);
+                showModal("status");
+              }}
+              onReject={() => {
+                setItemId(item.id);
+                showModal("reject");
+              }}
+            />
 
           </Card.Content>
         ) : null}

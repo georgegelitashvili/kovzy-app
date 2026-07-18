@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useContext } from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { TimerPicker } from "react-native-timer-picker";
 import { LanguageContext } from "../Language";
 
@@ -68,6 +69,16 @@ const TimePicker = ({
 
     return (
         <View style={[styles.container, { backgroundColor }]}>
+            {showButton && typeof onClose === "function" ? (
+                <TouchableOpacity
+                    style={styles.closeIconButton}
+                    onPress={onClose}
+                    hitSlop={10}
+                >
+                    <MaterialCommunityIcons name="close" size={24} color="#6c757d" />
+                </TouchableOpacity>
+            ) : null}
+
             <View style={styles.pickerContainer}>
                 <TimerPicker
                     key={`delay-picker-${startingMinutes}`}
@@ -103,14 +114,18 @@ const TimePicker = ({
                     <Text style={styles.buttonText}>+1 hour</Text>
                 </TouchableOpacity>
             </View>
-            {showButton ? <View style={styles.confirmContainer}>
-                <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
-                    <Text style={styles.confirmText}>{dictionary["cancel"] || "Cancel"}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.confirmButton} onPress={() => onDelaySet(formatDelayTime())}>
-                    <Text style={styles.confirmText}>{dictionary["okay"] || "Confirm"}</Text>
-                </TouchableOpacity>
-            </View> : null}
+            {showButton ? (
+                <View style={styles.confirmContainer}>
+                    <TouchableOpacity
+                        style={styles.confirmButton}
+                        onPress={() => onDelaySet(formatDelayTime())}
+                    >
+                        <Text style={styles.confirmText}>
+                            {dictionary["orders.approve"] || "დადასტურება"}
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+            ) : null}
         </View>
     );
 };
@@ -120,8 +135,18 @@ const styles = StyleSheet.create({
         alignItems: "center",
         justifyContent: "center",
         padding: 20,
+        paddingTop: 28,
         backgroundColor: "#fff",
         borderRadius: 10,
+        position: "relative",
+        width: "100%",
+    },
+    closeIconButton: {
+        position: "absolute",
+        top: 10,
+        right: 10,
+        zIndex: 2,
+        padding: 4,
     },
     pickerContainer: {
         alignItems: "center",
@@ -142,26 +167,25 @@ const styles = StyleSheet.create({
     },
     confirmContainer: {
         flexDirection: "row",
-        justifyContent: "space-between",
-        marginTop: 30,
-    },
-    cancelButton: {
-        backgroundColor: "#DC3545",
-        paddingVertical: 10,
-        paddingHorizontal: 20,
-        borderRadius: 5,
-        marginHorizontal: 10,
+        justifyContent: "center",
+        alignItems: "center",
+        marginTop: 48,
+        width: "100%",
     },
     confirmButton: {
         backgroundColor: "#28A745",
-        paddingVertical: 10,
-        paddingHorizontal: 20,
-        borderRadius: 5,
-        marginHorizontal: 10,
+        paddingVertical: 16,
+        paddingHorizontal: 48,
+        borderRadius: 10,
+        minWidth: 220,
+        minHeight: 56,
+        alignItems: "center",
+        justifyContent: "center",
     },
     confirmText: {
         color: "#fff",
-        fontSize: 16,
+        fontSize: 18,
+        fontWeight: "700",
         textAlign: "center",
     },
     buttonText: {

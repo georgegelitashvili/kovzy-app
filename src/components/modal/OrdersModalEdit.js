@@ -213,8 +213,21 @@ function collectChanges(products) {
   return { products: productPayload, collectionItems, packs };
 }
 
-function QuantityControls({ value, disabled, onChange, layout }) {
-  const displayValue = Number.isFinite(Number(value)) ? String(value) : '0';
+function clampQuantity(nextValue, max) {
+  const parsed = Number(nextValue);
+  const safeValue = Number.isFinite(parsed) ? parsed : 0;
+  const min = 0;
+  const hasMax = Number.isFinite(Number(max));
+  const upper = hasMax ? Math.max(min, Number(max)) : Number.POSITIVE_INFINITY;
+  return Math.min(upper, Math.max(min, safeValue));
+}
+
+function QuantityControls({ value, max, disabled, onChange, layout }) {
+  const numericValue = Number(value) || 0;
+  const maxValue = Number.isFinite(Number(max)) ? Number(max) : null;
+  const atMax = maxValue != null && numericValue >= maxValue;
+  const plusDisabled = disabled || atMax;
+  const displayValue = Number.isFinite(numericValue) ? String(numericValue) : '0';
   const iconSize = layout.isPhone ? 18 : 22;
 
   return (
@@ -237,7 +250,7 @@ function QuantityControls({ value, disabled, onChange, layout }) {
         ]}
         disabled={disabled}
         activeOpacity={0.7}
-        onPress={() => onChange(Math.max(0, Number(value) - 1))}
+        onPress={() => onChange(clampQuantity(numericValue - 1, maxValue))}
         hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
       >
         <MaterialCommunityIcons
@@ -284,7 +297,7 @@ function QuantityControls({ value, disabled, onChange, layout }) {
             return;
           }
           const next = parseFloat(cleaned);
-          onChange(Number.isFinite(next) ? Math.max(0, next) : 0);
+          onChange(clampQuantity(next, maxValue));
         }}
       />
       <TouchableOpacity
@@ -292,17 +305,17 @@ function QuantityControls({ value, disabled, onChange, layout }) {
           styles.qtyBtn,
           styles.qtyBtnRight,
           { width: layout.qtyBtnWidth, height: layout.qtyHeight },
-          disabled && styles.disabled,
+          plusDisabled && styles.disabled,
         ]}
-        disabled={disabled}
+        disabled={plusDisabled}
         activeOpacity={0.7}
-        onPress={() => onChange(Number(value) + 1)}
+        onPress={() => onChange(clampQuantity(numericValue + 1, maxValue))}
         hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
       >
         <MaterialCommunityIcons
           name="plus"
           size={iconSize}
-          color={disabled ? '#9aa3af' : '#1f2937'}
+          color={plusDisabled ? '#9aa3af' : '#1f2937'}
         />
       </TouchableOpacity>
     </View>
@@ -424,6 +437,7 @@ export default function OrdersModalEdit({
         <View style={styles.packControls}>
           <QuantityControls
             value={pack.quantity}
+            max={pack.originalQuantity}
             disabled={pack.deleted || parentDeleted}
             onChange={(quantity) => onPackChange(pack.id, { quantity })}
             layout={layout}
@@ -568,6 +582,7 @@ export default function OrdersModalEdit({
 
                   <QuantityControls
                     value={product.amount}
+                    max={product.originalAmount}
                     disabled={product.deleted}
                     onChange={(amount) =>
                       updateProduct(product.id, (p) => ({ ...p, amount }))
@@ -616,6 +631,7 @@ export default function OrdersModalEdit({
                       </View>
                       <QuantityControls
                         value={child.amount}
+                        max={child.originalAmount}
                         disabled={child.deleted || product.deleted}
                         onChange={(amount) =>
                           updateProduct(product.id, (p) => ({

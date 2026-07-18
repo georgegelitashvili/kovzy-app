@@ -5,7 +5,7 @@ import { MaterialCommunityIcons, SimpleLineIcons } from '@expo/vector-icons';
 import OrdersDetail from '../OrdersDetail';
 import { LanguageContext } from "../Language";
 import { canEditOrder } from "../../utils/canEditOrder";
-import { OrderActionIcon, OrderActionRow } from "./OrderActionButtons";
+import OrderCardActions from "./OrderCardActions";
 
 const OrderCard = (props) => {
   // Ensure all props exist before destructuring
@@ -43,7 +43,6 @@ const OrderCard = (props) => {
     loading
   } = safeProps;
   const showEdit = canEditOrder(item) && typeof onEdit === 'function';
-  const { width } = useWindowDimensions();
   const deliveryPrice = parseFloat(item.delivery_price);
   const additionalFees = parseFloat(item.service_fee) / 100;
   const feeData = JSON.parse(item.fees_details || '{}');
@@ -56,56 +55,12 @@ const OrderCard = (props) => {
   }, []);
 
   const { dictionary } = useContext(LanguageContext);
-  const isScheduled = item.take_away ? scheduled.scheduled_takeaway : scheduled.scheduled_delivery;
-  const showDelay = item.delivery_scheduled !== null && isScheduled;
-  const showSchedule = typeof onSchedule === 'function';
-
-  const renderButtons = () => {
-    return (
-      <OrderActionRow>
-        <OrderActionIcon
-          variant="accept"
-          icon="check-decagram-outline"
-          disabled={loading}
-          onPress={() => !loading && onAccept(item.id, item.take_away)}
-        />
-
-        {showEdit && (
-          <OrderActionIcon
-            variant="edit"
-            icon="pencil-outline"
-            disabled={loading}
-            onPress={() => !loading && onEdit(item)}
-          />
-        )}
-
-        {showSchedule && (
-          <OrderActionIcon
-            variant="schedule"
-            icon="clock-outline"
-            disabled={loading}
-            onPress={() => !loading && onSchedule(item.id)}
-          />
-        )}
-
-        {showDelay && (
-          <OrderActionIcon
-            variant="delay"
-            icon="bell-ring-outline"
-            disabled={loading}
-            onPress={() => !loading && onDelay(item.id, item.delivery_scheduled)}
-          />
-        )}
-
-        <OrderActionIcon
-          variant="reject"
-          icon="close-circle-outline"
-          disabled={loading}
-          onPress={() => !loading && onReject(item.id)}
-        />
-      </OrderActionRow>
-    );
-  };
+  const isScheduled = item.take_away
+    ? !!scheduled.scheduled_takeaway
+    : !!scheduled.scheduled_delivery;
+  const showDelay = item.delivery_scheduled != null && isScheduled && typeof onDelay === 'function';
+  // Only show Schedule when admin scheduled-orders setting is enabled for this order type.
+  const showSchedule = isScheduled && typeof onSchedule === 'function';
 
   return (
     <Card key={item.id} style={styles.card}>
@@ -143,9 +98,17 @@ const OrderCard = (props) => {
             detailsLoading={detailsLoading}
           />
 
-          <Card.Actions>
-            {renderButtons()}
-          </Card.Actions>
+          <OrderCardActions
+            loading={loading}
+            showEdit={showEdit}
+            showSchedule={showSchedule}
+            showDelay={showDelay}
+            onAccept={() => onAccept(item.id, item.take_away)}
+            onReject={() => onReject(item.id)}
+            onEdit={() => onEdit(item)}
+            onSchedule={() => onSchedule(item.id)}
+            onDelay={() => onDelay(item.id, item.delivery_scheduled)}
+          />
         </Card.Content>
       )}
     </Card>
