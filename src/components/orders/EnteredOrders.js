@@ -214,7 +214,6 @@ export const EnteredOrdersList = () => {
           branchid,
           Languageid: languageId,
           postponeOrder: false,
-          excludeDeliveryScheduled: true,
         },
         { signal: abortControllerRef.current?.signal }
       );
@@ -529,7 +528,6 @@ export const EnteredOrdersList = () => {
               branchid: branchid,
               Languageid: languageId,
               postponeOrder: false,
-              excludeDeliveryScheduled: true,
             },
             { signal: abortControllerRef.current?.signal }
           );

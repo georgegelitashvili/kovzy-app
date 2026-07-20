@@ -112,6 +112,11 @@ const ConnectionStatusBar = () => {
   }, [retrying]);
 
   const handleDismiss = useCallback(() => {
+    if (retryTimeoutRef.current) {
+      clearTimeout(retryTimeoutRef.current);
+      retryTimeoutRef.current = null;
+    }
+    setRetrying(false);
     dismissConnectionBanner();
     hideBanner();
   }, [hideBanner]);

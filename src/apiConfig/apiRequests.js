@@ -14,7 +14,7 @@ import {
 } from '../utils/connectionMonitor';
 
 const shouldSkipConnectionMonitor = (url = '') =>
-  /\/auth\/login|checkDomain|\/branches(?:\?|$)/i.test(url);
+  /\/auth\/login(?:\/|\?|$)|\/checkDomain(?:\/|\?|$)|\/branches(?:\/|\?|$)/i.test(url);
 
 const cache = new Map();
 const CACHE_DURATION = 5 * 60 * 1000;

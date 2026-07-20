@@ -10,17 +10,22 @@ export const useFetchLanguages = (apiUrls) => {
 
     const fetchLanguages = async () => {
       if (!apiUrls?.languages) {
-        setLanguages([]);
+        if (!cancelled) {
+          setLanguages([]);
+        }
         return;
       }
 
-      // Clear previous domain languages while loading the new domain list.
-      setLanguages([]);
-
       try {
         const response = await axiosInstance.post(apiUrls.languages);
-        if (!cancelled && response.data?.languages) {
+        if (cancelled) {
+          return;
+        }
+
+        if (response.data?.languages) {
           setLanguages(response.data.languages);
+        } else {
+          setLanguages([]);
         }
       } catch (error) {
         console.error('Error fetching languages:', error);

@@ -1,5 +1,5 @@
 // screens/SettingsScreen.js
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useRef } from 'react';
 import {
     StyleSheet,
     SafeAreaView,
@@ -29,6 +29,7 @@ const SettingsScreen = ({ navigation }) => {
         url_deliveronActivity: "",
     });
     const [togglingDeliveron, setTogglingDeliveron] = useState(false);
+    const togglingDeliveronRef = useRef(false);
 
     const loadMusicTitle = async () => {
         try {
@@ -103,7 +104,7 @@ const SettingsScreen = ({ navigation }) => {
     };
     
     const toggleDeliveron = (nextEnabled) => {
-        if (togglingDeliveron || !options.url_deliveronActivity) return;
+        if (togglingDeliveronRef.current || togglingDeliveron || !options.url_deliveronActivity) return;
 
         const enabling =
             typeof nextEnabled === 'boolean' ? nextEnabled : !deliveronEnabled;
@@ -116,9 +117,15 @@ const SettingsScreen = ({ navigation }) => {
     };
 
     const handleConfirmToggle = async (newValue) => {
-        setModalVisible(false);
-        if (togglingDeliveron || !options.url_deliveronActivity) return;
+        // Guard before closing the modal so a busy/missing-URL state does not
+        // dismiss the confirmation without sending the disable request.
+        // Ref blocks concurrent callers before React re-renders togglingDeliveron.
+        if (togglingDeliveronRef.current || togglingDeliveron || !options.url_deliveronActivity) {
+            return;
+        }
 
+        togglingDeliveronRef.current = true;
+        setModalVisible(false);
         setTogglingDeliveron(true);
 
         try {
@@ -127,7 +134,14 @@ const SettingsScreen = ({ navigation }) => {
             });
 
             const payload = response?.data?.data ?? response?.data;
-            if (newValue && (payload?.error === 'DELIVERON_NOT_INTEGRATED' || payload?.integrated === false)) {
+            const errorCode =
+              typeof payload?.error === 'string'
+                ? payload.error
+                : payload?.error?.code;
+            if (
+              newValue &&
+              (errorCode === 'DELIVERON_NOT_INTEGRATED' || payload?.integrated === false)
+            ) {
                 setDeliveronEnabled(false);
                 showDeliveronToast(
                     'failed',
@@ -137,10 +151,18 @@ const SettingsScreen = ({ navigation }) => {
                 return;
             }
 
-            const isEnabled = typeof payload?.enabled === 'boolean'
-                ? payload.enabled
-                : newValue;
-            setDeliveronEnabled(isEnabled);
+            if (typeof payload?.enabled === 'boolean') {
+                setDeliveronEnabled(payload.enabled);
+            } else if (errorCode || payload?.integrated === false) {
+                // Ambiguous success payload: keep prior UI state rather than guessing.
+                showDeliveronToast(
+                    'failed',
+                    dictionary['general.alerts'] || 'Alert',
+                    dictionary['errors.generic'] || 'Something went wrong. Please try again.'
+                );
+            } else {
+                setDeliveronEnabled(Boolean(newValue));
+            }
         } catch (error) {
             // Axios interceptor replaces the raw error with a formatted object.
             const statusCode = error?.statusCode || error?.response?.status || error?.originalError?.response?.status;
@@ -183,6 +205,7 @@ const SettingsScreen = ({ navigation }) => {
                 );
             }
         } finally {
+            togglingDeliveronRef.current = false;
             setTogglingDeliveron(false);
         }
     };
@@ -290,7 +313,7 @@ const SettingsScreen = ({ navigation }) => {
                                         </TouchableOpacity>
                                         <TouchableOpacity
                                             style={styles.confirmButton}
-                                            onPress={() => handleConfirmToggle(false)}
+                                            onPress={() => handleConfirmToggle(!deliveronEnabled)}
                                         >
                                             <Text style={styles.buttonText}>{dictionary['confirm']}</Text>
                                         </TouchableOpacity>

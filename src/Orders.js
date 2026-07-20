@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useContext, useCallback, useRef } from "react";
 import {
   Alert,
-  View,
-  StyleSheet
 } from "react-native";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createMaterialTopTabNavigator } from "@react-navigation/material-top-tabs";
@@ -13,7 +11,7 @@ import { EnteredOrdersList } from "./components/orders/EnteredOrders";
 import { PostponeOrders } from "./components/orders/PostponeOrders";
 import { AcceptedOrdersList } from "./components/orders/AcceptedOrders";
 import { LanguageContext } from "./components/Language";
-import { TabBarItem } from "./components/TabBarItem";
+import { CustomTabBar } from "./components/CustomTabBar";
 
 const Tab = createMaterialTopTabNavigator();
 
@@ -73,38 +71,6 @@ export default function TabContent() {
     }, [])
   );
 
-  const renderTabBar = props => {
-    const navState =
-      props.state ?? props.navigationState ?? props.navigation?.getState?.();
-    const routes = Array.isArray(navState?.routes) ? navState.routes : null;
-    const index = navState?.index;
-    const focusedRouteKey =
-      routes != null &&
-      Number.isInteger(index) &&
-      index >= 0 &&
-      index < routes.length
-        ? routes[index]?.key
-        : undefined;
-
-    return (
-      <View style={styles.tabBar}>
-        {Object.keys(props.descriptors).map(key => {
-          const { options, route } = props.descriptors[key];
-          const label = options.tabBarLabel || options.title || route.name;
-          return (
-            <TabBarItem
-              key={key}
-              label={label}
-              onPress={() => props.navigation.navigate(route.name)}
-              active={focusedRouteKey != null && focusedRouteKey === route.key}
-              {...props.descriptors[key]}
-            />
-          );
-        })}
-      </View>
-    );
-  };
-
   return (
     <Tab.Navigator
       screenOptions={{
@@ -120,7 +86,7 @@ export default function TabContent() {
           shadowOpacity: 0,
         },
       }}
-      tabBar={renderTabBar}
+      tabBar={(props) => <CustomTabBar {...props} />}
     >
       <Tab.Screen
         name="EnteredOrders"
@@ -144,13 +110,3 @@ export default function TabContent() {
     </Tab.Navigator>
   );
 }
-
-const styles = StyleSheet.create({
-  tabBar: {
-    flexDirection: 'row',
-    backgroundColor: 'white',
-    paddingHorizontal: 8,
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-});

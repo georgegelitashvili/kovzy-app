@@ -30,7 +30,7 @@ const normalizeProductsPayload = (response) => {
     };
   }
 
-  if (productsSource?.data) {
+  if (Array.isArray(productsSource?.data)) {
     return {
       category,
       excluded,
@@ -136,14 +136,19 @@ export default function Products({ navigation }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [bulkModalVisible, setBulkModalVisible] = useState(false);
   const [bulkLoading, setBulkLoading] = useState(false);
+  const fetchRequestIdRef = useRef(0);
 
   // Calculate button width based on screen size
   const buttonWidth = Math.max(80, (width - 30) / 3); // Minimum 80px, but distribute space evenly
 
   const fetchData = useCallback(async (pageOverride) => {
+    const requestId = ++fetchRequestIdRef.current;
+
     if (!user || !domain || !branchid) {
-      setLoading(false);
-      setRefreshing(false);
+      if (requestId === fetchRequestIdRef.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
       return;
     }
 
@@ -161,6 +166,11 @@ export default function Products({ navigation }) {
           like: searchQuery || null,
         }
       );
+
+      // A newer request (or unmount) superseded this one.
+      if (requestId !== fetchRequestIdRef.current) {
+        return;
+      }
 
       const {
         category: nextCategory,
@@ -187,15 +197,27 @@ export default function Products({ navigation }) {
         console.log(`[Products] Loaded ${updatedProducts.length} product(s) for branch ${branchid}`);
       }
     } catch (error) {
+      if (requestId !== fetchRequestIdRef.current) {
+        return;
+      }
       console.error('Error fetching products:', error);
       setProducts([]);
       setExcluded([]);
       setApiError(error);
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (requestId === fetchRequestIdRef.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   }, [user, domain, branchid, userLanguage, page, selectedCategories, searchQuery, clearError, setApiError]);
+
+  useEffect(() => {
+    return () => {
+      // Invalidate in-flight fetches on unmount.
+      fetchRequestIdRef.current += 1;
+    };
+  }, []);
 
   useEffect(() => {
     const removeSubscription = NetInfo.addEventListener((state) => {
@@ -232,15 +254,21 @@ export default function Products({ navigation }) {
   selectedCategoriesRef.current = selectedCategories;
 
   useEffect(() => {
-    // Only reset when the panel closes (not on initial mount while already closed)
-    if (!showFilter && wasFilterOpenRef.current) {
-      if (selectedCategoriesRef.current.length > 0) {
-        setSelectedCategories([]);
-        setCategoryPickerKey((key) => key + 1);
-        setPage((prev) => (prev === 1 ? prev : 1));
-      }
-    }
+    // Capture previous open state before updating the ref so open→close
+    // transitions remain deterministic across rapid toggles.
+    const wasOpen = wasFilterOpenRef.current;
     wasFilterOpenRef.current = showFilter;
+
+    // Only reset when the panel closes (not on initial mount while already closed)
+    if (!wasOpen || showFilter) {
+      return;
+    }
+
+    if (selectedCategoriesRef.current.length > 0) {
+      setSelectedCategories([]);
+      setCategoryPickerKey((key) => key + 1);
+      setPage(1);
+    }
   }, [showFilter]);
 
   useEffect(() => {
@@ -273,6 +301,18 @@ export default function Products({ navigation }) {
       handleSearchChange.cancel();
     };
   }, [handleSearchChange]);
+
+  // Drop any pending throttled search when branch context changes so a
+  // previously scheduled call cannot apply against the new branch.
+  useEffect(() => {
+    handleSearchChange.cancel();
+  }, [branchEnabled, handleSearchChange]);
+
+  useEffect(() => {
+    handleSearchChange.cancel();
+    setSearchQuery("");
+    setPage(1);
+  }, [branchid, handleSearchChange]);
 
   const handleAddCategoryFilter = useCallback((categoryId) => {
     if (categoryId == null || !branchEnabled) return;

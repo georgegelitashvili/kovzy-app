@@ -11,6 +11,7 @@ import Main from './src/Main';
 import ErrorWrapper from './src/components/generate/ErrorWrapper';
 import useErrorHandler from './src/hooks/useErrorHandler';
 import eventEmitter from './src/utils/EventEmitter';
+import { ToastManager } from './src/utils/NotificationManager';
 
 // Sentry initialization
 Sentry.init({
@@ -103,6 +104,9 @@ function App() {
         barStyle="dark-content"
         translucent
       />
+      {/* Global toasts must live above Main/ErrorBoundary so App-level
+          emitters (e.g. offline) and boundary fallbacks can still show them. */}
+      <ToastManager />
       <ErrorBoundary>
         <ErrorWrapper>
           <Main isConnected={isConnected} />

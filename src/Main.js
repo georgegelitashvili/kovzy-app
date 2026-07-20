@@ -12,7 +12,6 @@ import { AuthProvider } from "./context/AuthProvider";
 import { LanguageProvider } from './components/Language';
 import { navigationRef } from './helpers/navigate';
 import RootNavigator from "./RootNavigator";
-import { ToastManager } from './utils/NotificationManager';
 import ConnectionStatusBar from './components/generate/ConnectionStatusBar';
 import theme from './core/theme';
 
@@ -22,7 +21,6 @@ export default function Main({ isConnected }) {
       <PaperProvider theme={theme}>
         <LanguageProvider>
           <AuthProvider isConnected={isConnected}>
-            <ToastManager />
             <NavigationContainer ref={navigationRef}>
               <RootNavigator />
               <StatusBar style="auto" />

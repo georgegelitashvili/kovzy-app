@@ -59,7 +59,7 @@ export default function DrawerContent(props) {
           { timeout: 5000 }
         ),
         axiosInstance.post(`https://${domain}/api/v1/admin/getUnansweredOrders`,
-          { type: 0, branchid, postponeOrder: false, excludeDeliveryScheduled: true },
+          { type: 0, branchid, postponeOrder: false },
           { timeout: 5000 }
         )
       ]);
