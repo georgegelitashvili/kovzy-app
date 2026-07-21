@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
+import { View, StyleSheet } from 'react-native';
 import Background from '../components/generate/Background';
 import Logo from '../components/generate/Logo';
 import { Button } from "react-native-paper";
@@ -11,11 +12,11 @@ import useErrorDisplay from "../hooks/useErrorDisplay";
 
 export const DomainScreen = ({ navigation }) => {
   // All hooks must be called unconditionally and before any return
-  const { domain, setDomain, readDomain, intervalId, checkDomain, isLoading, setIsLoading } = useContext(AuthContext);
+  const { domain, setDomain, readDomain, intervalId, checkDomain, isLoading, setIsLoading, clearErrors } = useContext(AuthContext);
   const [inputDomain, setInputDomain] = useState({ value: domain || '', error: '' });
   const [isChecking, setIsChecking] = useState(false);
   const { dictionary } = useContext(LanguageContext);
-  const { errorDisplay, error, setError, clearError } = useErrorDisplay();
+  const { setError, clearError, errorDisplay } = useErrorDisplay({ showInline: true });
 
   // Helper to read domain from storage
   const readData = async () => {
@@ -31,6 +32,7 @@ export const DomainScreen = ({ navigation }) => {
   // Handler for domain check
   const onCheckPressed = async () => {
     clearError();
+    clearErrors();
 
     const trimmedDomain = inputDomain.value.trim();
 
@@ -40,25 +42,27 @@ export const DomainScreen = ({ navigation }) => {
     }
 
     // domainValidator returns a string error or empty string
-    const domainError = domainValidator(trimmedDomain);
-    if (domainError && typeof domainError === 'string' && domainError.length > 0) {
-      setError({ type: "VALIDATION_ERROR", message: domainError });
-      return;
-    }
+    // const domainError = domainValidator(trimmedDomain);
+    // if (domainError && typeof domainError === 'string' && domainError.length > 0) {
+    //   setError({ type: "VALIDATION_ERROR", message: domainError });
+    //   return;
+    // }
 
     // Validate domain exists in the backend system
     setIsChecking(true);
     try {
-      const result = await checkDomain(trimmedDomain);
+      // const result = await checkDomain(trimmedDomain);
       
-      if (!result.success) {
-        // Domain not found or validation failed
-        setError({
-          type: result.error?.type || "WEBSITE_NOT_FOUND",
-          message: result.error?.message || dictionary?.['errors.WEBSITE_NOT_FOUND'] || "Website not found"
-        });
-        return;
-      }
+      // if (!result.success) {
+      //   const errorPayload = {
+      //     type: result.error?.type || "WEBSITE_NOT_FOUND",
+      //   };
+      //   if (result.error?.message) {
+      //     errorPayload.message = result.error.message;
+      //   }
+      //   setError(errorPayload);
+      //   return;
+      // }
 
       // Domain is valid - save and navigate
       await storeData("domain", trimmedDomain);
@@ -68,7 +72,6 @@ export const DomainScreen = ({ navigation }) => {
     } catch (err) {
       setError({
         type: "DOMAIN_CHECK_ERROR",
-        message: err.message || dictionary?.['errors.DOMAIN_CHECK_ERROR'] || "Failed to verify domain"
       });
     } finally {
       setIsChecking(false);
@@ -87,9 +90,14 @@ export const DomainScreen = ({ navigation }) => {
 
   // No early return before hooks, all hooks above
   return (
-    <Background>
-      {errorDisplay}
-      <Logo />
+    <View style={styles.screen}>
+      {errorDisplay ? (
+        <View style={styles.errorOverlay} pointerEvents="box-none">
+          {errorDisplay}
+        </View>
+      ) : null}
+      <Background>
+        <Logo />
       <TextField
         dense
         label="Enter domain"
@@ -98,6 +106,7 @@ export const DomainScreen = ({ navigation }) => {
         value={inputDomain.value}
         onChangeText={(text) => {
           clearError();
+          clearErrors();
           setInputDomain({ value: text, error: '' });
         }}
         error={!!inputDomain.error}
@@ -118,6 +127,21 @@ export const DomainScreen = ({ navigation }) => {
       >
         {isChecking ? (dictionary?.['checking'] || 'Checking...') : (dictionary?.['save'] || 'Save')}
       </Button>
-    </Background>
+      </Background>
+    </View>
   );
 };
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+  },
+  errorOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10000,
+    elevation: 10000,
+  },
+});

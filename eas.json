@@ -11,7 +11,8 @@
         "buildType": "apk"
       },
       "env": {
-        "NODE_VERSION": "18"
+        "NODE_VERSION": "18",
+        "SENTRY_ALLOW_FAILURE": "true"
       }
     },
     "preview": {
@@ -21,7 +22,8 @@
       },
       "channel": "preview",
       "env": {
-        "NODE_VERSION": "18"
+        "NODE_VERSION": "18",
+        "SENTRY_ALLOW_FAILURE": "true"
       }
     },
     "production": {
@@ -32,7 +34,8 @@
         "gradleCommand": ":app:bundleRelease"
       },
       "env": {
-        "NODE_VERSION": "18"
+        "NODE_VERSION": "18",
+        "SENTRY_ALLOW_FAILURE": "true"
       }
     }
   },

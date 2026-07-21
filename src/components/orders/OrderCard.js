@@ -3,7 +3,9 @@ import { StyleSheet, View, TouchableOpacity, useWindowDimensions } from 'react-n
 import { Text, Card, Divider } from 'react-native-paper';
 import { MaterialCommunityIcons, SimpleLineIcons } from '@expo/vector-icons';
 import OrdersDetail from '../OrdersDetail';
-import { String, LanguageContext } from "../Language";
+import { LanguageContext } from "../Language";
+import { canEditOrder } from "../../utils/canEditOrder";
+import OrderCardActions from "./OrderCardActions";
 
 const OrderCard = (props) => {
   // Ensure all props exist before destructuring
@@ -14,10 +16,13 @@ const OrderCard = (props) => {
     fees: props.fees || [],
     scheduled: props.scheduled || {},
     orderData: props.orderData || [],
+    detailsLoading: props.detailsLoading || false,
     onToggle: props.onToggle,
     onAccept: props.onAccept,
     onDelay: props.onDelay,
+    onSchedule: props.onSchedule,
     onReject: props.onReject,
+    onEdit: props.onEdit,
     loading: props.loading || false
   };
   
@@ -28,13 +33,16 @@ const OrderCard = (props) => {
     fees,
     scheduled,
     orderData,
+    detailsLoading,
     onToggle,
     onAccept,
     onDelay,
+    onSchedule,
     onReject,
+    onEdit,
     loading
   } = safeProps;
-  const { width, height } = useWindowDimensions();
+  const showEdit = canEditOrder(item) && typeof onEdit === 'function';
   const deliveryPrice = parseFloat(item.delivery_price);
   const additionalFees = parseFloat(item.service_fee) / 100;
   const feeData = JSON.parse(item.fees_details || '{}');
@@ -46,78 +54,13 @@ const OrderCard = (props) => {
     return acc;
   }, []);
 
-  const { dictionary, languageId } = useContext(LanguageContext);
-  const isScheduled = item.take_away ? scheduled.scheduled_takeaway : scheduled.scheduled_delivery;
-
-  // Calculate responsive button dimensions
-  const isSmallScreen = width < 400;
-  const isMediumScreen = width >= 400 && width < 600;
-  const isLargeScreen = width >= 600;
-
-  const buttonWidth = isSmallScreen ? 70 : isMediumScreen ? 80 : 85;
-  const buttonHeight = isSmallScreen ? 40 : isMediumScreen ? 42 : 45;
-  const iconSize = isSmallScreen ? 24 : isMediumScreen ? 26 : 30;
-  const buttonMargin = isSmallScreen ? 3 : isMediumScreen ? 4 : 5;
-
-  const renderButtons = () => {
-    const isTakeAway = item.take_away === 1;
-    const hasDeliveryScheduled = item.delivery_scheduled && item.delivery_scheduled.length > 0;
-    const showDelayButton = isTakeAway && hasDeliveryScheduled;
-
-    return (
-      <View style={[styles.buttonContainer, { paddingHorizontal: buttonMargin }]}>
-        <TouchableOpacity
-          style={[
-            styles.buttonAccept, 
-            { 
-              width: buttonWidth, 
-              height: buttonHeight,
-              marginHorizontal: buttonMargin 
-            },
-            loading && styles.buttonDisabled
-          ]}
-          onPress={() => !loading && onAccept(item.id, item.take_away)}
-          disabled={loading}
-        >
-          <MaterialCommunityIcons name="check-decagram-outline" size={iconSize} color="white" />
-        </TouchableOpacity>
-
-        {item.delivery_scheduled !== null && isScheduled && (
-          <TouchableOpacity
-            style={[
-              styles.buttonDelay, 
-              { 
-                width: buttonWidth, 
-                height: buttonHeight,
-                marginHorizontal: buttonMargin 
-              },
-              loading && styles.buttonDisabled
-            ]}
-            onPress={() => !loading && onDelay(item.id, item.delivery_scheduled)}
-            disabled={loading}
-          >
-            <MaterialCommunityIcons name="bell-ring-outline" size={iconSize} color="white" />
-          </TouchableOpacity>
-        )}
-
-        <TouchableOpacity
-          style={[
-            styles.buttonReject, 
-            { 
-              width: buttonWidth, 
-              height: buttonHeight,
-              marginHorizontal: buttonMargin 
-            },
-            loading && styles.buttonDisabled
-          ]}
-          onPress={() => !loading && onReject(item.id)}
-          disabled={loading}
-        >
-          <MaterialCommunityIcons name="close-circle-outline" size={iconSize} color="white" />
-        </TouchableOpacity>
-      </View>
-    );
-  };
+  const { dictionary } = useContext(LanguageContext);
+  const isScheduled = item.take_away
+    ? !!scheduled.scheduled_takeaway
+    : !!scheduled.scheduled_delivery;
+  const showDelay = item.delivery_scheduled != null && isScheduled && typeof onDelay === 'function';
+  // Only show Schedule when admin scheduled-orders setting is enabled for this order type.
+  const showSchedule = isScheduled && typeof onSchedule === 'function';
 
   return (
     <Card key={item.id} style={styles.card}>
@@ -152,18 +95,36 @@ const OrderCard = (props) => {
             additionalFees={additionalFees}
             feesDetails={feesDetails}
             orderData={orderData}
+            detailsLoading={detailsLoading}
           />
 
-          <Card.Actions>
-            {renderButtons()}
-          </Card.Actions>
+          <OrderCardActions
+            loading={loading}
+            showEdit={showEdit}
+            showSchedule={showSchedule}
+            showDelay={showDelay}
+            onAccept={() => onAccept(item.id, item.take_away)}
+            onReject={() => onReject(item.id)}
+            onEdit={() => onEdit(item)}
+            onSchedule={() => onSchedule(item.id)}
+            onDelay={() => onDelay(item.id, item.delivery_scheduled)}
+          />
         </Card.Content>
       )}
     </Card>
   );
 };
 
-const OrderDetails = ({ item, dictionary, currency, deliveryPrice, additionalFees, feesDetails, orderData }) => {
+const OrderDetails = ({
+  item,
+  dictionary,
+  currency,
+  deliveryPrice,
+  additionalFees,
+  feesDetails,
+  orderData,
+  detailsLoading,
+}) => {
   const { width } = useWindowDimensions();
   const isSmallScreen = width < 400;
   const textSize = isSmallScreen ? 13 : 14;
@@ -203,7 +164,11 @@ const OrderDetails = ({ item, dictionary, currency, deliveryPrice, additionalFee
       </Text>
 
       <Divider />
-      <OrdersDetail orderId={item.id} orderData={orderData || []} />
+      <OrdersDetail
+        orderId={item.id}
+        orderData={orderData || []}
+        isLoading={detailsLoading}
+      />
       <Divider />
 
       <PriceDetails
@@ -304,54 +269,27 @@ const styles = StyleSheet.create({
   feeDetailText: {
     fontSize: 15,
   },
-  buttonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    marginTop: 10,
-    flexWrap: 'wrap',
-  },
-  buttonAccept: {
-    borderRadius: 21,
-    borderWidth: 1,
-    borderColor: "#2fa360",
-    backgroundColor: "#2fa360",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  buttonDelay: {
-    borderRadius: 21,
-    borderWidth: 1,
-    borderColor: "#3490dc",
-    backgroundColor: "#3490dc",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  buttonReject: {
-    borderRadius: 21,
-    borderWidth: 1,
-    borderColor: "#f14c4c",
-    backgroundColor: "#f14c4c",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  buttonText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: 'white',
-  },
-  delayIcon: {
-    position: 'absolute',
-    left: '50%',
-    marginLeft: -20,
-  },
-  delayButtonText: {
-    color: "#fff",
-    marginLeft: 28,
-  },
-  buttonDisabled: {
-    opacity: 0.5,
-  },
 });
 
-export default OrderCard;
+function arePropsEqual(prev, next) {
+  return (
+    prev.item?.id === next.item?.id &&
+    prev.item?.price === next.item?.price &&
+    prev.item?.total_cost === next.item?.total_cost &&
+    prev.item?.can_edit_order === next.item?.can_edit_order &&
+    prev.item?.use_preauthorization === next.item?.use_preauthorization &&
+    prev.item?.pay_type === next.item?.pay_type &&
+    prev.item?.delivery_scheduled === next.item?.delivery_scheduled &&
+    prev.isOpen === next.isOpen &&
+    prev.loading === next.loading &&
+    prev.currency === next.currency &&
+    prev.orderData === next.orderData &&
+    prev.detailsLoading === next.detailsLoading &&
+    prev.fees === next.fees &&
+    prev.scheduled === next.scheduled &&
+    prev.onEdit === next.onEdit &&
+    prev.onSchedule === next.onSchedule
+  );
+}
+
+export default React.memo(OrderCard, arePropsEqual);

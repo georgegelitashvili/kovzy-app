@@ -27,6 +27,7 @@ import OrdersDetail from "../OrdersDetail";
 import OrdersModal from "../modal/OrdersModalQr";
 import printRows from "../../PrintRows";
 import { useOrderDetails } from "../../hooks/useOrderDetails";
+import OrderCardActions from "../orders/OrderCardActions";
 
 const initialWidth = Dimensions.get("window").width;
 const getColumnsByScreenSize = (screenWidth) => {
@@ -292,27 +293,17 @@ export const AcceptedOrdersList = () => {
               {dictionary["orders.totalcost"]}: {item.total_cost} {currency}
             </Text>
 
-            <Card.Actions>
-              <TouchableOpacity
-                style={styles.buttonAccept}
-                onPress={() => {
-                  setItemId(item.id);
-                  showModal("status");
-                }}
-              >
-                <MaterialCommunityIcons name="check-decagram-outline" size={30} color="white" />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.buttonReject}
-                onPress={() => {
-                  setItemId(item.id);
-                  showModal("reject");
-                }}
-              >
-                <MaterialCommunityIcons name="close-circle-outline" size={30} color="white" />
-              </TouchableOpacity>
-            </Card.Actions>
+            <OrderCardActions
+              acceptLabel={dictionary["orders.finish"] || dictionary["orders.accept"]}
+              onAccept={() => {
+                setItemId(item.id);
+                showModal("status");
+              }}
+              onReject={() => {
+                setItemId(item.id);
+                showModal("reject");
+              }}
+            />
 
           </Card.Content>
         ) : null}
@@ -445,28 +436,6 @@ const styles = StyleSheet.create({
   rightIcon: {
     marginRight: 15,
     fontSize: 25,
-  },
-  buttonAccept: {
-    width: 85,
-    height: 45,
-    borderRadius: 21,
-    borderWidth: 1,
-    borderColor: "#2fa360",
-    backgroundColor: "#2fa360",
-    justifyContent: "center",
-    alignItems: "center",
-    marginHorizontal: 5,
-  },
-  buttonReject: {
-    width: 85,
-    height: 45,
-    borderRadius: 21,
-    borderWidth: 1,
-    borderColor: "#f14c4c",
-    backgroundColor: "#f14c4c",
-    justifyContent: "center",
-    alignItems: "center",
-    marginHorizontal: 5,
   },
   title: {
     paddingVertical: 10,

@@ -7,7 +7,7 @@ import React, {
   useMemo,
   useRef,
 } from "react";
-import { AppState } from "react-native";
+import { AppState, View, StyleSheet } from "react-native";
 import axiosInstance from "../apiConfig/apiRequests";
 import * as SecureStore from "expo-secure-store";
 import {
@@ -16,16 +16,32 @@ import {
   getSecureData,
   removeData,
 } from "../helpers/storage";
-import Toast from "../components/generate/Toast";
 import { useFetchLanguages } from "../components/UseFetchLanguages";
 import { LanguageContext } from "../components/Language";
-import Loader from "../components/generate/loader";
-import ErrorDisplay from "../components/generate/ErrorDisplay";
 import useErrorDisplay from '../hooks/useErrorDisplay';
 import AppUpdates from "../components/AppUpdates";
 import eventEmitter from "../utils/EventEmitter";
+import Loader from "../components/generate/loader";
 
 export const AuthContext = createContext();
+export const AuthStateContext = createContext(null);
+export const AuthActionsContext = createContext(null);
+
+export const useAuthState = () => {
+  const context = useContext(AuthStateContext);
+  if (!context) {
+    throw new Error('useAuthState must be used within AuthProvider');
+  }
+  return context;
+};
+
+export const useAuthActions = () => {
+  const context = useContext(AuthActionsContext);
+  if (!context) {
+    throw new Error('useAuthActions must be used within AuthProvider');
+  }
+  return context;
+};
 
 export const AuthProvider = ({ isConnected, children }) => {
   // ==== ყველა Hook აუცილებლად ერთ რიგში და კონდიციონალი ლოგიკის გარეშე ====  
@@ -41,6 +57,8 @@ export const AuthProvider = ({ isConnected, children }) => {
   const [isVisible, setIsVisible] = useState(false);
 
   const isMounted = useRef(true);
+  const autoLoginAttempted = useRef(false);
+  const languageDomainRef = useRef(null);
 
   // ყველა Context Hook ერთდროულად
   const { setAvailableLanguages, userLanguageChange, dictionary } = useContext(LanguageContext);
@@ -77,12 +95,12 @@ export const AuthProvider = ({ isConnected, children }) => {
   // Custom Hook-ები სტაბილური რიგით
   const { languages } = useFetchLanguages(apiUrls);
   const {
-    errorDisplay,
     error,
     setError,
     clearError,
-    persistent
-  } = useErrorDisplay();
+    persistent,
+    errorDisplay,
+  } = useErrorDisplay({ showInline: true });
 
   const clearErrors = useCallback(() => {
     console.log('[AuthProvider] clearErrors called');
@@ -94,10 +112,15 @@ export const AuthProvider = ({ isConnected, children }) => {
 
   const handleError = useCallback(
     (errorParam, type = "UNKNOWN", options = {}) => {
-      // ზოგადი ერორების დამუშავება
-      const errorMessage = errorParam?.message || dictionary?.["errors.UNKNOWN"] || "Unknown error";
+      const rawMessage = errorParam?.message;
+      const errorMessage =
+        typeof rawMessage === "string"
+          ? rawMessage
+          : rawMessage && typeof rawMessage === "object"
+            ? Object.values(rawMessage).flat().filter((item) => typeof item === "string").join("\n")
+            : dictionary?.["errors.UNKNOWN"] || "Unknown error";
       console.log(`[AuthProvider handleError] Calling setError with:`, { type, errorMessage, options });
-      setError(type, errorMessage, options);
+      setError(type, errorMessage || dictionary?.["errors.UNKNOWN"] || "Unknown error", options);
       eventEmitter.emit("apiError", { type, message: errorMessage });
     },
     [dictionary, setError]
@@ -114,7 +137,8 @@ export const AuthProvider = ({ isConnected, children }) => {
   const cleanupAuth = useCallback(async () => {
     const itemsToDelete = ["token", "credentials", "user", "rcml-lang", "languages"];
     await Promise.all(itemsToDelete.map(deleteItem));
-    await removeData(["domain", "branch", "branchNames"]);
+    await removeData(["domain", "branch", "branchNames", "branches"]);
+    autoLoginAttempted.current = false;
     setDomain(null);
     setBranchid(null);
     setBranchName(null);
@@ -164,32 +188,93 @@ export const AuthProvider = ({ isConnected, children }) => {
         };
       }
       
-      // Handle network/other errors
-      const errorMessage = error.message || dictionary?.['errors.DOMAIN_CHECK_ERROR'] || 'Domain check failed';
+      // Network/client errors: return type only so the UI localizes via LanguageContext.
       return {
         success: false,
         error: {
           type: error.type || 'DOMAIN_CHECK_ERROR',
-          message: errorMessage
         }
       };
     }
   }, [buildApiUrl, dictionary]);
 
+  const resolveBranchById = useCallback(async (branchId, domainValue) => {
+    const branchesUrl = buildApiUrl(domainValue, "branches");
+    if (!branchesUrl || branchId == null) return null;
+
+    try {
+      const response = await axiosInstance.post(branchesUrl);
+      const branches = response.data?.branches || [];
+      return (
+        branches.find(
+          (branch) =>
+            branch.id === branchId ||
+            branch.id === Number(branchId) ||
+            String(branch.id) === String(branchId)
+        ) || null
+      );
+    } catch (error) {
+      if (__DEV__) {
+        console.log("[AuthProvider] Failed to resolve branch name:", error?.message);
+      }
+      return null;
+    }
+  }, [buildApiUrl]);
+
   const readRestData = useCallback(async () => {
     try {
       const branchValue = await getData("branches");
-      if (branchValue && branchValue.id) {
+      if (branchValue?.id) {
         setBranchid(branchValue.id);
         setBranchName(branchValue);
-      } else {
-        setBranchid(null);
-        setBranchName(null);
+        return;
       }
+
+      const savedBranchId = await getData("branch");
+      if (savedBranchId) {
+        setBranchid(savedBranchId);
+
+        const domainValue = domain || (await getData("domain"));
+        if (domainValue) {
+          const resolvedBranch = await resolveBranchById(savedBranchId, domainValue);
+          if (resolvedBranch) {
+            setBranchName(resolvedBranch);
+            await storeData("branches", resolvedBranch);
+          }
+        }
+        return;
+      }
+
+      setBranchid(null);
+      setBranchName(null);
     } catch (error) {
       handleError(error, "READ_BRANCH_DATA_ERROR");
     }
-  }, [handleError]);
+  }, [domain, handleError, resolveBranchById]);
+
+  useEffect(() => {
+    if (!domain || !branchid || branchName) return;
+
+    let cancelled = false;
+
+    (async () => {
+      const storedBranch = await getData("branches");
+      if (storedBranch?.id && !cancelled) {
+        setBranchName(storedBranch);
+        return;
+      }
+
+      const resolvedBranch = await resolveBranchById(branchid, domain);
+      if (resolvedBranch && !cancelled) {
+        setBranchName(resolvedBranch);
+        await storeData("branches", resolvedBranch);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [domain, branchid, branchName, resolveBranchById]);
 
   const login = useCallback(
     async (username, password) => {
@@ -208,10 +293,35 @@ export const AuthProvider = ({ isConnected, children }) => {
         ]);
         if (isMounted.current) setUser(userResponse);
       } catch (error) {
-        // Support new error format: { error: { message, code, status } }
-        const errorMessage = error.response?.data?.error?.message || error.response?.data?.message || error.message;
-        setLoginError(errorMessage);
-        handleError(error, "LOGIN_ERROR", { persistent: true }); // persistent=true რომ დარჩეს სანამ დახურავ
+        // Always show localized login messages; never surface raw English API text.
+        const statusCode =
+          error?.statusCode ||
+          error?.originalError?.response?.status ||
+          error?.response?.status;
+        const payload = error?.data || error?.originalError?.response?.data || error?.response?.data;
+        const validationErrors =
+          payload?.error?.errors ||
+          (payload?.error?.message && typeof payload.error.message === 'object'
+            ? payload.error.message
+            : null);
+
+        const localizedLoginError =
+          dictionary?.["errors.INVALID_CREDENTIALS"] ||
+          dictionary?.["errors.LOGIN_ERROR"] ||
+          "Login failed";
+
+        // Only clear username when API says username itself is invalid (422 + username field).
+        // Wrong password (401) must keep the username.
+        const usernameInvalid =
+          statusCode === 422 && Boolean(validationErrors?.username);
+
+        setLoginError({
+          clearUsername: usernameInvalid,
+          highlightUsername: usernameInvalid,
+          highlightPassword: true,
+        });
+
+        handleError({ message: localizedLoginError }, "LOGIN_ERROR", { persistent: true });
       } finally {
         setIsLoading(false);
       }
@@ -277,6 +387,7 @@ export const AuthProvider = ({ isConnected, children }) => {
   }, [fetchBranchStatus, fetchDeliveronStatus]);
 
   const loadUser = useCallback(async () => {
+    setIsLoading(true);
     try {
       const [credentials, token] = await Promise.all([getSecureData("credentials"), getSecureData("token")]);
       if (credentials && token) {
@@ -285,6 +396,8 @@ export const AuthProvider = ({ isConnected, children }) => {
       }
     } catch (error) {
       handleError(error, "LOAD_USER_ERROR");
+    } finally {
+      setIsLoading(false);
     }
   }, [login, handleError]);
 
@@ -295,13 +408,17 @@ export const AuthProvider = ({ isConnected, children }) => {
     };
   }, []);
 
+  const appStateRef = useRef(appState);
+  appStateRef.current = appState;
+
   useEffect(() => {
     if (!apiUrls?.deliveronStatus || !apiUrls?.branchStatus) return;
 
     fetchAllStatus();
 
     const handleAppStateChange = (nextAppState) => {
-      if (appState.match(/inactive|background/) && nextAppState === "active") {
+      const wasBackground = appStateRef.current.match(/inactive|background/);
+      if (wasBackground && nextAppState === "active") {
         fetchAllStatus();
         if (!user && isConnected && apiUrls?.authUser) loadUser();
       }
@@ -310,38 +427,70 @@ export const AuthProvider = ({ isConnected, children }) => {
 
     const subscription = AppState.addEventListener("change", handleAppStateChange);
     return () => subscription.remove();
-  }, [appState, apiUrls, isConnected, user, fetchAllStatus, loadUser]);
+    // Intentionally omit appState — including it re-fetched status on every state change and could snap switches back
+  }, [apiUrls, isConnected, user, fetchAllStatus, loadUser]);
 
   useEffect(() => {
-    if (!isConnected) return;
+    if (!isConnected) {
+      return;
+    }
+
+    let cancelled = false;
+
     (async () => {
-      const hasDomain = await readDomain();
-      if (hasDomain) await readRestData();
+      try {
+        const hasDomain = await readDomain();
+        if (hasDomain) await readRestData();
+      } catch (error) {
+        if (!cancelled) {
+          handleError(error, "BOOTSTRAP_ERROR");
+        }
+      }
     })();
-  }, [isConnected, readDomain, readRestData]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isConnected, readDomain, readRestData, handleError]);
 
   useEffect(() => {
-    if (!user && apiUrls?.authUser && isConnected) loadUser();
+    if (autoLoginAttempted.current || user || !apiUrls?.authUser || !isConnected) {
+      return;
+    }
+    autoLoginAttempted.current = true;
+    loadUser();
   }, [user, apiUrls?.authUser, isConnected, loadUser]);
 
   useEffect(() => {
-    if (languages.length === 0 || !apiUrls) return;
+    if (languages.length === 0 || !apiUrls || !domain) return;
 
     (async () => {
       try {
         const defaultLang = languages.find((l) => l.default === 1);
         const savedLang = await getData("rcml-lang");
-        if (!savedLang && defaultLang) {
-          await storeData("rcml-lang", defaultLang.lang);
-          userLanguageChange(defaultLang.lang);
+        const domainChanged = languageDomainRef.current !== domain;
+
+        if (defaultLang) {
+          // On domain change, always switch to that domain's default language.
+          // On same domain, only set default when nothing was saved yet.
+          if (domainChanged || !savedLang) {
+            if (savedLang !== defaultLang.lang) {
+              await storeData("rcml-lang", defaultLang.lang);
+              await userLanguageChange(defaultLang.lang);
+            } else if (!savedLang) {
+              await storeData("rcml-lang", defaultLang.lang);
+            }
+          }
         }
+
+        languageDomainRef.current = domain;
         await storeData("languages", languages);
         setAvailableLanguages(languages);
       } catch (error) {
         handleError(error, "LANGUAGE_INIT_ERROR");
       }
     })();
-  }, [languages, apiUrls, userLanguageChange, setAvailableLanguages, handleError]);
+  }, [languages, apiUrls, domain, userLanguageChange, setAvailableLanguages, handleError]);
 
   useEffect(() => {
     const listener = eventEmitter.addEventListener("sessionExpired", () => {
@@ -351,32 +500,17 @@ export const AuthProvider = ({ isConnected, children }) => {
     return () => eventEmitter.removeEventListener(listener);
   }, [cleanupAuth, handleError, dictionary]);
 
-  const contextValue = useMemo(() => ({
+  const authState = useMemo(() => ({
     domain,
-    setDomain,
     user,
     loginError,
     error,
-    setError,
-    clearErrors,
     isLoading,
-    setIsLoading,
     branchid,
-    setBranchid,
     branchName,
     branchEnabled,
-    setBranchEnabled,
     deliveronEnabled,
-    setDeliveronEnabled,
-    setIsVisible,
-    login,
-    logout,
-    deleteItem,
-    readDomain,
-    readRestData,
-    handleError,
     languages,
-    checkDomain,
   }), [
     domain,
     user,
@@ -387,35 +521,88 @@ export const AuthProvider = ({ isConnected, children }) => {
     branchName,
     branchEnabled,
     deliveronEnabled,
-    isVisible,
+    languages,
+  ]);
+
+  const authActions = useMemo(() => ({
+    setDomain,
+    setError,
+    clearErrors,
+    setIsLoading,
+    setBranchid,
+    setBranchEnabled,
+    setDeliveronEnabled,
+    setIsVisible,
     login,
     logout,
     deleteItem,
     readDomain,
     readRestData,
     handleError,
-    languages,
+    checkDomain,
+  }), [
+    login,
+    logout,
+    deleteItem,
+    readDomain,
+    readRestData,
+    handleError,
     clearErrors,
     checkDomain,
   ]);
 
+  const contextValue = useMemo(
+    () => ({ ...authState, ...authActions }),
+    [authState, authActions]
+  );
+
   return (
-    <AuthContext.Provider value={contextValue}>
-      <AppUpdates
-        showLogs={true}
-        playStoreUrl="https://play.google.com/store/apps/details?id=com.kovzy.app"
-        onError={(err) => handleError(err, "UPDATE_ERROR")}
-      />
+    <AuthStateContext.Provider value={authState}>
+      <AuthActionsContext.Provider value={authActions}>
+        <AuthContext.Provider value={contextValue}>
+          <AppUpdates
+            showLogs={true}
+            playStoreUrl="https://play.google.com/store/apps/details?id=com.kovzy.app"
+            onError={(err) => handleError(err, "UPDATE_ERROR")}
+          />
 
-      {/* ErrorDisplay კომპონენტი, რომელიც აჩვენებს current error-ს */}
-      {errorDisplay}
-
-      {/* Loading სპინერი თუ საჭირო */}
-      {isLoading ? (
-        <Loader text={dictionary?.["loading"]} />
-      ) : (
-        children
-      )}
-    </AuthContext.Provider>
+          <View style={styles.appRoot}>
+            {children}
+            {isLoading ? (
+              <View style={styles.loadingOverlay} pointerEvents="auto">
+                <Loader text={dictionary?.["loading"]} />
+              </View>
+            ) : null}
+            {errorDisplay && error?.type !== "LOGIN_ERROR" ? (
+              <View style={styles.errorOverlay} pointerEvents="box-none">
+                {errorDisplay}
+              </View>
+            ) : null}
+          </View>
+        </AuthContext.Provider>
+      </AuthActionsContext.Provider>
+    </AuthStateContext.Provider>
   );
 };
+
+const styles = StyleSheet.create({
+  appRoot: {
+    flex: 1,
+  },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 10001,
+    elevation: 10001,
+    backgroundColor: "rgba(255,255,255,0.72)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  errorOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10000,
+    elevation: 10000,
+  },
+});

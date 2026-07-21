@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext, useCallback } from "react";
-import { StyleSheet } from "react-native";
+import { View, StyleSheet } from "react-native";
 import { Text, Button } from "react-native-paper";
 import Background from "../components/generate/Background";
 import Logo from "../components/generate/Logo";
@@ -25,7 +25,7 @@ export const BranchScreen = ({ navigation }) => {
   const [shouldRedirectToDomain, setShouldRedirectToDomain] = useState(false);
   const [currentDomain, setCurrentDomain] = useState(domain); // Track current domain for change detection
 
-  const { errorDisplay, error, setError, clearError } = useErrorDisplay();
+  const { setError, clearError, errorDisplay } = useErrorDisplay({ showInline: true });
 
   // Check if domain is invalid (but don't return early)
   const isDomainInvalid = !domain || domainValidator(domain) !== '';
@@ -56,15 +56,17 @@ export const BranchScreen = ({ navigation }) => {
     }
   }, [domain]);
 
+  const showInvalidDomainError = useCallback(() => {
+    const message = dictionary?.["errors.INVALID_DOMAIN"] || "Invalid domain entered. Please try again.";
+    handleError({ message }, "INVALID_DOMAIN");
+  }, [dictionary, handleError]);
+
   const branchApi = useCallback(async () => {
     try {
       // Double-check domain validity before making API call
       if (!domain || domainValidator(domain) !== '') {
         console.log('[BranchScreen] Invalid domain detected in branchApi:', domain);
-        setError({ 
-          type: "INVALID_DOMAIN", 
-          message: dictionary["errors.INVALID_DOMAIN"] || "Invalid domain entered. Please try again." 
-        });
+        showInvalidDomainError();
         setIsLoading(false);
         setBranch([]);
         setBranches([]);
@@ -122,10 +124,7 @@ export const BranchScreen = ({ navigation }) => {
       
       if (isDomainError) {
         console.log('[BranchScreen] Domain error detected, clearing and redirecting');
-        setError({ 
-          type: "INVALID_DOMAIN", 
-          message: dictionary["errors.INVALID_DOMAIN"] || "Invalid domain entered. Please try again." 
-        });
+        showInvalidDomainError();
         try {
           await removeData("domain");
           setShouldRedirectToDomain(true);
@@ -145,7 +144,7 @@ export const BranchScreen = ({ navigation }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [domain, options.url_branches, dictionary, userLanguage]);
+  }, [domain, options.url_branches, dictionary, userLanguage, showInvalidDomainError, clearError]);
 
   const onCheckPressed = () => {
     if (selected === null) {
@@ -165,7 +164,10 @@ export const BranchScreen = ({ navigation }) => {
       setBranches([]);
       setBranch([]);
       setSelected(null);
-      clearError();
+      const domainWasCleared = Boolean(currentDomain) && !domain;
+      if (!domainWasCleared) {
+        clearError();
+      }
       clearInterval(intervalId);
       setShouldRedirectToDomain(false);
       setCurrentDomain(domain);
@@ -189,11 +191,7 @@ export const BranchScreen = ({ navigation }) => {
     
     if (domainValidator(domain) !== '') {
       console.log('[BranchScreen] Invalid domain format:', domain);
-      // Invalid domain - clear it and redirect
-      setError({ 
-        type: "INVALID_DOMAIN", 
-        message: dictionary["errors.INVALID_DOMAIN"] || "Invalid domain. Please check and try again." 
-      });
+      showInvalidDomainError();
       setIsLoading(false);
       setOptions({ url_branches: "" });
       removeData("domain").then(() => {
@@ -208,7 +206,7 @@ export const BranchScreen = ({ navigation }) => {
     console.log('[BranchScreen] Valid domain, setting up API');
     setIsLoading(true); // Start loading when valid domain is detected
     apiOptions();
-  }, [domain, userLanguage, dictionary, intervalId, clearError, apiOptions, currentDomain]);
+  }, [domain, userLanguage, dictionary, intervalId, clearError, apiOptions, currentDomain, showInvalidDomainError]);
 
   // Separate effect for API calls when URL is ready
   useEffect(() => {
@@ -231,36 +229,32 @@ export const BranchScreen = ({ navigation }) => {
 
   useEffect(() => {
     const saveSelection = async () => {
-      if (selected !== null) {
-        await removeData("branches");
-        const item = branch.find(item => item.id === selected);
-        if (item) {
-          await storeData("branches", item);
-          await readRestData();
-        }
-        setBranchid(selected);
-        await storeData("branch", selected);
-        clearInterval(intervalId);
+      if (selected === null) return;
+
+      const item = branch.find((entry) => entry.id === selected);
+      setBranchid(selected);
+      await storeData("branch", selected);
+
+      if (item) {
+        await storeData("branches", item);
+        await readRestData();
       }
+
+      clearInterval(intervalId);
     };
 
     saveSelection();
-  }, [domain, selected, userLanguage]);
-
-  // Don't render anything if we're redirecting due to invalid domain
-  if (shouldRedirectToDomain) {
-    return null;
-  }
+  }, [domain, selected, userLanguage, branch, setBranchid, readRestData, intervalId]);
 
   return (
-    <Background>
-      <Logo />
-      {isLoading ? (
+    <View style={styles.screen}>
+      {errorDisplay}
+      <Background>
+        <Logo />
+      {isLoading || shouldRedirectToDomain ? (
         <Loader />
       ) : (
         <>
-          {errorDisplay}
-
           <SelectOption
             value={selected}
             onValueChange={(value) => {
@@ -283,11 +277,15 @@ export const BranchScreen = ({ navigation }) => {
           </Button>
         </>
       )}
-    </Background>
+      </Background>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+  },
   button: {
     marginTop: 17,
   },

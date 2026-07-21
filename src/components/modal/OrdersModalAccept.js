@@ -183,6 +183,8 @@ export default function OrdersModalContent(props) {
               mode="contained"
               textColor="white"
               style={styles.buttonAccept}
+              contentStyle={styles.buttonAcceptContent}
+              labelStyle={styles.buttonAcceptLabel}
               onPress={acceptOrder}
               disabled={loading || (
                 props.deliveron?.status === 1 && 
@@ -190,16 +192,7 @@ export default function OrdersModalContent(props) {
                 deliveron?.data?.length === 0
               )}
             >
-              {loading ? "მიღება..." : dictionary["orders.approve"]}
-            </Button>
-            <Button
-              mode="contained"
-              textColor="white"
-              style={styles.buttonClose}
-              onPress={props.hideModal}
-              disabled={loading}
-            >
-              {dictionary["close"]}
+              {loading ? "მიღება..." : (dictionary["orders.approve"] || "დადასტურება")}
             </Button>
           </View>
         </View>
@@ -225,20 +218,23 @@ const styles = StyleSheet.create({
   },
   buttonModal: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    paddingTop: 20,
-    gap: 10,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingTop: 48,
+    width: "100%",
   },
   buttonAccept: {
-    flex: 1,
-    backgroundColor: "#2fa360",
-    borderRadius: 8,
-    marginRight: 5,
+    backgroundColor: "#28A745",
+    borderRadius: 10,
+    minWidth: 220,
   },
-  buttonClose: {
-    flex: 1,
-    backgroundColor: "#6c757d",
-    borderRadius: 8,
-    marginLeft: 5,
+  buttonAcceptContent: {
+    minHeight: 56,
+    paddingHorizontal: 48,
+    justifyContent: "center",
+  },
+  buttonAcceptLabel: {
+    fontSize: 18,
+    fontWeight: "700",
   },
 });

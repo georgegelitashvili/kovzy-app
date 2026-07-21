@@ -1,5 +1,5 @@
 // screens/SettingsScreen.js
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useRef } from 'react';
 import {
     StyleSheet,
     SafeAreaView,
@@ -8,40 +8,29 @@ import {
     Text,
     TouchableOpacity,
     Switch,
-    Image,
     Modal,
 } from 'react-native';
 import FeatherIcon from 'react-native-vector-icons/Feather';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { TouchableRipple } from 'react-native-paper'; // Corrected import
-import { String, LanguageContext } from "./components/Language";
-import { AuthContext, AuthProvider } from "./context/AuthProvider";
+import { LanguageContext } from "./components/Language";
+import { AuthContext } from "./context/AuthProvider";
 import axiosInstance from "./apiConfig/apiRequests";
-
-// import { Drawer, Text, TouchableRipple, Switch } from "react-native-paper";
-
+import eventEmitter from "./utils/EventEmitter";
 
 const SettingsScreen = ({ navigation }) => {
     const { domain, setDeliveronEnabled, deliveronEnabled } = useContext(AuthContext);
     const { dictionary } = useContext(LanguageContext);
     const [postponeOrderShow, setPostponeOrderShow] = useState(false);
-    
-    const [form, setForm] = useState({
-        darkMode: false,
-        emailNotifications: true,
-        pushNotifications: false,
-    });
-    const [musicTitle, setMusicTitle] = useState(''); // State for music title
-    
+    const [postponeOrderLoaded, setPostponeOrderLoaded] = useState(false);
+    const [musicTitle, setMusicTitle] = useState('');
     const [modalVisible, setModalVisible] = useState(false);
     const [options, setOptions] = useState({
         url_deliveronStatus: "",
         url_deliveronActivity: "",
     });
+    const [togglingDeliveron, setTogglingDeliveron] = useState(false);
+    const togglingDeliveronRef = useRef(false);
 
-    const [optionsIsLoaded, setOptionsIsLoaded] = useState(false); 
-    const [deliveronChangeOptions, setDeliveronChangeOptions] = useState({});
-    // Function to load the music title from AsyncStorage
     const loadMusicTitle = async () => {
         try {
             const title = await AsyncStorage.getItem('selectedMusicTitle');
@@ -54,33 +43,40 @@ const SettingsScreen = ({ navigation }) => {
             console.log('Error loading music title:', error);
         }
     };
-    const [isDeliveronEnabled, setIsDeliveronEnabled] = useState(false);
 
     const apiOptions = () => {
         setOptions({
           url_deliveronStatus: `https://${domain}/api/v1/admin/deliveronStatus`,
           url_deliveronActivity: `https://${domain}/api/v1/admin/deliveronActivity`,
         });
-        setOptionsIsLoaded(true);
     };
 
     useEffect(() => {
+        let active = true;
         const loadPostponeOrder = async () => {
             try {
                 const storedValue = await AsyncStorage.getItem('postponeOrderShow');
+                if (!active) return;
                 if (storedValue !== null) {
-                    setPostponeOrderShow(JSON.parse(storedValue)); // Parse the stored string to boolean
+                    setPostponeOrderShow(JSON.parse(storedValue));
                 }
             } catch (error) {
                 console.error('Failed to load stored value', error);
+            } finally {
+                if (active) setPostponeOrderLoaded(true);
             }
         };
 
         loadPostponeOrder();
+        return () => {
+            active = false;
+        };
     }, []);
 
-    // Save the value in AsyncStorage whenever the state changes
     useEffect(() => {
+        // Don't persist the initial default `false` before AsyncStorage has loaded
+        if (!postponeOrderLoaded) return;
+
         const savePostponeOrder = async () => {
             try {
                 await AsyncStorage.setItem('postponeOrderShow', JSON.stringify(postponeOrderShow));
@@ -90,14 +86,30 @@ const SettingsScreen = ({ navigation }) => {
         };
 
         savePostponeOrder();
-    }, [postponeOrderShow]);
+    }, [postponeOrderShow, postponeOrderLoaded]);
 
-    const togglePostponeOrder = () => {
-        setPostponeOrderShow(prevState => !prevState);
+    const togglePostponeOrder = (nextValue) => {
+        setPostponeOrderShow(
+            typeof nextValue === 'boolean' ? nextValue : (prev) => !prev
+        );
+    };
+
+    const showDeliveronToast = (type, title, subtitle = '') => {
+        eventEmitter.emit('showToast', {
+            type,
+            title,
+            subtitle,
+            duration: 4500,
+        });
     };
     
-      const toggleDeliveron = () => {
-        if (deliveronEnabled == true) {
+    const toggleDeliveron = (nextEnabled) => {
+        if (togglingDeliveronRef.current || togglingDeliveron || !options.url_deliveronActivity) return;
+
+        const enabling =
+            typeof nextEnabled === 'boolean' ? nextEnabled : !deliveronEnabled;
+
+        if (!enabling) {
             setModalVisible(true);
         } else {
             handleConfirmToggle(true);
@@ -105,31 +117,106 @@ const SettingsScreen = ({ navigation }) => {
     };
 
     const handleConfirmToggle = async (newValue) => {
+        // Guard before closing the modal so a busy/missing-URL state does not
+        // dismiss the confirmation without sending the disable request.
+        // Ref blocks concurrent callers before React re-renders togglingDeliveron.
+        if (togglingDeliveronRef.current || togglingDeliveron || !options.url_deliveronActivity) {
+            return;
+        }
+
+        togglingDeliveronRef.current = true;
         setModalVisible(false);
-        setDeliveronEnabled(newValue); 
-        setDeliveronChangeOptions((prev) => ({
-            ...prev,
-            data: { enabled: newValue ? 0 : 1 },
-        }));
+        setTogglingDeliveron(true);
+
         try {
-            await axiosInstance.post(options.url_deliveronActivity, deliveronChangeOptions.data);
+            const response = await axiosInstance.post(options.url_deliveronActivity, {
+                enabled: newValue,
+            });
+
+            const payload = response?.data?.data ?? response?.data;
+            const errorCode =
+              typeof payload?.error === 'string'
+                ? payload.error
+                : payload?.error?.code;
+            if (
+              newValue &&
+              (errorCode === 'DELIVERON_NOT_INTEGRATED' || payload?.integrated === false)
+            ) {
+                setDeliveronEnabled(false);
+                showDeliveronToast(
+                    'failed',
+                    dictionary['dv.needIntegration'] || 'Deliveron integration required',
+                    dictionary['dv.needIntegrationHint'] || 'Connect Deliveron in the admin panel, then try again.'
+                );
+                return;
+            }
+
+            if (typeof payload?.enabled === 'boolean') {
+                setDeliveronEnabled(payload.enabled);
+            } else if (errorCode || payload?.integrated === false) {
+                // Ambiguous success payload: keep prior UI state rather than guessing.
+                showDeliveronToast(
+                    'failed',
+                    dictionary['general.alerts'] || 'Alert',
+                    dictionary['errors.generic'] || 'Something went wrong. Please try again.'
+                );
+            } else {
+                setDeliveronEnabled(Boolean(newValue));
+            }
         } catch (error) {
-            console.error("Error toggling deliveron:", error);
-            setDeliveronEnabled(!newValue);
+            // Axios interceptor replaces the raw error with a formatted object.
+            const statusCode = error?.statusCode || error?.response?.status || error?.originalError?.response?.status;
+            const errorPayload = error?.data || error?.response?.data || error?.originalError?.response?.data;
+            const code =
+                error?.code ||
+                (typeof errorPayload?.error === 'string' ? errorPayload.error : errorPayload?.error?.code) ||
+                error?.type;
+            const integrated = errorPayload?.integrated;
+
+            if (__DEV__) {
+                console.log('[Deliveron toggle] caught error', {
+                    statusCode,
+                    code,
+                    integrated,
+                    type: error?.type,
+                    message: error?.message,
+                    data: errorPayload,
+                });
+            }
+
+            const isMissingIntegration =
+                newValue &&
+                (code === 'DELIVERON_NOT_INTEGRATED' ||
+                    integrated === false ||
+                    statusCode === 422);
+
+            if (isMissingIntegration) {
+                showDeliveronToast(
+                    'failed',
+                    dictionary['dv.needIntegration'] || 'Deliveron integration required',
+                    dictionary['dv.needIntegrationHint'] || 'Connect Deliveron in the admin panel, then try again.'
+                );
+            } else {
+                console.error("Error toggling deliveron:", error);
+                showDeliveronToast(
+                    'failed',
+                    dictionary['general.alerts'] || 'Alert',
+                    dictionary['errors.generic'] || 'Something went wrong. Please try again.'
+                );
+            }
+        } finally {
+            togglingDeliveronRef.current = false;
+            setTogglingDeliveron(false);
         }
     };
 
-
-    // Fetch the music title when the screen mounts
     useEffect(() => {
         loadMusicTitle();
 
-        // Optional: Add a listener for focus event to reload the title when screen is focused
         const unsubscribe = navigation.addListener('focus', () => {
             loadMusicTitle();
         });
 
-        // Clean up the listener on unmount
         return unsubscribe;
     }, [navigation]);
 
@@ -139,170 +226,13 @@ const SettingsScreen = ({ navigation }) => {
         }
       }, [domain]);
 
-    useEffect(() => {
-        setDeliveronChangeOptions((prev) => ({
-          ...prev,
-          data: { enabled: deliveronEnabled ? 0 : 1 },
-        }));
-        setIsDeliveronEnabled(true);
-    }, [deliveronEnabled]);
-
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: '#f6f6f6' }}>
             <View style={styles.container}>
                 <ScrollView>
-                    {/* <View style={styles.profile}>
-                        <Image
-                            alt=""
-                            source={{
-                                uri: 'https://images.unsplash.com/photo-1633332755192-727a05c4013d?ixlib=rb-1.2.1&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=facearea&facepad=2.5&w=256&h=256&q=80',
-                            }}
-                            style={styles.profileAvatar} />
-
-                        <Text style={styles.profileName}>John Doe</Text>
-
-                        <Text style={styles.profileEmail}>john.doe@mail.com</Text>
-
-                        <TouchableOpacity
-                            onPress={() => {
-                                // handle onPress
-                            }}>
-                            <View style={styles.profileAction}>
-                                <Text style={styles.profileActionText}>Edit Profile</Text>
-
-                                <FeatherIcon color="#fff" name="edit" size={16} />
-                            </View>
-                        </TouchableOpacity>
-                    </View> */}
-
                     <View style={styles.section}>
-                        {/* დროებით დაკომენტარებული შეიძლება სამომავლოდ გამოდგეს */}
-                        {/* <Text style={styles.sectionTitle}>Preferences</Text>
-
-                        <View style={styles.sectionBody}>
-                            <View style={[styles.rowWrapper, styles.rowFirst]}>
-                                <TouchableOpacity
-                                    onPress={() => {
-                                        // handle onPress
-                                    }}
-                                    style={styles.row}>
-                                    <View
-                                        style={[styles.rowIcon, { backgroundColor: '#fe9400' }]}>
-                                        <FeatherIcon
-                                            color="#fff"
-                                            name="globe"
-                                            size={20} />
-                                    </View>
-
-                                    <Text style={styles.rowLabel}>Language</Text>
-
-                                    <View style={styles.rowSpacer} />
-
-                                    <Text style={styles.rowValue}>English</Text>
-
-                                    <FeatherIcon
-                                        color="#C6C6C6"
-                                        name="chevron-right"
-                                        size={20} />
-                                </TouchableOpacity>
-                            </View>
-
-                            <View style={styles.rowWrapper}>
-                                <View style={styles.row}>
-                                    <View
-                                        style={[styles.rowIcon, { backgroundColor: '#007AFF' }]}>
-                                        <FeatherIcon
-                                            color="#fff"
-                                            name="moon"
-                                            size={20} />
-                                    </View>
-
-                                    <Text style={styles.rowLabel}>Dark Mode</Text>
-
-                                    <View style={styles.rowSpacer} />
-
-                                    <Switch
-                                        onValueChange={darkMode => setForm({ ...form, darkMode })}
-                                        value={form.darkMode} />
-                                </View>
-                            </View>
-
-                            <View style={styles.rowWrapper}>
-                                <TouchableOpacity
-                                    onPress={() => {
-                                        // handle onPress
-                                    }}
-                                    style={styles.row}>
-                                    <View
-                                        style={[styles.rowIcon, { backgroundColor: '#32c759' }]}>
-                                        <FeatherIcon
-                                            color="#fff"
-                                            name="navigation"
-                                            size={20} />
-                                    </View>
-
-                                    <Text style={styles.rowLabel}>Location</Text>
-
-                                    <View style={styles.rowSpacer} />
-
-                                    <Text style={styles.rowValue}>Los Angeles, CA</Text>
-
-                                    <FeatherIcon
-                                        color="#C6C6C6"
-                                        name="chevron-right"
-                                        size={20} />
-                                </TouchableOpacity>
-                            </View>
-                        </View> */}
-
                         <View style={styles.section}>
-                            {/* <Text style={styles.sectionTitle}>Notifications</Text> */}
-
                             <View style={styles.sectionBody}>
-                                {/* <View style={[styles.rowWrapper, styles.rowFirst]}>
-                                    <View style={styles.row}>
-                                        <View
-                                            style={[styles.rowIcon, { backgroundColor: '#38C959' }]}>
-                                            <FeatherIcon
-                                                color="#fff"
-                                                name="at-sign"
-                                                size={20} />
-                                        </View>
-
-                                        <Text style={styles.rowLabel}>Email Notifications</Text>
-
-                                        <View style={styles.rowSpacer} />
-
-                                        <Switch
-                                            onValueChange={emailNotifications =>
-                                                setForm({ ...form, emailNotifications })
-                                            }
-                                            value={form.emailNotifications} />
-                                    </View>
-                                </View>
-
-                                <View style={styles.rowWrapper}>
-                                    <View style={styles.row}>
-                                        <View
-                                            style={[styles.rowIcon, { backgroundColor: '#38C959' }]}>
-                                            <FeatherIcon
-                                                color="#fff"
-                                                name="bell"
-                                                size={20} />
-                                        </View>
-
-                                        <Text style={styles.rowLabel}>Push Notifications</Text>
-
-                                        <View style={styles.rowSpacer} />
-
-                                        <Switch
-                                            onValueChange={pushNotifications =>
-                                                setForm({ ...form, pushNotifications })
-                                            }
-                                            value={form.pushNotifications} />
-                                    </View>
-                                </View> */}
-
                                 <View style={styles.rowWrapper}>
                                     <TouchableOpacity
                                         onPress={() => navigation.navigate('MusicList')}
@@ -330,28 +260,36 @@ const SettingsScreen = ({ navigation }) => {
                             </View>
                         </View>
                         <View style={[styles.section, styles.sectionContainer]}>
-                            <TouchableRipple onPress={toggleDeliveron}>
-                                <View style={[styles.row, styles.rowWrapper]}>
+                            <View style={[styles.row, styles.rowWrapper]}>
+                                <TouchableOpacity
+                                    style={styles.rowLabelPressable}
+                                    onPress={() => toggleDeliveron(!deliveronEnabled)}
+                                    disabled={togglingDeliveron || !options.url_deliveronActivity}
+                                >
                                     <Text style={styles.rowLabel}>{dictionary["dv.deliveron"]}</Text>
-                                    <Switch
-                                        style={styles.switch}
-                                        value={deliveronEnabled}
-                                        onValueChange={toggleDeliveron}
-                                    />
-                                </View>
-                            </TouchableRipple>
+                                </TouchableOpacity>
+                                <Switch
+                                    style={styles.switch}
+                                    value={deliveronEnabled}
+                                    onValueChange={toggleDeliveron}
+                                    disabled={togglingDeliveron || !options.url_deliveronActivity}
+                                />
+                            </View>
                         </View>
                         <View style={[styles.section, styles.sectionContainer]}>
-                            <TouchableRipple onPress={togglePostponeOrder}>
-                                <View style={[styles.row, styles.rowWrapper]}>
+                            <View style={[styles.row, styles.rowWrapper]}>
+                                <TouchableOpacity
+                                    style={styles.rowLabelPressable}
+                                    onPress={() => togglePostponeOrder(!postponeOrderShow)}
+                                >
                                     <Text style={styles.rowLabel}>{dictionary["st.postponeOrder"]}</Text>
-                                    <Switch
-                                        style={styles.switch}
-                                        value={postponeOrderShow}
-                                        onValueChange={togglePostponeOrder}
-                                    />
-                                </View>
-                            </TouchableRipple>
+                                </TouchableOpacity>
+                                <Switch
+                                    style={styles.switch}
+                                    value={postponeOrderShow}
+                                    onValueChange={togglePostponeOrder}
+                                />
+                            </View>
                         </View>
                         <Modal
                             transparent={true}
@@ -420,7 +358,6 @@ const styles = StyleSheet.create({
         color: '#929292',
         textAlign: 'center',
     },
-    /** Header */
     header: {
         paddingHorizontal: 24,
         marginBottom: 12,
@@ -436,7 +373,6 @@ const styles = StyleSheet.create({
         color: '#929292',
         marginTop: 6,
     },
-    /** Profile */
     profile: {
         padding: 16,
         flexDirection: 'column',
@@ -479,7 +415,6 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         color: '#fff',
     },
-    /** Section */
     section: {
         paddingTop: 12,
     },
@@ -499,7 +434,6 @@ const styles = StyleSheet.create({
         borderBottomWidth: 1,
         borderColor: '#e3e3e3',
     },
-    /** Row */
     row: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -526,6 +460,11 @@ const styles = StyleSheet.create({
         fontSize: 17,
         fontWeight: '500',
         color: '#000',
+    },
+    rowLabelPressable: {
+        flex: 1,
+        justifyContent: 'center',
+        height: '100%',
     },
     rowSpacer: {
         flexGrow: 1,

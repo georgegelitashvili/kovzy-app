@@ -1,26 +1,57 @@
-import React, { useState, useContext, useEffect, useRef } from "react";
+import React, { useState, useContext, useEffect, useRef, useCallback } from "react";
 import { View, StyleSheet, ActivityIndicator } from "react-native";
 import { DrawerItem, DrawerContentScrollView } from "@react-navigation/drawer";
+import { useNavigationState } from "@react-navigation/native";
 import { Drawer, Text, TouchableRipple, Switch } from "react-native-paper";
 import { MaterialCommunityIcons, Fontisto, SimpleLineIcons } from "@expo/vector-icons";
-import { AuthContext } from "../context/AuthProvider";
+import { useAuthState, useAuthActions } from "../context/AuthProvider";
 import LanguageSelector from "./generate/LanguageSelector";
 import axiosInstance from "../apiConfig/apiRequests";
 import { LanguageContext } from "./Language";
 import eventEmitter from "../utils/EventEmitter";
+import { CONNECTION_EVENTS } from "../utils/connectionMonitor";
+
+const FALLBACK_POLL_INTERVAL = 30000;
+const ORDER_DRAWER_ROUTES = new Set(['Orders', 'QrOrders']);
+
+const getBranchDisplayName = (branch, userLanguage) => {
+  if (!branch) return "";
+
+  return (
+    branch.titles?.[userLanguage] ||
+    branch.name ||
+    (branch.titles && Object.values(branch.titles).find(Boolean)) ||
+    ""
+  );
+};
 
 export default function DrawerContent(props) {
   const { navigation, ...otherProps } = props;
-  const { domain, branchid, branchName, branchEnabled, setBranchEnabled, logout, setIsLoading, setIsVisible, handleError, clearErrors } = useContext(AuthContext);
+  const { domain, branchid, branchName, branchEnabled } = useAuthState();
+  const { setBranchEnabled, logout, setIsLoading, setIsVisible, handleError, clearErrors } = useAuthActions();
   const { dictionary, userLanguage } = useContext(LanguageContext);
   const [qrOrdersBadge, setQrOrdersBadge] = useState(0);
   const [onlineOrdersBadge, setOnlineOrdersBadge] = useState(0);
   const [loading, setLoading] = useState(false);
   const intervalRef = useRef(null);
 
-  const fetchUnansweredOrders = async () => {
+  const activeDrawerRoute = useNavigationState((state) => {
+    if (!state?.routes?.length) return null;
+    return state.routes[state.index]?.name ?? null;
+  });
+
+  const isOrderScreenActive = ORDER_DRAWER_ROUTES.has(activeDrawerRoute);
+
+  const clearPollingInterval = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+  }, []);
+
+  const fetchUnansweredOrders = useCallback(async () => {
     if (!domain || !branchid) return;
-    
+
     try {
       const [responseQr, responseOnline] = await Promise.all([
         axiosInstance.post(`https://${domain}/api/v1/admin/getUnansweredOrders`,
@@ -38,88 +69,104 @@ export default function DrawerContent(props) {
         setOnlineOrdersBadge(responseOnline.data.data.length);
       }
     } catch (error) {
-      console.error("Error fetching orders:", error);
-      if (error.message?.includes('timeout')) {
-        if (intervalRef.current) {
-          clearInterval(intervalRef.current);
-        }
+      if (__DEV__) {
+        console.log("[DrawerContent] Badge poll failed:", error?.type || error?.message);
+      }
+      if (error.message?.includes('timeout') || error.type === 'REQUEST_TIMEOUT') {
+        clearPollingInterval();
       }
     }
-  };
+  }, [branchid, clearPollingInterval, domain]);
+
+  const fetchUnansweredOrdersRef = useRef(fetchUnansweredOrders);
+  fetchUnansweredOrdersRef.current = fetchUnansweredOrders;
 
   useEffect(() => {
-    console.log('🚨 BranchName updated in component:', branchName);
-  }, [branchName]);
+    fetchUnansweredOrdersRef.current();
 
-  useEffect(() => {
-    fetchUnansweredOrders();
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-    }
-    intervalRef.current = setInterval(fetchUnansweredOrders, 10000);
+    const badgeListener = eventEmitter.addEventListener('orderBadgeUpdate', ({ type, count }) => {
+      if (type === 0) {
+        setOnlineOrdersBadge(count);
+      } else if (type === 1) {
+        setQrOrdersBadge(count);
+      }
+    });
 
-    // Listen for forceLogout event to clear interval
+    const retryListener = eventEmitter.addEventListener(CONNECTION_EVENTS.RETRY, () => {
+      fetchUnansweredOrdersRef.current();
+    });
+
     const logoutListener = () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
+      clearPollingInterval();
       setQrOrdersBadge(0);
       setOnlineOrdersBadge(0);
     };
-    eventEmitter.addEventListener('forceLogout', logoutListener);
+
+    const logoutListenerId = eventEmitter.addEventListener('forceLogout', logoutListener);
 
     return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-      eventEmitter.removeEventListener(logoutListener);
+      clearPollingInterval();
+      eventEmitter.removeEventListener(badgeListener);
+      eventEmitter.removeEventListener(retryListener);
+      eventEmitter.removeEventListener(logoutListenerId);
     };
-  }, [branchid, domain]);
+  }, [branchid, clearPollingInterval, domain]);
+
+  useEffect(() => {
+    clearPollingInterval();
+
+    if (domain && branchid && !isOrderScreenActive) {
+      intervalRef.current = setInterval(
+        () => fetchUnansweredOrdersRef.current(),
+        FALLBACK_POLL_INTERVAL
+      );
+    }
+
+    return () => {
+      clearPollingInterval();
+    };
+  }, [branchid, clearPollingInterval, domain, isOrderScreenActive]);
 
   const onLogoutPressed = () => {
     setIsLoading(true);
     props.navigation.closeDrawer();
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-    }
-    // Call logout with navigation to force reset
+    clearPollingInterval();
     logout(props.navigation);
   };
 
   const toggleBranch = async () => {
     if (loading || !domain || !branchid) return;
 
-    const newStatus = !branchEnabled; // toggle
+    const newStatus = !branchEnabled;
     setLoading(true);
 
-    console.log("Toggling branch status:", newStatus, "for branch ID:", branchid);
+    if (__DEV__) {
+      console.log("Toggling branch status:", newStatus, "for branch ID:", branchid);
+    }
 
     try {
       const resp = await axiosInstance.post(
         `https://${domain}/api/v1/admin/branchActivity`,
         {
           branchid,
-          enabled: newStatus ? 0 : 1, // 0 → ჩართვა, 1 → გათიშვა
+          enabled: newStatus ? 1 : 0,
         }
       );
 
       const result = resp?.data?.data;
-      console.log("Toggle branch response:", resp?.data);
 
       if (typeof result === "boolean") {
-        const isEnabled = result; // true = enabled, false = disabled
-        const isClosed = !isEnabled; // true = closed, false = open
-        setBranchEnabled(isClosed);     // Switch state
-        setIsVisible(isClosed);          // Toast visibility
+        // API returns open status: true = open/enabled, false = closed
+        setBranchEnabled(result);
+        setIsVisible(!result);
 
-        if (!isClosed) {
+        if (!result) {
           handleError(
             { message: dictionary?.["orders.branchDisabled"] || "Branch is temporarily closed" },
             "BRANCH_TEMPORARILY_CLOSED",
             { persistent: true }
           );
         } else {
-          console.log('🟢 Branch enabled, clearing persistent errors');
           clearErrors();
         }
       } else {
@@ -130,8 +177,6 @@ export default function DrawerContent(props) {
     } catch (error) {
       console.error("Branch toggle failed:", error);
       handleError(error, "TOGGLE_BRANCH_ERROR");
-
-      // optional: fallback მდგომარეობაზე არ გააკეთოს setBranchEnabled, შეინარჩუნოს არსებული
     } finally {
       setLoading(false);
     }
@@ -154,7 +199,7 @@ export default function DrawerContent(props) {
             style={{ fontSize: 20 }}
           />
           <Text style={{ paddingLeft: 17, color: '#090909', fontWeight: "bold" }}>
-            {branchName?.titles[userLanguage]}
+            {getBranchDisplayName(branchName, userLanguage)}
           </Text>
         </View>
 

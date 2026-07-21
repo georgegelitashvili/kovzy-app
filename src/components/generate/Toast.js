@@ -1,14 +1,13 @@
-import React, { useRef, useEffect, useState, useContext } from "react";
+import React, { useRef, useEffect, useContext, useCallback } from "react";
 import {
   View,
   Text,
   StyleSheet,
   Animated,
-  useWindowDimensions,
-  TouchableOpacity,
   StatusBar,
+  useWindowDimensions,
+  PanResponder,
 } from "react-native";
-import Icon from "react-native-vector-icons/Ionicons";
 import { LanguageContext } from "../Language";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
@@ -17,17 +16,71 @@ import {
 } from "../../utils/ErrorConstants";
 
 const Toast = ({ type, title, subtitle, animate, addStyles, onDismiss, persistent = false }) => {
-  // ALWAYS call ALL hooks at the top level - NEVER conditionally
   const { dictionary } = useContext(LanguageContext);
   const insets = useSafeAreaInsets();
+  const { width: screenWidth } = useWindowDimensions();
   const slideAnim = useRef(new Animated.Value(-120)).current;
+  const dismissTimeoutRef = useRef(null);
+  const isDismissingRef = useRef(false);
+  const onDismissRef = useRef(onDismiss);
+  onDismissRef.current = onDismiss;
 
-  const ICON = {
-    success: "checkmark-circle",
-    warning: "alert-circle",
-    failed: "close-circle",
-    info: "information-circle",
-  }[type] || "alert-circle";
+  const dismissWithAnimation = useCallback(() => {
+    if (isDismissingRef.current) {
+      return;
+    }
+    isDismissingRef.current = true;
+
+    if (dismissTimeoutRef.current) {
+      clearTimeout(dismissTimeoutRef.current);
+      dismissTimeoutRef.current = null;
+    }
+
+    Animated.timing(slideAnim, {
+      toValue: -120,
+      duration: 250,
+      useNativeDriver: true,
+    }).start(() => {
+      onDismissRef.current?.();
+      isDismissingRef.current = false;
+    });
+  }, [slideAnim]);
+
+  const dismissRef = useRef(dismissWithAnimation);
+  dismissRef.current = dismissWithAnimation;
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gestureState) =>
+        Math.abs(gestureState.dy) > 4 || Math.abs(gestureState.dx) > 4,
+      onPanResponderMove: (_, gestureState) => {
+        if (gestureState.dy < 0) {
+          slideAnim.setValue(gestureState.dy);
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        const isTap =
+          Math.abs(gestureState.dy) < 8 && Math.abs(gestureState.dx) < 8;
+        const isSwipeUp =
+          gestureState.dy < -40 || gestureState.vy < -0.45;
+
+        if (isTap || isSwipeUp) {
+          dismissRef.current();
+          return;
+        }
+
+        Animated.spring(slideAnim, {
+          toValue: 0,
+          useNativeDriver: true,
+          bounciness: 6,
+        }).start();
+      },
+    })
+  ).current;
+
+  const horizontalPadding = screenWidth >= 768 ? 24 : 16;
+  const toastMaxWidth = Math.min(screenWidth - horizontalPadding * 2, 600);
 
   const COLOR = {
     success: "#2fa360",
@@ -39,8 +92,17 @@ const Toast = ({ type, title, subtitle, animate, addStyles, onDismiss, persisten
   const statusBarHeight = insets.top || StatusBar.currentHeight || 0;
   const topPosition = statusBarHeight + 10;
 
-  const getLocalizedMessage = (message, type) => {
-    if (type === "failed" && dictionary) {
+  const getLocalizedMessage = (message, toastType) => {
+    if (message == null) return "";
+    if (typeof message === "object") {
+      const flattened = Object.values(message)
+        .flat()
+        .filter((item) => typeof item === "string" && item.trim())
+        .join("\n");
+      return flattened || dictionary?.["errors.USER_FRIENDLY"] || "Something went wrong";
+    }
+
+    if (toastType === "failed" && dictionary) {
       if (message && typeof message === "string") {
         if (USER_VISIBLE_ERROR_TYPES.includes(message)) {
           return dictionary[`errors.${message}`] || dictionary["errors.USER_FRIENDLY"] || message;
@@ -51,34 +113,34 @@ const Toast = ({ type, title, subtitle, animate, addStyles, onDismiss, persisten
         return message;
       }
     }
-    return message;
+    return String(message);
   };
 
   const processedMessage = getLocalizedMessage(subtitle, type);
 
-  // Check conditions that would suppress the toast
-  const lowerType = typeof type === 'string' ? type.toLowerCase() : '';
-  const lowerSubtitle = typeof subtitle === 'string' ? subtitle.toLowerCase() : '';
-  const shouldSuppressNetworkError = (
-    lowerType.includes('network_error') ||
-    lowerType.includes('network error') ||
-    lowerType.includes('ქსელთან კავშირის პრობლემა') ||
-    lowerSubtitle.includes('network_error') ||
-    lowerSubtitle.includes('network error') ||
-    lowerSubtitle.includes('ქსელთან კავშირის პრობლემა')
-  );
+  const lowerType = typeof type === "string" ? type.toLowerCase() : "";
+  const lowerSubtitle = typeof subtitle === "string" ? subtitle.toLowerCase() : "";
+  const shouldSuppressNetworkError =
+    lowerType.includes("network_error") ||
+    lowerType.includes("network error") ||
+    lowerType.includes("ქსელთან კავშირის პრობლემა") ||
+    lowerSubtitle.includes("network_error") ||
+    lowerSubtitle.includes("network error") ||
+    lowerSubtitle.includes("ქსელთან კავშირის პრობლემა");
 
-  const shouldSuppressTechnicalError = type === "failed" && TECHNICAL_ERROR_PATTERNS.some((pattern) =>
-    pattern.test(subtitle || "")
-  );
+  const shouldSuppressTechnicalError =
+    type === "failed" &&
+    TECHNICAL_ERROR_PATTERNS.some((pattern) => pattern.test(subtitle || ""));
 
   const shouldSuppressMessage = processedMessage === null;
+  const shouldHide =
+    shouldSuppressNetworkError || shouldSuppressTechnicalError || shouldSuppressMessage;
 
-  const shouldHide = shouldSuppressNetworkError || shouldSuppressTechnicalError || shouldSuppressMessage;
-
-  // Animation effect - ALWAYS call useEffect hooks
   useEffect(() => {
     if (!animate || shouldHide) return;
+
+    isDismissingRef.current = false;
+    slideAnim.setValue(-120);
 
     Animated.timing(slideAnim, {
       toValue: 0,
@@ -87,63 +149,47 @@ const Toast = ({ type, title, subtitle, animate, addStyles, onDismiss, persisten
     }).start();
 
     if (persistent) {
-      return;
+      return undefined;
     }
 
     const duration = type === "failed" ? 5000 : 3000;
-    const timeout = setTimeout(() => {
-      Animated.timing(slideAnim, {
-        toValue: -120,
-        duration: 300,
-        useNativeDriver: true,
-      }).start();
-
-      if (onDismiss) {
-        setTimeout(onDismiss, 400);
-      }
+    dismissTimeoutRef.current = setTimeout(() => {
+      dismissWithAnimation();
     }, duration);
 
-    return () => clearTimeout(timeout);
-  }, [animate, persistent, shouldHide, slideAnim, type, onDismiss]);
-  
-  // Handle dismiss action
-  const handleDismiss = () => {
-    Animated.timing(slideAnim, {
-      toValue: -120,
-      duration: 300,
-      useNativeDriver: true,
-    }).start(() => {
-      if (onDismiss) onDismiss();
-    });
-  };
+    return () => {
+      if (dismissTimeoutRef.current) {
+        clearTimeout(dismissTimeoutRef.current);
+        dismissTimeoutRef.current = null;
+      }
+    };
+  }, [animate, persistent, shouldHide, slideAnim, type, dismissWithAnimation]);
 
-  // Return null if we should hide the toast (after all hooks are called)
   if (shouldHide) {
     return null;
   }
 
   return (
     <Animated.View
+      pointerEvents="box-none"
       style={[
         styles.animatedContainer,
-        { transform: [{ translateY: slideAnim }], top: topPosition },
+        {
+          transform: [{ translateY: slideAnim }],
+          top: topPosition,
+          paddingHorizontal: horizontalPadding,
+        },
       ]}
     >
-      <View style={[styles.toastBox, addStyles]}>
+      <View
+        {...panResponder.panHandlers}
+        style={[styles.toastBox, addStyles, { maxWidth: toastMaxWidth }]}
+      >
         <View style={[styles.uiLine, { backgroundColor: COLOR }]} />
-        <Icon name={ICON} size={24} color={COLOR} style={styles.icon} />
         <View style={styles.textContainer}>
           <Text style={styles.toastTitle}>{title}</Text>
           <Text style={styles.toastMsg}>{processedMessage}</Text>
         </View>
-        <TouchableOpacity
-          onPress={handleDismiss}
-          style={styles.closeButton}
-          accessibilityLabel="Dismiss notification"
-          accessibilityRole="button"
-        >
-          <Text style={styles.closeIcon}>✕</Text>
-        </TouchableOpacity>
       </View>
     </Animated.View>
   );
@@ -155,9 +201,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 1000,
-    paddingHorizontal: 16,
     alignItems: "center",
-    pointerEvents: "box-none",
   },
   toastBox: {
     flexDirection: "row",
@@ -171,20 +215,16 @@ const styles = StyleSheet.create({
     shadowRadius: 4.65,
     elevation: 6,
     width: "100%",
-    maxWidth: 600, // restrict max width
   },
   uiLine: {
     width: 4,
     height: "80%",
     borderRadius: 3,
-    marginRight: 8,
-  },
-  icon: {
-    marginHorizontal: 8,
+    marginRight: 12,
   },
   textContainer: {
     flex: 1,
-    marginLeft: 4,
+    flexShrink: 1,
   },
   toastTitle: {
     fontSize: 15,
@@ -196,21 +236,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "400",
     color: "#444",
-  },
-  closeButton: {
-    padding: 8,
-    borderRadius: 50,
-    marginLeft: 4,
-    backgroundColor: "#f0f0f0",
-    width: 30,
-    height: 30,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  closeIcon: {
-    fontSize: 16,
-    color: "#666",
-    fontWeight: "bold",
   },
 });
 

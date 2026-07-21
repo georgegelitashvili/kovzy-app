@@ -15,18 +15,20 @@ import { FlatGrid } from "react-native-super-grid";
 import { MaterialCommunityIcons, SimpleLineIcons } from "@expo/vector-icons";
 import * as Updates from 'expo-updates';
 
-import { AuthContext, AuthProvider } from "../../context/AuthProvider";
+import { useAuthState } from "../../context/AuthProvider";
 import Loader from "../generate/loader";
 import { String, LanguageContext } from "../Language";
 import axiosInstance from "../../apiConfig/apiRequests";
 import OrdersDetail from "../OrdersDetail";
 import OrdersModal from "../modal/OrdersModalQr";
 import printRows from "../../PrintRows";
+import OrderCardActions from "../orders/OrderCardActions";
 
 import NotificationSound from '../../utils/NotificationSound';
 import NotificationManager from '../../utils/NotificationManager';
 import { useOrderDetails } from "../../hooks/useOrderDetails";
 import eventEmitter from "../../utils/EventEmitter";
+import { CONNECTION_EVENTS } from "../../utils/connectionMonitor";
 
 const initialWidth = Dimensions.get("window").width;
 const getColumnsByScreenSize = (screenWidth) => {
@@ -42,7 +44,7 @@ const type = 1;
 
 // render entered orders function
 export const EnteredOrdersList = () => {
-  const { domain, branchid, user } = useContext(AuthContext);
+  const { domain, branchid, user } = useAuthState();
   const [isNotificationReady, setIsNotificationReady] = useState(false);
   // Use the custom hook for order details management
   const {
@@ -88,6 +90,18 @@ export const EnteredOrdersList = () => {
   const [retryCount, setRetryCount] = useState(0);
   const MAX_RETRIES = 3;
   const RETRY_DELAY = 5000;
+  const ordersRef = useRef(orders);
+  const retryCountRef = useRef(retryCount);
+  const startIntervalRef = useRef(null);
+  const fetchEnteredOrdersRef = useRef(null);
+
+  useEffect(() => {
+    ordersRef.current = orders;
+  }, [orders]);
+
+  useEffect(() => {
+    retryCountRef.current = retryCount;
+  }, [retryCount]);
 
   const { dictionary, languageId } = useContext(LanguageContext);
 
@@ -169,7 +183,7 @@ export const EnteredOrdersList = () => {
     }
   };
 
-  const fetchEnteredOrders = async (showLoader = false) => {
+  const fetchEnteredOrders = useCallback(async (showLoader = false) => {
     if (!user || !options.url_unansweredOrders) {
       return null;
     }
@@ -180,7 +194,9 @@ export const EnteredOrdersList = () => {
     }
 
     try {
-      console.log(`📋 Fetching QR orders with languageId: ${languageId}`);
+      if (__DEV__) {
+        console.log(`📋 Fetching QR orders with languageId: ${languageId}`);
+      }
       const resp = await axiosInstance.post(options.url_unansweredOrders, {
         type: 1,
         page: 1,
@@ -191,7 +207,7 @@ export const EnteredOrdersList = () => {
       const feesData = resp.data.fees;
       
       // Get current order IDs to compare with new ones
-      const currentOrderIds = orders.map(order => order.id);
+      const currentOrderIds = ordersRef.current.map(order => order.id);
       const newOrderIds = data.map(order => order.id);
       
       // Find orders that are new to the orders state AND don't have cached details
@@ -203,6 +219,8 @@ export const EnteredOrdersList = () => {
       setOrders(data);
       setFees(feesData);
       setCurrency(resp.data.currency);
+
+      eventEmitter.emit('orderBadgeUpdate', { type: 1, count: data.length });
 
       // Handle order details fetching
       if (isLanguageChangeInProgressRef.current) {
@@ -234,19 +252,23 @@ export const EnteredOrdersList = () => {
       console.log('Error fetching qr entered orders full:', error);
       const statusCode = error?.status || 'Unknown';
       console.log('Status code qr entered orders:', statusCode);
-      if (retryCount < MAX_RETRIES) {
+      if (retryCountRef.current < MAX_RETRIES) {
         setRetryCount(prev => prev + 1);
-        console.log(`Retry attempt ${retryCount + 1} of ${MAX_RETRIES}`);
+        if (__DEV__) {
+          console.log(`Retry attempt ${retryCountRef.current + 1} of ${MAX_RETRIES}`);
+        }
 
         if (intervalRef.current) {
           clearInterval(intervalRef.current);
         }
 
         setTimeout(() => {
-          startInterval();
+          startIntervalRef.current?.();
         }, RETRY_DELAY);
       } else {
-        console.log('Max retries reached, stopping interval');
+        if (__DEV__) {
+          console.log('Max retries reached, stopping interval');
+        }
         if (intervalRef.current) {
           clearInterval(intervalRef.current);
         }
@@ -258,34 +280,62 @@ export const EnteredOrdersList = () => {
         setLoading(false);
       }
     }
-  };
+  }, [
+    user,
+    options.url_unansweredOrders,
+    branchid,
+    languageId,
+    isOrderDetailsLoaded,
+    fetchBatchOrderDetails,
+  ]);
 
-  const startInterval = () => {
+  useEffect(() => {
+    fetchEnteredOrdersRef.current = fetchEnteredOrders;
+  }, [fetchEnteredOrders]);
+
+  const startInterval = useCallback(() => {
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
     }
-    console.log('call interval');
+    if (__DEV__) {
+      console.log('call interval');
+    }
     
     // Initial fetch with loader
     if (optionsIsLoaded) {
-      fetchEnteredOrders(true); // Show loader for first call
+      fetchEnteredOrdersRef.current?.(true);
     }
     
     intervalRef.current = setInterval(() => {
       if (optionsIsLoaded) {
-        fetchEnteredOrders(false); // No loader for interval calls
-      } else {
+        fetchEnteredOrdersRef.current?.(false);
+      } else if (__DEV__) {
         console.log('Options not loaded');
       }
     }, 5000);
-  };
+  }, [optionsIsLoaded]);
+
+  useEffect(() => {
+    startIntervalRef.current = startInterval;
+  }, [startInterval]);
+
+  useEffect(() => {
+    const retryListenerId = eventEmitter.addEventListener(CONNECTION_EVENTS.RETRY, () => {
+      fetchEnteredOrdersRef.current?.(true);
+      startIntervalRef.current?.();
+    });
+
+    return () => {
+      eventEmitter.removeEventListener(retryListenerId);
+    };
+  }, []);
 
   const handleAppStateChange = (nextAppState) => {
     if (appState.match(/inactive|background/) && nextAppState === "active") {
       console.log('QR App state changed: background -> active');
       // Don't interfere if language change is in progress
       if (!isLanguageChangeInProgressRef.current) {
-        startInterval();
+        startIntervalRef.current?.();
       }
     } else {
       if (intervalRef.current) {
@@ -315,7 +365,7 @@ export const EnteredOrdersList = () => {
         if (intervalRef.current) {
           clearInterval(intervalRef.current);
         }
-        startInterval();
+        startIntervalRef.current?.();
         console.log('Interval started.');
         return () => {
           setPreviousOrderCount(0);
@@ -356,7 +406,7 @@ export const EnteredOrdersList = () => {
           isLanguageChangeInProgressRef.current = false;
           
           // Restart interval
-          startInterval();
+          startIntervalRef.current?.();
           
           console.log(`✅ QR Language change complete - orders and details refreshed with languageId: ${languageId}`);
         } catch (error) {
@@ -364,7 +414,7 @@ export const EnteredOrdersList = () => {
           // Clear language change flag even on error
           isLanguageChangeInProgressRef.current = false;
           // Restart interval even on error
-          startInterval();
+          startIntervalRef.current?.();
         }
       })();
     } else if (optionsIsLoaded && !isLanguageChangeInProgressRef.current) {
@@ -373,7 +423,7 @@ export const EnteredOrdersList = () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
-      startInterval();
+      startIntervalRef.current?.();
       console.log('Interval started.');
       return () => {
         setPreviousOrderCount(0);
@@ -490,30 +540,18 @@ export const EnteredOrdersList = () => {
               <Text variant="titleMedium" style={styles.title}>
                 {dictionary["orders.totalcost"]}: {item.total_cost} {currency}
               </Text>
-              <Card.Actions>
-                <TouchableOpacity
-                  style={styles.buttonAccept}
-                  onPress={() => {
-                    setItemId(item.id);
-                    setItemTakeAway(item.take_away);
-                    showModal("accept");
-                  }}
-                >
-                  <MaterialCommunityIcons name="check-decagram-outline" size={30} color="white" />
-                </TouchableOpacity>
-
-
-                <TouchableOpacity
-                  style={styles.buttonReject}
-                  onPress={() => {
-                    setItemId(item.id);
-                    setItemTakeAway(null);
-                    showModal("reject");
-                  }}
-                >
-                  <MaterialCommunityIcons name="close-circle-outline" size={30} color="white" />
-                </TouchableOpacity>
-              </Card.Actions>
+              <OrderCardActions
+                onAccept={() => {
+                  setItemId(item.id);
+                  setItemTakeAway(item.take_away);
+                  showModal("accept");
+                }}
+                onReject={() => {
+                  setItemId(item.id);
+                  setItemTakeAway(null);
+                  showModal("reject");
+                }}
+              />
 
             </Card.Content>
           ) : null}
@@ -572,6 +610,9 @@ export const EnteredOrdersList = () => {
                   style={{ flex: 1 }}
                   onEndReachedThreshold={0.5}
                   removeClippedSubviews={true}
+                  maxToRenderPerBatch={10}
+                  windowSize={10}
+                  initialNumToRender={10}
                   getItemLayout={getItemLayout}
                 />
               </View>
@@ -620,39 +661,6 @@ const styles = StyleSheet.create({
     marginRight: 15,
     fontSize: 25,
   },
-  buttonAccept: {
-    width: 85,
-    height: 45,
-    borderRadius: 21,
-    borderWidth: 1,
-    borderColor: "#2fa360",
-    backgroundColor: "#2fa360",
-    justifyContent: "center",
-    alignItems: "center",
-    marginHorizontal: 5,
-  },
-  buttonDelay: {
-    width: 85,
-    height: 45,
-    borderRadius: 21,
-    borderWidth: 1,
-    borderColor: "#3490dc",
-    backgroundColor: "#3490dc",
-    justifyContent: "center",
-    alignItems: "center",
-    marginHorizontal: 5,
-  },
-  buttonReject: {
-    width: 85,
-    height: 45,
-    borderRadius: 21,
-    borderWidth: 1,
-    borderColor: "#f14c4c",
-    backgroundColor: "#f14c4c",
-    justifyContent: "center",
-    alignItems: "center",
-    marginHorizontal: 5,
-  },
   title: {
     paddingVertical: 8,
     lineHeight: 20,
@@ -670,7 +678,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(0, 0, 0, 0.7)", // Semi-transparent background
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
   },
   modalContent: {
     backgroundColor: "#fff",

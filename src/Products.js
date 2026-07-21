@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useContext, useCallback, useMemo, memo } from "react";
-import { StyleSheet, View, TouchableOpacity, Dimensions, RefreshControl, useWindowDimensions } from "react-native";
+import React, { useState, useEffect, useContext, useCallback, useMemo, memo, useRef } from "react";
+import { StyleSheet, View, TouchableOpacity, Dimensions, RefreshControl, useWindowDimensions, Alert } from "react-native";
 import NetInfo from "@react-native-community/netinfo";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { Text, Button, Card, Checkbox } from "react-native-paper";
-import { useIsFocused } from '@react-navigation/native';
+import { Text, Button, Card, Checkbox, Chip } from "react-native-paper";
 import { FlatGrid } from "react-native-super-grid";
 import SelectOption from "./components/generate/SelectOption";
 import { AuthContext } from "./context/AuthProvider";
@@ -12,6 +11,41 @@ import TextField from './components/generate/TextField';
 import { LanguageContext } from "./components/Language";
 import axiosInstance from "./apiConfig/apiRequests";
 import throttle from 'lodash.throttle';
+import useErrorDisplay from "./hooks/useErrorDisplay";
+import ProductsBulkActivityModal from "./components/modal/ProductsBulkActivityModal";
+
+const normalizeProductsPayload = (response) => {
+  const payload = response?.data?.data ?? response?.data ?? {};
+  const category = payload.category ?? [];
+  const excluded = payload.excluded ?? [];
+  const productsSource = payload.products;
+
+  if (Array.isArray(productsSource)) {
+    return {
+      category,
+      excluded,
+      productList: productsSource,
+      total: productsSource.length,
+      perPage: productsSource.length || 1,
+    };
+  }
+
+  if (Array.isArray(productsSource?.data)) {
+    return {
+      category,
+      excluded,
+      productList: productsSource.data,
+      total: productsSource.total ?? productsSource.data.length,
+      perPage: productsSource.per_page ?? (productsSource.data.length || 1),
+    };
+  }
+
+  return { category, excluded, productList: [], total: 0, perPage: 1 };
+};
+
+// null / "" = all channels. "0" is legacy from API casting disabled_by to int.
+const isAllChannelsExcluded = (disabledBy) =>
+  disabledBy === "" || disabledBy === null || disabledBy === "0" || disabledBy === 0;
 
 const MemoizedProductCard = memo(({ item, isExcluded, isExcludedQr, isExcludedOnline, checkedItems, onCheckboxPress, onButtonPress, onNavigate, dictionary }) => {
   const buttonText = isExcluded ? dictionary["prod.enableProduct"] : dictionary["prod.disableProduct"];
@@ -82,14 +116,15 @@ const MemoizedProductCard = memo(({ item, isExcluded, isExcludedQr, isExcludedOn
 
 export default function Products({ navigation }) {
   const { width } = useWindowDimensions();
-  const { setIsDataSet, domain, branchid, user, intervalId, branchEnabled } = useContext(AuthContext);
-  const isFocused = useIsFocused();
+  const { domain, branchid, user, branchEnabled } = useContext(AuthContext);
   const { dictionary, userLanguage } = useContext(LanguageContext);
+  const { errorDisplay, setApiError, clearError } = useErrorDisplay({ showInline: true });
 
   const [products, setProducts] = useState([]);
   const [category, setCategory] = useState([]);
   const [excluded, setExcluded] = useState([]);
-  const [selected, setSelected] = useState("");
+  const [selectedCategories, setSelectedCategories] = useState([]);
+  const [categoryPickerKey, setCategoryPickerKey] = useState(0);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -99,52 +134,90 @@ export default function Products({ navigation }) {
   const [showFilter, setShowFilter] = useState(false);
   const [checkedItems, setCheckedItems] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [bulkModalVisible, setBulkModalVisible] = useState(false);
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const fetchRequestIdRef = useRef(0);
 
   // Calculate button width based on screen size
   const buttonWidth = Math.max(80, (width - 30) / 3); // Minimum 80px, but distribute space evenly
 
-  const fetchData = useCallback(async () => {
-    if (!user || !domain || !branchid || !branchEnabled) return;
+  const fetchData = useCallback(async (pageOverride) => {
+    const requestId = ++fetchRequestIdRef.current;
+
+    if (!user || !domain || !branchid) {
+      if (requestId === fetchRequestIdRef.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
+      return;
+    }
+
+    const requestPage = pageOverride ?? page;
 
     try {
+      clearError();
       const response = await axiosInstance.post(
         `https://${domain}/api/v1/admin/getProducts`,
         {
           lang: userLanguage,
-          page: page,
-          categoryid: selected,
-          branchid: branchid,
-          like: searchQuery
+          page: requestPage,
+          categoryids: selectedCategories.length > 0 ? selectedCategories : null,
+          branchid: Number(branchid),
+          like: searchQuery || null,
         }
       );
 
-      setCategory(response.data.category);
-      const newExcluded = response.data.excluded || [];
+      // A newer request (or unmount) superseded this one.
+      if (requestId !== fetchRequestIdRef.current) {
+        return;
+      }
+
+      const {
+        category: nextCategory,
+        excluded: newExcluded,
+        productList,
+        total,
+        perPage,
+      } = normalizeProductsPayload(response);
+
+      setCategory(nextCategory);
       setExcluded(newExcluded);
 
-      const updatedProducts = response.data.products.data.map(product => ({
+      const updatedProducts = productList.map((product) => ({
         ...product,
-        isExcluded: newExcluded.some(item => item.productid === product.id && item.disabled_by === ""),
-        isExcludedQr: newExcluded.some(item => item.productid === product.id && item.disabled_by === "qr-menu"),
-        isExcludedOnline: newExcluded.some(item => item.productid === product.id && item.disabled_by === "online"),
+        isExcluded: newExcluded.some((item) => item.productid === product.id && isAllChannelsExcluded(item.disabled_by)),
+        isExcludedQr: newExcluded.some((item) => item.productid === product.id && item.disabled_by === "qr-menu"),
+        isExcludedOnline: newExcluded.some((item) => item.productid === product.id && item.disabled_by === "online"),
       }));
-      
-      setProducts(updatedProducts);
 
-      setTotalPages(response.data.products.total / response.data.products.per_page);
-    } catch (error) {
-      console.error('Error fetching products:', error);
-      if (error.status === 401) {
-        setProducts([]);
-        setExcluded([]);
-        setIsDataSet(false);
-        clearInterval(intervalId);
+      setProducts(updatedProducts);
+      setTotalPages(total / perPage);
+
+      if (__DEV__) {
+        console.log(`[Products] Loaded ${updatedProducts.length} product(s) for branch ${branchid}`);
       }
+    } catch (error) {
+      if (requestId !== fetchRequestIdRef.current) {
+        return;
+      }
+      console.error('Error fetching products:', error);
+      setProducts([]);
+      setExcluded([]);
+      setApiError(error);
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (requestId === fetchRequestIdRef.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
-  }, [user, domain, branchid, branchEnabled, userLanguage, page, selected, searchQuery, setIsDataSet, intervalId]);
+  }, [user, domain, branchid, userLanguage, page, selectedCategories, searchQuery, clearError, setApiError]);
+
+  useEffect(() => {
+    return () => {
+      // Invalidate in-flight fetches on unmount.
+      fetchRequestIdRef.current += 1;
+    };
+  }, []);
 
   useEffect(() => {
     const removeSubscription = NetInfo.addEventListener((state) => {
@@ -155,46 +228,113 @@ export default function Products({ navigation }) {
   }, []);
 
   useEffect(() => {
-    if (isConnected && (page || userLanguage || selected || searchQuery) && branchEnabled) {
-      setLoading(true);
-      setCategory([]);
-      fetchData();
+    if (!user || !domain || !branchid || !isConnected) {
+      setLoading(false);
+      return;
     }
-  }, [isConnected, page, userLanguage, selected, branchid, searchQuery, branchEnabled, fetchData]);
+
+    setLoading(true);
+    setCategory([]);
+    fetchData();
+  }, [isConnected, page, userLanguage, selectedCategories, branchid, searchQuery, fetchData, user, domain]);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
-      if (branchEnabled) {
-        setPage(1);
-        setRefreshing(true);
-        fetchData();
-      }
+      if (!user || !domain || !branchid) return;
+      setPage(1);
+      setRefreshing(true);
+      fetchData(1);
     });
 
     return unsubscribe;
-  }, [navigation, branchEnabled, fetchData]);
+  }, [navigation, fetchData, user, domain, branchid]);
+
+  const wasFilterOpenRef = useRef(false);
+  const selectedCategoriesRef = useRef(selectedCategories);
+  selectedCategoriesRef.current = selectedCategories;
 
   useEffect(() => {
-    if (!showFilter) {
-      setSelected("");
+    // Capture previous open state before updating the ref so open→close
+    // transitions remain deterministic across rapid toggles.
+    const wasOpen = wasFilterOpenRef.current;
+    wasFilterOpenRef.current = showFilter;
+
+    // Only reset when the panel closes (not on initial mount while already closed)
+    if (!wasOpen || showFilter) {
+      return;
     }
+
+    if (selectedCategoriesRef.current.length > 0) {
+      setSelectedCategories([]);
+      setCategoryPickerKey((key) => key + 1);
+      setPage(1);
+    }
+  }, [showFilter]);
+
+  useEffect(() => {
     if (!showSearch) {
       setSearchQuery("");
     }
-  }, [showFilter, showSearch]);
+  }, [showSearch]);
 
   const onRefresh = useCallback(async () => {
-    if (!branchEnabled) return;
     setRefreshing(true);
     await fetchData();
     setCheckedItems([]);
-  }, [branchEnabled, fetchData]);
+  }, [fetchData]);
 
-  const handleSearchChange = useCallback(throttle((query) => {
-    if (!branchEnabled) return;
-    setSearchQuery(query);
+  const branchEnabledRef = useRef(branchEnabled);
+  branchEnabledRef.current = branchEnabled;
+
+  const handleSearchChange = useMemo(
+    () =>
+      throttle((query) => {
+        if (!branchEnabledRef.current) return;
+        setSearchQuery(query);
+        setPage(1);
+      }, 500),
+    []
+  );
+
+  useEffect(() => {
+    return () => {
+      handleSearchChange.cancel();
+    };
+  }, [handleSearchChange]);
+
+  // Drop any pending throttled search when branch context changes so a
+  // previously scheduled call cannot apply against the new branch.
+  useEffect(() => {
+    handleSearchChange.cancel();
+  }, [branchEnabled, handleSearchChange]);
+
+  useEffect(() => {
+    handleSearchChange.cancel();
+    setSearchQuery("");
     setPage(1);
-  }, 500), [branchEnabled]);
+  }, [branchid, handleSearchChange]);
+
+  const handleAddCategoryFilter = useCallback((categoryId) => {
+    if (categoryId == null || !branchEnabled) return;
+    if (selectedCategories.includes(categoryId)) return;
+
+    setSelectedCategories((prev) => [...prev, categoryId]);
+    setCategoryPickerKey((key) => key + 1);
+    setPage(1);
+  }, [branchEnabled, selectedCategories]);
+
+  const handleRemoveCategoryFilter = useCallback((categoryId) => {
+    if (!branchEnabled) return;
+    setSelectedCategories((prev) => prev.filter((id) => id !== categoryId));
+    setPage(1);
+  }, [branchEnabled]);
+
+  const handleClearCategoryFilters = useCallback(() => {
+    if (!branchEnabled) return;
+    setSelectedCategories([]);
+    setCategoryPickerKey((key) => key + 1);
+    setPage(1);
+  }, [branchEnabled]);
 
   const handleButtonPress = useCallback(async (item, disabled_by) => {
     if (!domain || !branchid || !branchEnabled) return;
@@ -221,7 +361,7 @@ export default function Products({ navigation }) {
           const filtered = prev.filter(ex => {
             if (disabled_by === "") {
 
-              return !(ex.productid === item.id && (ex.disabled_by === "" || ex.disabled_by === null));
+              return !(ex.productid === item.id && isAllChannelsExcluded(ex.disabled_by));
             } else {
 
               return !(ex.productid === item.id && ex.disabled_by === disabled_by);
@@ -236,7 +376,7 @@ export default function Products({ navigation }) {
         setExcluded(prev => {
           if (disabled_by === "") {
 
-            return prev.filter(ex => !(ex.productid === item.id && (ex.disabled_by === "" || ex.disabled_by === null)));
+            return prev.filter(ex => !(ex.productid === item.id && isAllChannelsExcluded(ex.disabled_by)));
           } else {
 
             return prev.filter(ex => !(ex.productid === item.id && ex.disabled_by === disabled_by));
@@ -251,43 +391,99 @@ export default function Products({ navigation }) {
     }
   }, [domain, branchid, branchEnabled, excluded, onRefresh]);
 
+  const isProductExcludedForChannel = useCallback((productId, disabledBy) => {
+    return excluded.some((item) => {
+      if (item.productid !== productId) return false;
+      if (disabledBy === "") return isAllChannelsExcluded(item.disabled_by);
+      return item.disabled_by === disabledBy;
+    });
+  }, [excluded]);
+
   const handleCheckboxPress = useCallback((id) => {
     if (!branchEnabled) return;
 
     setCheckedItems((prevState) => {
       if (prevState.includes(id)) {
-
         return prevState.filter((item) => item !== id);
-      } else {
-     
-        return [...prevState, id];
       }
+      return [...prevState, id];
     });
   }, [branchEnabled]);
 
-  const checkboxPressed = useCallback(() => {
+  const openBulkActivityModal = useCallback(() => {
     if (!branchEnabled) return;
 
-    if (checkedItems.length > 0) {
-
-      checkedItems.forEach(id => {
-        const item = products.find(item => item.id === id);
-        if (item) {
-
-          handleButtonPress(item, ""); // Pass empty string for regular disable/enable
-        }
-      });
-    } else {
-      console.log('No items checked');
+    if (checkedItems.length === 0) {
+      Alert.alert(
+        dictionary["general.alerts"] || "Alert",
+        dictionary["prod.noProductsSelected"] || "Select products first"
+      );
+      return;
     }
-  }, [branchEnabled, checkedItems, products, handleButtonPress]);
+
+    setBulkModalVisible(true);
+  }, [branchEnabled, checkedItems.length, dictionary]);
+
+  const applyBulkActivity = useCallback(async (channels, action = "toggle") => {
+    if (!domain || !branchid || !branchEnabled || channels.length === 0) return;
+
+    setBulkLoading(true);
+    try {
+      for (const disabledBy of channels) {
+        let productIds = checkedItems;
+
+        if (action === "disable") {
+          productIds = checkedItems.filter(
+            (productId) => !isProductExcludedForChannel(productId, disabledBy)
+          );
+        } else if (action === "enable") {
+          productIds = checkedItems.filter((productId) =>
+            isProductExcludedForChannel(productId, disabledBy)
+          );
+        }
+
+        if (productIds.length === 0) continue;
+
+        await axiosInstance.post(
+          `https://${domain}/api/v1/admin/productActivity`,
+          {
+            pid: productIds,
+            branchid: branchid,
+            disabled_by: disabledBy,
+          }
+        );
+      }
+
+      setBulkModalVisible(false);
+      setCheckedItems([]);
+      await onRefresh();
+    } catch (error) {
+      console.error("Error updating bulk product activity:", error);
+      // Keep selection on partial failure; refresh so UI matches what succeeded
+      await onRefresh();
+      Alert.alert(
+        dictionary["general.alerts"] || "Alert",
+        dictionary["errors.generic"] || "Something went wrong. Please try again."
+      );
+    } finally {
+      setBulkLoading(false);
+    }
+  }, [
+    domain,
+    branchid,
+    branchEnabled,
+    checkedItems,
+    isProductExcludedForChannel,
+    onRefresh,
+    dictionary,
+  ]);
 
   const handleNavigate = useCallback((id) => {
     navigation.navigate('ProductsDetail', { id });
   }, [navigation]);
 
   const renderItem = useCallback(({ item }) => {
-    const isExcluded = excluded.some((excludedItem) => excludedItem.productid === item.id && (excludedItem.disabled_by === "" || excludedItem.disabled_by === null));
+    const isExcluded = excluded.some((excludedItem) => excludedItem.productid === item.id && isAllChannelsExcluded(excludedItem.disabled_by));
     const isExcludedQr = excluded.some((excludedItem) => excludedItem.productid === item.id && excludedItem.disabled_by === "qr-menu");
     const isExcludedOnline = excluded.some((excludedItem) => excludedItem.productid === item.id && excludedItem.disabled_by === "online");
     return (
@@ -305,9 +501,17 @@ export default function Products({ navigation }) {
     );
   }, [excluded, checkedItems, handleCheckboxPress, handleButtonPress, handleNavigate, dictionary]);
 
-  const categoryItems = useMemo(() => 
-    category.map((item) => ({ label: item.name, value: item.id }))
-  , [category]);
+  const categoryItems = useMemo(() =>
+    category
+      .filter((item) => !selectedCategories.includes(item.id))
+      .map((item) => ({ label: item.name, value: item.id }))
+  , [category, selectedCategories]);
+
+  const selectedCategoryChips = useMemo(() =>
+    selectedCategories
+      .map((id) => category.find((item) => item.id === id))
+      .filter(Boolean)
+  , [selectedCategories, category]);
 
   if (loading) {
     return <Loader />;
@@ -315,6 +519,7 @@ export default function Products({ navigation }) {
 
   return (
     <>
+      {errorDisplay}
       <View style={styles.buttonContainer}>
         <View style={[styles.buttonWrapper, { width: buttonWidth }]}>
           <Button
@@ -328,6 +533,7 @@ export default function Products({ navigation }) {
             onPress={() => setShowFilter(prev => !prev)}
           >
             {dictionary["filters"]}
+            {selectedCategories.length > 0 ? ` (${selectedCategories.length})` : ""}
           </Button>
         </View>
         
@@ -355,12 +561,20 @@ export default function Products({ navigation }) {
             mode='contained'
             compact
             labelStyle={styles.buttonLabel}
-            onPress={checkboxPressed}
+            onPress={openBulkActivityModal}
           >
             On/Off
           </Button>
         </View>
       </View>
+
+      <ProductsBulkActivityModal
+        visible={bulkModalVisible}
+        selectedCount={checkedItems.length}
+        loading={bulkLoading}
+        onClose={() => !bulkLoading && setBulkModalVisible(false)}
+        onApply={applyBulkActivity}
+      />
 
       <View style={{ paddingHorizontal: 10 }}>
         {showSearch && (
@@ -374,11 +588,38 @@ export default function Products({ navigation }) {
           />
         )}
         {showFilter && (
-          <SelectOption
-            value={selected}
-            onValueChange={setSelected}
-            items={categoryItems}
-          />
+          <View style={styles.filterPanel}>
+            <SelectOption
+              key={categoryPickerKey}
+              value={null}
+              placeholder={dictionary["prod.chooseCategory"] || "Choose Category"}
+              onValueChange={handleAddCategoryFilter}
+              items={categoryItems}
+            />
+            {selectedCategoryChips.length > 0 && (
+              <View style={styles.chipRow}>
+                {selectedCategoryChips.map((item) => (
+                  <Chip
+                    key={item.id}
+                    style={styles.chip}
+                    textStyle={styles.chipText}
+                    onClose={() => handleRemoveCategoryFilter(item.id)}
+                    closeIconAccessibilityLabel={dictionary["filter.clear"] || "Clear"}
+                  >
+                    {item.name}
+                  </Chip>
+                ))}
+                <Button
+                  compact
+                  mode="text"
+                  onPress={handleClearCategoryFilters}
+                  labelStyle={styles.clearFiltersLabel}
+                >
+                  {dictionary["filter.clear"] || "Clear"}
+                </Button>
+              </View>
+            )}
+          </View>
         )}
       </View>
 
@@ -398,11 +639,6 @@ export default function Products({ navigation }) {
         windowSize={5}
         updateCellsBatchingPeriod={50}
         removeClippedSubviews={true}
-        getItemLayout={(data, index) => ({
-          length: 200,
-          offset: 200 * index,
-          index,
-        })}
       />
 
       <View style={styles.paginationContainer}>
@@ -535,5 +771,26 @@ const styles = StyleSheet.create({
   markButton: {
     backgroundColor: '#3490dc',
     paddingHorizontal: 4,
+  },
+  filterPanel: {
+    marginBottom: 8,
+  },
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  chip: {
+    backgroundColor: '#e8f1fb',
+    marginBottom: 4,
+  },
+  chipText: {
+    fontSize: 13,
+  },
+  clearFiltersLabel: {
+    fontSize: 13,
+    color: '#3490dc',
   },
 });

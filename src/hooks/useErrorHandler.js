@@ -24,8 +24,8 @@ const extractError = (err, fallbackType = "UNKNOWN") => {
 
   if (typeof err === "string") return { type: fallbackType, message: err };
 
-  if (err?.type && err?.message) {
-    return { type: err.type, message: err.message };
+  if (err?.type) {
+    return { type: err.type, message: err.message || '' };
   }
 
   if (err?.response?.data?.message) {
@@ -54,9 +54,9 @@ export default function useErrorHandler() {
   const setError = useCallback((errOrType, maybeMessage = null, options = {}) => {
     let type, message, persistentFlag;
 
-    if (typeof errOrType === "object" && errOrType?.type && errOrType?.message) {
+    if (typeof errOrType === "object" && errOrType?.type) {
       type = errOrType.type;
-      message = errOrType.message;
+      message = errOrType.message || '';
       persistentFlag = errOrType.persistent === true || options?.persistent === true;
     } else if (typeof errOrType === "object" && maybeMessage === null) {
       const extracted = extractError(errOrType);

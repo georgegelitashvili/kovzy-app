@@ -3,7 +3,6 @@ import {
   StyleSheet,
   Dimensions,
   View,
-  Modal,
   Alert,
   AppState,
   FlatList,
@@ -15,24 +14,25 @@ import * as Updates from 'expo-updates';
 import { Audio } from 'expo-av';
 import NetInfo from '@react-native-community/netinfo';
 
-import { AuthContext, AuthProvider } from "../../context/AuthProvider";
+import { useAuthState } from "../../context/AuthProvider";
 import Loader from "../generate/loader";
-import TimePicker from "../generate/TimePicker";
 import { LanguageContext } from "../Language";
 import axiosInstance from "../../apiConfig/apiRequests";
 import OrdersModal from "../modal/OrdersModal";
+import OrdersModalEdit from "../modal/OrdersModalEdit";
+import OrdersModalTimePicker from "../modal/OrdersModalTimePicker";
 import ErrorDisplay from "../generate/ErrorDisplay";
 import useErrorHandler from "../../hooks/useErrorHandler";
 import eventEmitter from "../../utils/EventEmitter";
 
 import NotificationSound from '../../utils/NotificationSound';
 import NotificationManager from '../../utils/NotificationManager';
-import ConnectionStatusBar from "../generate/ConnectionStatusBar";
 import { orderReducer, initialState } from '../../reducers/orderReducer';
 import OrderCard from "./OrderCard";
-import { handleDelaySet } from '../../utils/timeUtils';
-import { debounce } from 'lodash';
+import { handleDelaySet, handleSetDeliveryScheduled } from '../../utils/timeUtils';
+import debounce from 'lodash.debounce';
 import { useOrderDetails } from "../../hooks/useOrderDetails";
+import { CONNECTION_EVENTS } from "../../utils/connectionMonitor";
 
 // This will be replaced with a dynamic calculation based on screen size
 const initialWidth = Dimensions.get("window").width;
@@ -54,7 +54,7 @@ let newOrderCount;
 const type = 0;
 
 export const EnteredOrdersList = () => {
-  const { domain, branchid, user } = useContext(AuthContext);
+  const { domain, branchid, user } = useAuthState();
   const { dictionary, languageId } = useContext(LanguageContext);
   const [state, dispatch] = useReducer(orderReducer, initialState);
   // Use the custom hook for order details management
@@ -63,8 +63,11 @@ export const EnteredOrdersList = () => {
     loadingDetails,
     fetchBatchOrderDetails,
     fetchOrderDetailsLazy,
+    fetchSingleOrderDetails,
     isOrderDetailsLoaded,
+    isOrderLoading,
     clearOrderDetails,
+    invalidateOrderDetails,
     getOrderDetails
   } = useOrderDetails();
   
@@ -76,6 +79,8 @@ export const EnteredOrdersList = () => {
   const [cardSize, setCardSize] = useState(getCardSize(width, numColumns));
   const [retryCount, setRetryCount] = useState(0);
   const [isPickerVisible, setPickerVisible] = useState(false);
+  const [pickerMode, setPickerMode] = useState('postpone'); // 'postpone' | 'schedule'
+  const [editOrder, setEditOrder] = useState(null);
   const [appState, setAppState] = useState(AppState.currentState);
   const [isConnected, setIsConnected] = useState(true);
   const [isLanguageChangeLoading, setIsLanguageChangeLoading] = useState(false);
@@ -85,7 +90,9 @@ export const EnteredOrdersList = () => {
     url_deliveronRecheck: "",
     url_acceptOrder: "",
     url_rejectOrder: "",
-    url_pushToken: ""
+    url_pushToken: "",
+    url_updateOrderCart: "",
+    url_setDeliveryScheduled: "",
   });
   const [optionsIsLoaded, setOptionsIsLoaded] = useState(false);
   const processedOrdersRef = useRef(new Set());
@@ -99,6 +106,24 @@ export const EnteredOrdersList = () => {
   const abortControllerRef = useRef(null); // For cancelling in-flight requests
   const lastRequestTimestampRef = useRef(0); // Track request timestamps to prevent stale responses
   const [layoutKey, setLayoutKey] = useState(0);
+  const ordersRef = useRef(state.orders);
+  const loadingRef = useRef(state.loading);
+  const retryCountRef = useRef(retryCount);
+  const startIntervalRef = useRef(null);
+  const debouncedFetchRef = useRef(null);
+  const fetchEnteredOrdersRef = useRef(null);
+
+  useEffect(() => {
+    ordersRef.current = state.orders;
+  }, [state.orders]);
+
+  useEffect(() => {
+    loadingRef.current = state.loading;
+  }, [state.loading]);
+
+  useEffect(() => {
+    retryCountRef.current = retryCount;
+  }, [retryCount]);
 
   const MAX_RETRIES = 15;
   const RETRY_DELAY = 5000;
@@ -144,13 +169,17 @@ export const EnteredOrdersList = () => {
       url_acceptOrder: `https://${domain}/api/v1/admin/acceptOrder`,
       url_rejectOrder: `https://${domain}/api/v1/admin/rejectOrder`,
       url_pushToken: `https://${domain}/api/v1/admin/storePushToken`,
+      url_updateOrderCart: `https://${domain}/api/v1/admin/updateOrderCart`,
+      url_setDeliveryScheduled: `https://${domain}/api/v1/admin/setDeliveryScheduled`,
     });
     setOptionsIsLoaded(true);
   }, [domain]);
 
   const fetchEnteredOrders = useCallback(async () => {
     if (!user || !options.url_unansweredOrders || global.isLoggedOut) {
-      console.log('[EnteredOrdersList] Skipped fetchEnteredOrders: no user, no url, or logged out');
+      if (__DEV__) {
+        console.log('[EnteredOrdersList] Skipped fetchEnteredOrders: no user, no url, or logged out');
+      }
       return;
     }
 
@@ -159,14 +188,18 @@ export const EnteredOrdersList = () => {
 
     // Only show loader for the very first app launch or initial fetch
     const shouldShowLoader = wasFirstAppLaunch && wasInitialFetch;
-    console.log('fetchEnteredOrders: shouldShowLoader=', shouldShowLoader, {
-      wasFirstAppLaunch,
-      wasInitialFetch,
-      isLanguageChangeInProgress: isLanguageChangeInProgressRef.current
-    });
+    if (__DEV__) {
+      console.log('fetchEnteredOrders: shouldShowLoader=', shouldShowLoader, {
+        wasFirstAppLaunch,
+        wasInitialFetch,
+        isLanguageChangeInProgress: isLanguageChangeInProgressRef.current
+      });
+    }
 
     if (shouldShowLoader) {
-      console.log('Setting loading to true for initial fetch');
+      if (__DEV__) {
+        console.log('Setting loading to true for initial fetch');
+      }
       dispatch({ type: 'SET_LOADING', payload: true });
     }
 
@@ -180,17 +213,17 @@ export const EnteredOrdersList = () => {
           page: 1,
           branchid,
           Languageid: languageId,
-          postponeOrder: false
+          postponeOrder: false,
         },
         { signal: abortControllerRef.current?.signal }
       );
 
       const newOrders = resp.data.data;
       const newOrderIds = newOrders.map(o => o.id);
-      const currentOrderIds = state.orders.map(o => o.id);
+      const currentOrderIds = ordersRef.current.map(o => o.id);
 
       const isFirstFetch = wasInitialFetch && !isLanguageChangeInProgressRef.current;
-      const isFirstLoad = state.orders.length === 0 && newOrders.length > 0;
+      const isFirstLoad = ordersRef.current.length === 0 && newOrders.length > 0;
 
       const genuinelyNewOrders = newOrders.filter(order => !lastOrdersRef.current.has(order.id));
       const genuinelyNewOrderIds = genuinelyNewOrders.map(o => o.id);
@@ -226,22 +259,23 @@ export const EnteredOrdersList = () => {
         }
       }
 
-      const ordersNeedingDetails = newOrderIds.filter(
-        id => !currentOrderIds.includes(id) && !isOrderDetailsLoaded(id)
-      );
+      // Fetch cart details for any orders not yet loaded (initial + newly arrived)
+      const ordersNeedingDetails = newOrderIds.filter(id => !isOrderDetailsLoaded(id));
+
+      if (ordersNeedingDetails.length > 0 && !isLanguageChangeInProgressRef.current) {
+        try {
+          await fetchBatchOrderDetails(ordersNeedingDetails, false);
+        } catch (e) {
+          console.error('❌ Order detail fetch failed', e);
+        }
+      }
 
       if ((isFirstFetch || isFirstLoad) && !isLanguageChangeInProgressRef.current) {
         isInitialFetchRef.current = false;
-        newOrderIds.forEach(id => lastOrdersRef.current.add(id));
-
-        if (newOrderIds.length > 0) {
-          try {
-            await fetchBatchOrderDetails(newOrderIds, false); // No loader for details
-          } catch (e) {
-            console.error("❌ Initial order detail fetch failed", e);
-          }
-        }
       }
+
+      // Track seen order IDs so runtime alerts only fire for true newcomers
+      newOrderIds.forEach(id => lastOrdersRef.current.add(id));
 
       dispatch({
         type: 'SET_ORDERS',
@@ -254,9 +288,13 @@ export const EnteredOrdersList = () => {
         }
       });
 
+      eventEmitter.emit('orderBadgeUpdate', { type: 0, count: newOrders.length });
+
       // Always ensure loading is false after fetch
-      if (state.loading) {
-        console.log('Forcing loading to false after fetch');
+      if (loadingRef.current) {
+        if (__DEV__) {
+          console.log('Forcing loading to false after fetch');
+        }
         dispatch({ type: 'SET_LOADING', payload: false });
       }
 
@@ -276,7 +314,9 @@ export const EnteredOrdersList = () => {
         error.message?.includes('canceled');
 
       if (isCancelled) {
-        console.log('🚫 Request was cancelled');
+        if (__DEV__) {
+          console.log('🚫 Request was cancelled');
+        }
         return;
       }
 
@@ -290,10 +330,10 @@ export const EnteredOrdersList = () => {
         isFirstAppLaunchRef.current = false;
       }
 
-      if (retryCount < MAX_RETRIES) {
+      if (retryCountRef.current < MAX_RETRIES) {
         setRetryCount(prev => prev + 1);
         if (intervalRef.current) clearInterval(intervalRef.current);
-        setTimeout(startInterval, RETRY_DELAY);
+        setTimeout(() => startIntervalRef.current?.(), RETRY_DELAY);
       } else {
         if (intervalRef.current) clearInterval(intervalRef.current);
         handleReload();
@@ -304,21 +344,25 @@ export const EnteredOrdersList = () => {
     options.url_unansweredOrders,
     branchid,
     languageId,
-    dictionary,
-    retryCount,
-    state.orders,
     isOrderDetailsLoaded,
     fetchBatchOrderDetails
   ]);
 
-  const debouncedFetch = useCallback(
-    debounce(() => {
+  useEffect(() => {
+    fetchEnteredOrdersRef.current = fetchEnteredOrders;
+  }, [fetchEnteredOrders]);
+
+  useEffect(() => {
+    debouncedFetchRef.current = debounce(() => {
       if (optionsIsLoaded && user && options.url_unansweredOrders && !global.isLoggedOut) {
-        fetchEnteredOrders();
+        fetchEnteredOrdersRef.current?.();
       }
-    }, DEBOUNCE_DELAY),
-    [optionsIsLoaded, user, options.url_unansweredOrders, fetchEnteredOrders]
-  );
+    }, DEBOUNCE_DELAY);
+
+    return () => {
+      debouncedFetchRef.current?.cancel?.();
+    };
+  }, [optionsIsLoaded, user, options.url_unansweredOrders]);
 
   const startInterval = useCallback(() => {
     if (intervalRef.current) {
@@ -326,8 +370,18 @@ export const EnteredOrdersList = () => {
     }
     // Prevent polling if logged out or no user
     if (!user || global.isLoggedOut) return;
-    intervalRef.current = setInterval(debouncedFetch, FETCH_INTERVAL);
-  }, [optionsIsLoaded, user]);
+    intervalRef.current = setInterval(() => {
+      debouncedFetchRef.current?.();
+    }, FETCH_INTERVAL);
+  }, [user]);
+
+  useEffect(() => {
+    startIntervalRef.current = startInterval;
+  }, [startInterval]);
+
+  const handleRefresh = useCallback(() => {
+    debouncedFetchRef.current?.();
+  }, []);
 
   
   const initializeNotifications = async () => {
@@ -345,7 +399,7 @@ export const EnteredOrdersList = () => {
         lastOrdersRef.current.clear();
         shownAlertsRef.current.clear(); // Clear shown alerts on app resume
       }
-      startInterval();
+      startIntervalRef.current?.();
     } else {
       if (intervalRef.current) {
       clearInterval(intervalRef.current);
@@ -382,7 +436,7 @@ export const EnteredOrdersList = () => {
       if (connectionStatus && !isConnected && !isLanguageChangeInProgressRef.current) {
         // Connection restored, restart interval (but not during language change)
         if (optionsIsLoaded) {
-          startInterval();
+          startIntervalRef.current?.();
         }
       } else if (!connectionStatus && isConnected) {
         // Connection lost, stop interval and clear alerts
@@ -406,16 +460,14 @@ export const EnteredOrdersList = () => {
         clearInterval(intervalRef.current);
       }
       if (isConnected && user && !global.isLoggedOut) {
-        startInterval();
+        startIntervalRef.current?.();
       }
 
       // Listen for forceLogout event to clear interval
       const logoutListener = () => {
         if (intervalRef.current) clearInterval(intervalRef.current);
       };
-      if (typeof eventEmitter !== 'undefined') {
-        eventEmitter.addEventListener('forceLogout', logoutListener);
-      }
+      const logoutListenerId = eventEmitter.addEventListener('forceLogout', logoutListener);
 
       return () => {
         if (intervalRef.current) {
@@ -423,9 +475,7 @@ export const EnteredOrdersList = () => {
         }
         dispatch({ type: 'UPDATE_ORDER_COUNT', payload: 0 });
         subscribe.remove();
-        if (typeof eventEmitter !== 'undefined') {
-          eventEmitter.removeEventListener(logoutListener);
-        }
+        eventEmitter.removeEventListener(logoutListenerId);
       };
     }
   }, [optionsIsLoaded, appState, isConnected, user]);
@@ -438,7 +488,9 @@ export const EnteredOrdersList = () => {
     }
 
     if (optionsIsLoaded && user && options.url_unansweredOrders) {
-      console.log(`🔄 User manually changed language to ${languageId}, forcing complete refresh`);
+      if (__DEV__) {
+        console.log(`🔄 User manually changed language to ${languageId}, forcing complete refresh`);
+      }
       setIsLanguageChangeLoading(true);
       isLanguageChangeInProgressRef.current = true;
       isFirstAppLaunchRef.current = false;
@@ -506,7 +558,7 @@ export const EnteredOrdersList = () => {
           }
 
           if (isConnected) {
-            startInterval();
+            startIntervalRef.current?.();
           }
         } catch (error) {
           if (
@@ -525,7 +577,7 @@ export const EnteredOrdersList = () => {
             setIsLanguageChangeLoading(false);
           }
           if (isConnected) {
-            startInterval();
+            startIntervalRef.current?.();
           }
         }
       })();
@@ -551,12 +603,12 @@ export const EnteredOrdersList = () => {
 
   const handleToggleContent = useCallback((id) => {
     dispatch({ type: 'TOGGLE_CONTENT', payload: id });
-    
-    // Lazy load: fetch order details when expanding if not already loaded
-    if (!state.isOpen.includes(id) && !orderDetails[id]) {
+
+    // Lazy load when expanding if details are missing (or prior fetch failed)
+    if (!state.isOpen.includes(id) && !isOrderDetailsLoaded(id)) {
       fetchOrderDetailsLazy(id);
     }
-  }, [state.isOpen, orderDetails, fetchOrderDetailsLazy]);
+  }, [state.isOpen, isOrderDetailsLoaded, fetchOrderDetailsLazy]);
 
   const handleAcceptOrder = useCallback(async (itemId, itemTakeAway) => {
     try {
@@ -675,11 +727,18 @@ export const EnteredOrdersList = () => {
 
   const handleDelayOrder = useCallback((id, scheduledTime) => {
     dispatch({ type: 'SET_LOADING', payload: true });
-    
     dispatch({ type: 'SET_MODAL_STATE', payload: { itemId: id } });
     dispatch({ type: 'SET_DELIVERY_SCHEDULED', payload: scheduledTime });
+    setPickerMode('postpone');
     setPickerVisible(true);
-    
+    dispatch({ type: 'SET_LOADING', payload: false });
+  }, []);
+
+  const handleScheduleOrder = useCallback((id) => {
+    dispatch({ type: 'SET_LOADING', payload: true });
+    dispatch({ type: 'SET_MODAL_STATE', payload: { itemId: id } });
+    setPickerMode('schedule');
+    setPickerVisible(true);
     dispatch({ type: 'SET_LOADING', payload: false });
   }, []);
 
@@ -688,12 +747,29 @@ export const EnteredOrdersList = () => {
   }, []);
 
   const handleDelaySetWrapper = useCallback(async (delay) => {
+    if (pickerMode === 'schedule') {
+      await handleSetDeliveryScheduled({
+        delay,
+        itemId: state.itemId,
+        options,
+        dictionary,
+        setLoadingOptions: (value) => dispatch({ type: 'SET_LOADING_OPTIONS', payload: value }),
+        setPickerVisible,
+        setLoading: (value) => dispatch({ type: 'SET_LOADING', payload: value }),
+        onSuccess: async () => {
+          await fetchEnteredOrdersRef.current?.();
+        },
+      });
+      return;
+    }
+
     const params = {
       delay,
       deliveryScheduled: state.deliveryScheduled,
       scheduled: state.scheduled,
       itemId: state.itemId,
       options,
+      dictionary,
       setLoadingOptions: (value) => dispatch({ type: 'SET_LOADING_OPTIONS', payload: value }),
       setPostponeOrder: (value) => dispatch({ type: 'SET_POSTPONE_ORDER', payload: value }),
       setPickerVisible,
@@ -701,11 +777,34 @@ export const EnteredOrdersList = () => {
     };
 
     await handleDelaySet(params);
-  }, [state.deliveryScheduled, state.scheduled, state.itemId, options, dictionary]);
+  }, [pickerMode, state.deliveryScheduled, state.scheduled, state.itemId, options, dictionary]);
+
+  const handleEditOrder = useCallback(async (item) => {
+    const orderIdStr = String(item.id);
+    let details = getOrderDetails(orderIdStr);
+    if (!details || details.length === 0) {
+      details = await fetchSingleOrderDetails(orderIdStr);
+    }
+    setEditOrder({ order: item, orderData: details || [] });
+  }, [getOrderDetails, fetchSingleOrderDetails]);
+
+  const handleEditClose = useCallback(() => {
+    setEditOrder(null);
+  }, []);
+
+  const handleOrderUpdated = useCallback(async (orderId) => {
+    invalidateOrderDetails(orderId);
+    await fetchEnteredOrdersRef.current?.();
+    if (state.isOpen.includes(orderId)) {
+      await fetchSingleOrderDetails(String(orderId));
+    }
+  }, [invalidateOrderDetails, state.isOpen, fetchSingleOrderDetails]);
 
   // Memoize order details per order to avoid unnecessary re-renders
   const renderOrderCard = useCallback(({ item }) => {
     const orderDataForItem = getOrderDetails(item.id) || [];
+    const detailsLoading = isOrderLoading(item.id) ||
+      (state.isOpen.includes(item.id) && !isOrderDetailsLoaded(item.id));
     return (
       <View style={{
         width: cardSize,
@@ -720,15 +819,18 @@ export const EnteredOrdersList = () => {
           scheduled={state.scheduled}
           dictionary={dictionary}
           orderData={orderDataForItem}
+          detailsLoading={detailsLoading}
           onToggle={handleToggleContent}
           onAccept={handleAcceptOrder}
           onDelay={handleDelayOrder}
+          onSchedule={handleScheduleOrder}
           onReject={handleRejectOrder}
+          onEdit={handleEditOrder}
           loading={state.loading}
         />
       </View>
     );
-  }, [state.currency, state.isOpen, state.fees, state.scheduled, state.loading, dictionary, getOrderDetails, handleToggleContent, handleAcceptOrder, handleDelayOrder, handleRejectOrder, cardSize]);
+  }, [state.currency, state.isOpen, state.fees, state.scheduled, state.loading, dictionary, getOrderDetails, isOrderLoading, isOrderDetailsLoaded, handleToggleContent, handleAcceptOrder, handleDelayOrder, handleScheduleOrder, handleRejectOrder, handleEditOrder, cardSize]);
 
   const keyExtractor = useCallback((item) => String(item.id), []);
 
@@ -783,13 +885,16 @@ export const EnteredOrdersList = () => {
         NotificationSoundRef.current.stopSound();
       }
     };
-    if (typeof eventEmitter !== 'undefined') {
-      eventEmitter.addEventListener('forceLogout', logoutListener);
-    }
+    const logoutListenerId = eventEmitter.addEventListener('forceLogout', logoutListener);
+
+    const retryListenerId = eventEmitter.addEventListener(CONNECTION_EVENTS.RETRY, () => {
+      fetchEnteredOrdersRef.current?.();
+      startIntervalRef.current?.();
+    });
+
     return () => {
-      if (typeof eventEmitter !== 'undefined') {
-        eventEmitter.removeEventListener(logoutListener);
-      }
+      eventEmitter.removeEventListener(logoutListenerId);
+      eventEmitter.removeEventListener(retryListenerId);
     };
   }, []);
 
@@ -805,7 +910,6 @@ export const EnteredOrdersList = () => {
             onDismiss={clearError} 
             style={styles.errorDisplay} 
           />
-          <ConnectionStatusBar dictionary={dictionary} />
           {state.visible && (
             <OrdersModal
               isVisible={state.visible}
@@ -820,27 +924,31 @@ export const EnteredOrdersList = () => {
               PendingOrders={true}
             />
           )}
-          <Modal
-            transparent={true}
+          <OrdersModalEdit
+            visible={!!editOrder}
+            onClose={handleEditClose}
+            order={editOrder?.order}
+            orderData={editOrder?.orderData}
+            currency={state.currency}
+            updateUrl={options.url_updateOrderCart}
+            onUpdated={handleOrderUpdated}
+          />
+          <OrdersModalTimePicker
             visible={isPickerVisible}
-            animationType="fade"
-            onRequestClose={() => {
+            initialMinutes={30}
+            loading={state.loadingOptions}
+            title={
+              pickerMode === "schedule"
+                ? dictionary["orders.scheduleOrder"]
+                : dictionary["orders.postponeOrder"] || dictionary["orders.scheduleOrder"]
+            }
+            onConfirm={handleDelaySetWrapper}
+            onClose={() => {
               setPickerVisible(false);
-              dispatch({ type: 'SET_LOADING_OPTIONS', payload: false });
+              setPickerMode("postpone");
+              dispatch({ type: "SET_LOADING_OPTIONS", payload: false });
             }}
-          >
-            <View style={styles.modalContainer}>
-              <TimePicker
-                scheduled={state.scheduled}
-                showButton={true}
-                onDelaySet={handleDelaySetWrapper}
-                onClose={() => {
-                  setPickerVisible(false);
-                  dispatch({ type: 'SET_LOADING_OPTIONS', payload: false });
-                }}
-              />
-            </View>
-          </Modal>
+          />
           <FlatList
             key={`flat-list-${numColumns}`}
             data={state.orders}
@@ -850,7 +958,7 @@ export const EnteredOrdersList = () => {
             getItemLayout={getItemLayout}
             removeClippedSubviews={true}
             maxToRenderPerBatch={10}
-            windowSize={21}
+            windowSize={10}
             initialNumToRender={10}
             onEndReachedThreshold={0.5}
             contentContainerStyle={[
@@ -863,7 +971,7 @@ export const EnteredOrdersList = () => {
               </View>
             }
             refreshing={state.loading}
-            onRefresh={debouncedFetch}
+            onRefresh={handleRefresh}
           />
         </>
       )}
@@ -922,39 +1030,6 @@ const styles = StyleSheet.create({
   rightIcon: {
     marginRight: 15,
     fontSize: 25,
-  },
-  buttonAccept: {
-    width: 85,
-    height: 45,
-    borderRadius: 21,
-    borderWidth: 1,
-    borderColor: "#2fa360",
-    backgroundColor: "#2fa360",
-    justifyContent: "center",
-    alignItems: "center",
-    marginHorizontal: 5,
-  },
-  buttonDelay: {
-    width: 85,
-    height: 45,
-    borderRadius: 21,
-    borderWidth: 1,
-    borderColor: "#3490dc",
-    backgroundColor: "#3490dc",
-    justifyContent: "center",
-    alignItems: "center",
-    marginHorizontal: 5,
-  },
-  buttonReject: {
-    width: 85,
-    height: 45,
-    borderRadius: 21,
-    borderWidth: 1,
-    borderColor: "#f14c4c",
-    backgroundColor: "#f14c4c",
-    justifyContent: "center",
-    alignItems: "center",
-    marginHorizontal: 5,
   },
   title: {
     paddingVertical: 10,
