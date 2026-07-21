@@ -3,15 +3,23 @@ import { View, StyleSheet, Text, Keyboard, TouchableWithoutFeedback } from 'reac
 import RNPickerSelect from 'react-native-picker-select';
 import { theme } from '../../core/theme';
 
-export default function SelectOption({ errorText, description, items, ...props }) {
+export default function SelectOption({ errorText, description, placeholder = "", items, ...props }) {
+  // Always pass a labeled placeholder so empty string still reserves the placeholder slot
+  // (unlike undefined, which skips it, or {}, which disables it in RNPickerSelect).
+  const placeholderConfig = { label: placeholder, value: null };
+
   return (
     <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
       <View style={styles.container}>
         {items && items.length > 0 && (
           <RNPickerSelect
             useNativeAndroidPickerStyle={false}
+            placeholder={placeholderConfig}
             style={pickerSelectStyles}
-            items={items.map((item, index) => ({ label: item.label, value: item.value, key: index.toString() }))}
+            items={items.map(item => ({
+              label: `${item.name || item.label || item.companyName || item.type || "Default Label"} ${item.dividedCost ? item.dividedCost.clientCost : (item.price_before_accept || '')}`,
+              value: item.id || item.value || item.companyId || item.type
+            }))}
             {...props}
           />
         )}
@@ -51,7 +59,6 @@ const pickerSelectStyles = StyleSheet.create({
     borderRadius: 4,
     borderColor: 'gray',
     paddingRight: 30,
-    backgroundColor: theme.colors.surface,
   },
   inputAndroid: {
     fontSize: 16,
@@ -62,6 +69,5 @@ const pickerSelectStyles = StyleSheet.create({
     borderColor: 'gray',
     color: 'black',
     paddingRight: 30,
-    backgroundColor: theme.colors.surface,
   },
 });

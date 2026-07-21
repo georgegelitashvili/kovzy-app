@@ -1,84 +1,189 @@
-import React, { useState, useContext, useEffect } from "react";
-import { View, StyleSheet } from "react-native";
+import React, { useState, useContext, useEffect, useRef, useCallback } from "react";
+import { View, StyleSheet, ActivityIndicator } from "react-native";
 import { DrawerItem, DrawerContentScrollView } from "@react-navigation/drawer";
+import { useNavigationState } from "@react-navigation/native";
 import { Drawer, Text, TouchableRipple, Switch } from "react-native-paper";
 import { MaterialCommunityIcons, Fontisto, SimpleLineIcons } from "@expo/vector-icons";
-import { AuthContext, AuthProvider } from "../context/AuthProvider";
+import { useAuthState, useAuthActions } from "../context/AuthProvider";
 import LanguageSelector from "./generate/LanguageSelector";
 import axiosInstance from "../apiConfig/apiRequests";
-import { String, LanguageContext } from "./Language";
+import { LanguageContext } from "./Language";
+import eventEmitter from "../utils/EventEmitter";
+import { CONNECTION_EVENTS } from "../utils/connectionMonitor";
+
+const FALLBACK_POLL_INTERVAL = 30000;
+const ORDER_DRAWER_ROUTES = new Set(['Orders', 'QrOrders']);
+
+const getBranchDisplayName = (branch, userLanguage) => {
+  if (!branch) return "";
+
+  return (
+    branch.titles?.[userLanguage] ||
+    branch.name ||
+    (branch.titles && Object.values(branch.titles).find(Boolean)) ||
+    ""
+  );
+};
 
 export default function DrawerContent(props) {
+  const { navigation, ...otherProps } = props;
+  const { domain, branchid, branchName, branchEnabled } = useAuthState();
+  const { setBranchEnabled, logout, setIsLoading, setIsVisible, handleError, clearErrors } = useAuthActions();
+  const { dictionary, userLanguage } = useContext(LanguageContext);
+  const [qrOrdersBadge, setQrOrdersBadge] = useState(0);
+  const [onlineOrdersBadge, setOnlineOrdersBadge] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const intervalRef = useRef(null);
 
-  const { domain, branchid, branchName, branchEnabled, setBranchEnabled, setDeliveronEnabled, deliveronEnabled, logout, intervalId, setIsLoading } = useContext(AuthContext);
-  const { dictionary, userLanguageChange } = useContext(LanguageContext);
+  const activeDrawerRoute = useNavigationState((state) => {
+    if (!state?.routes?.length) return null;
+    return state.routes[state.index]?.name ?? null;
+  });
 
-  const [options, setOptions] = useState({
-    url_branchActivity: "",
-    url_deliveronStatus: "",
-    url_branchStatus: "",
-    url_deliveronActivity: "",
-  }); // api options
-  const [optionsIsLoaded, setOptionsIsLoaded] = useState(false); // check api options is loaded
-  const [branchChangeOptions, setBranchChangeOptions] = useState({});
-  const [deliveronChangeOptions, setDeliveronChangeOptions] = useState({});
+  const isOrderScreenActive = ORDER_DRAWER_ROUTES.has(activeDrawerRoute);
 
-  const [isBranchEnabled, setIsBranchEnabled] = useState(false);
-  const [isDeliveronEnabled, setIsDeliveronEnabled] = useState(false);
+  const clearPollingInterval = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+  }, []);
 
-  const apiOptions = () => {
-    setOptions({
-      url_branchActivity: `https://${domain}/api/v1/admin/branchActivity`,
-      url_deliveronStatus: `https://${domain}/api/v1/admin/deliveronStatus`,
-      url_branchStatus: `https://${domain}/api/v1/admin/branchStatus`,
-      url_deliveronActivity: `https://${domain}/api/v1/admin/deliveronActivity`,
+  const fetchUnansweredOrders = useCallback(async () => {
+    if (!domain || !branchid) return;
+
+    try {
+      const [responseQr, responseOnline] = await Promise.all([
+        axiosInstance.post(`https://${domain}/api/v1/admin/getUnansweredOrders`,
+          { type: 1, branchid },
+          { timeout: 5000 }
+        ),
+        axiosInstance.post(`https://${domain}/api/v1/admin/getUnansweredOrders`,
+          { type: 0, branchid, postponeOrder: false },
+          { timeout: 5000 }
+        )
+      ]);
+
+      if (responseQr.data && responseOnline.data) {
+        setQrOrdersBadge(responseQr.data.data.length);
+        setOnlineOrdersBadge(responseOnline.data.data.length);
+      }
+    } catch (error) {
+      if (__DEV__) {
+        console.log("[DrawerContent] Badge poll failed:", error?.type || error?.message);
+      }
+      if (error.message?.includes('timeout') || error.type === 'REQUEST_TIMEOUT') {
+        clearPollingInterval();
+      }
+    }
+  }, [branchid, clearPollingInterval, domain]);
+
+  const fetchUnansweredOrdersRef = useRef(fetchUnansweredOrders);
+  fetchUnansweredOrdersRef.current = fetchUnansweredOrders;
+
+  useEffect(() => {
+    fetchUnansweredOrdersRef.current();
+
+    const badgeListener = eventEmitter.addEventListener('orderBadgeUpdate', ({ type, count }) => {
+      if (type === 0) {
+        setOnlineOrdersBadge(count);
+      } else if (type === 1) {
+        setQrOrdersBadge(count);
+      }
     });
-    setOptionsIsLoaded(true);
-  };
+
+    const retryListener = eventEmitter.addEventListener(CONNECTION_EVENTS.RETRY, () => {
+      fetchUnansweredOrdersRef.current();
+    });
+
+    const logoutListener = () => {
+      clearPollingInterval();
+      setQrOrdersBadge(0);
+      setOnlineOrdersBadge(0);
+    };
+
+    const logoutListenerId = eventEmitter.addEventListener('forceLogout', logoutListener);
+
+    return () => {
+      clearPollingInterval();
+      eventEmitter.removeEventListener(badgeListener);
+      eventEmitter.removeEventListener(retryListener);
+      eventEmitter.removeEventListener(logoutListenerId);
+    };
+  }, [branchid, clearPollingInterval, domain]);
+
+  useEffect(() => {
+    clearPollingInterval();
+
+    if (domain && branchid && !isOrderScreenActive) {
+      intervalRef.current = setInterval(
+        () => fetchUnansweredOrdersRef.current(),
+        FALLBACK_POLL_INTERVAL
+      );
+    }
+
+    return () => {
+      clearPollingInterval();
+    };
+  }, [branchid, clearPollingInterval, domain, isOrderScreenActive]);
 
   const onLogoutPressed = () => {
     setIsLoading(true);
     props.navigation.closeDrawer();
-    clearInterval(intervalId);
-    logout();
+    clearPollingInterval();
+    logout(props.navigation);
   };
 
   const toggleBranch = async () => {
-    await axiosInstance
-      .post(options.url_branchActivity, branchChangeOptions.data)
-      .then((resp) => setBranchEnabled(resp.data.data));
-  };
+    if (loading || !domain || !branchid) return;
 
-  const toggleDeliveron = async () => {
-    await axiosInstance
-      .post(options.url_deliveronActivity, deliveronChangeOptions.data)
-      .then((resp) => setDeliveronEnabled(resp.data.data));
-  };
+    const newStatus = !branchEnabled;
+    setLoading(true);
 
-  useEffect(() => {
-    if (domain) {
-      apiOptions();
+    if (__DEV__) {
+      console.log("Toggling branch status:", newStatus, "for branch ID:", branchid);
     }
-  }, [domain]);
 
-  useEffect(() => {
-    setBranchChangeOptions((prev) => ({
-      ...prev,
-      data: { branchid: branchid, enabled: branchEnabled ? 1 : 0 },
-    }));
-    setIsBranchEnabled(true);
-  }, [branchEnabled, branchid]);
+    try {
+      const resp = await axiosInstance.post(
+        `https://${domain}/api/v1/admin/branchActivity`,
+        {
+          branchid,
+          enabled: newStatus ? 1 : 0,
+        }
+      );
 
-  useEffect(() => {
-    setDeliveronChangeOptions((prev) => ({
-      ...prev,
-      data: { enabled: deliveronEnabled ? 0 : 1 },
-    }));
-    setIsDeliveronEnabled(true);
-  }, [deliveronEnabled]);
+      const result = resp?.data?.data;
+
+      if (typeof result === "boolean") {
+        // API returns open status: true = open/enabled, false = closed
+        setBranchEnabled(result);
+        setIsVisible(!result);
+
+        if (!result) {
+          handleError(
+            { message: dictionary?.["orders.branchDisabled"] || "Branch is temporarily closed" },
+            "BRANCH_TEMPORARILY_CLOSED",
+            { persistent: true }
+          );
+        } else {
+          clearErrors();
+        }
+      } else {
+        console.warn("Unexpected response in toggleBranch:", resp?.data);
+        handleError(new Error("Invalid toggle response format"), "TOGGLE_BRANCH_INVALID");
+      }
+
+    } catch (error) {
+      console.error("Branch toggle failed:", error);
+      handleError(error, "TOGGLE_BRANCH_ERROR");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <DrawerContentScrollView {...props}>
+    <DrawerContentScrollView {...otherProps}>
       <View style={styles.drawerContent}>
         <View
           style={{
@@ -93,8 +198,8 @@ export default function DrawerContent(props) {
             color={branchEnabled ? "#2fa360" : "#f14c4c"}
             style={{ fontSize: 20 }}
           />
-          <Text style={{ paddingLeft: 17, fontWeight: "bold" }}>
-            {branchName}
+          <Text style={{ paddingLeft: 17, color: '#090909', fontWeight: "bold" }}>
+            {getBranchDisplayName(branchName, userLanguage)}
           </Text>
         </View>
 
@@ -103,77 +208,135 @@ export default function DrawerContent(props) {
         </View>
 
         <Drawer.Section style={styles.drawerSection}>
-          <TouchableRipple onPress={toggleDeliveron}>
-            <View style={styles.preference}>
-              <Text>{dictionary["dv.deliveron"]}</Text>
-              <View pointerEvents="none">
-                <Switch value={deliveronEnabled} />
-              </View>
-            </View>
-          </TouchableRipple>
-
           <TouchableRipple style={styles.ripple} onPress={toggleBranch}>
             <View style={styles.preference}>
-              <Text>{dictionary["orders.branch"]}</Text>
-              <View pointerEvents="none">
-                <Switch value={branchEnabled} />
+              <Text style={{ color: '#090909', fontWeight: "bold" }}>{dictionary["orders.branch"]}</Text>
+              <View pointerEvents="none" style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Switch
+                  value={branchEnabled}
+                  onValueChange={toggleBranch}
+                  disabled={loading}
+                />
+                {loading && (
+                  <ActivityIndicator
+                    size="small"
+                    color="#0000ff"
+                    style={{ marginLeft: 10 }}
+                  />
+                )}
               </View>
             </View>
           </TouchableRipple>
         </Drawer.Section>
 
-
-          <DrawerItem
-            icon={({ color, size }) => (
-              <MaterialCommunityIcons
-                name="cards-outline"
-                color={color}
-                size={size}
-              />
-            )}
-            label={dictionary["nav.products"]}
-            onPress={() => {
-              props.navigation.navigate("Products");
-            }}
-          />
-          <DrawerItem
-            icon={({ color, size }) => (
-              <MaterialCommunityIcons
-                name="format-list-bulleted"
-                color={color}
-                size={size}
-              />
-            )}
-            label={dictionary["nav.onlineOrders"]}
-            onPress={() => {
-              props.navigation.navigate("Orders");
-            }}
-          />
-          <DrawerItem
-            icon={({ color, size }) => (
-              <SimpleLineIcons name="settings"
-                color={color}
-                size={size} />
-            )}
-            label={dictionary["settings"]}
-            onPress={() => {
-              props.navigation.navigate("Settings");
-            }}
-          />
-          <DrawerItem
-            icon={({ color, size }) => (
-              <MaterialCommunityIcons name="logout" color={color} size={size} />
-            )}
-            label={dictionary.logout}
-            onPress={onLogoutPressed}
-          />
-
+        <DrawerItem
+          key="products"
+          icon={({ color, size }) => (
+            <MaterialCommunityIcons
+              name="cards-outline"
+              color={color}
+              size={size}
+            />
+          )}
+          label={dictionary["nav.products"]}
+          onPress={() => navigation.navigate("Products")}
+        />
+        <DrawerItem
+          key="online-orders"
+          icon={({ color, size }) => (
+            <MaterialCommunityIcons name="format-list-bulleted" color={color} size={size} />
+          )}
+          label={() => (
+            <View style={styles.labelContainer}>
+              <Text style={styles.labelText}>{dictionary["nav.onlineOrders"]}</Text>
+              {onlineOrdersBadge > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{onlineOrdersBadge}</Text>
+                </View>
+              )}
+            </View>
+          )}
+          onPress={() => {
+            navigation.closeDrawer();
+            navigation.navigate("Orders", { screen: "EnteredOrders" });
+          }}
+        />
+        <DrawerItem
+          key="qr-orders"
+          icon={({ color, size }) => (
+            <MaterialCommunityIcons name="qrcode-scan" color={color} size={size} />
+          )}
+          label={() => (
+            <View style={styles.labelContainer}>
+              <Text style={styles.labelText}>{dictionary["nav.QROrders"]}</Text>
+              {qrOrdersBadge > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{qrOrdersBadge}</Text>
+                </View>
+              )}
+            </View>
+          )}
+          onPress={() => {
+            navigation.closeDrawer();
+            navigation.navigate("QrOrders", { screen: "QrOrdersScreen" });
+          }}
+        />
+        <DrawerItem
+          key="reports"
+          icon={({ color, size }) => (
+            <MaterialCommunityIcons name="chart-line" color={color} size={size} />
+          )}
+          label={dictionary["nav.Reports"]}
+          onPress={() => {
+            navigation.closeDrawer();
+            navigation.navigate("Reports", { screen: "ReportsScreen" });
+          }}
+        />
+        <DrawerItem
+          key="settings"
+          icon={({ color, size }) => (
+            <SimpleLineIcons name="settings" color={color} size={size} />
+          )}
+          label={dictionary["settings"]}
+          onPress={() => navigation.navigate("Settings")}
+        />
+        <DrawerItem
+          key="logout"
+          icon={({ color, size }) => (
+            <MaterialCommunityIcons name="logout" color={color} size={size} />
+          )}
+          label={dictionary.logout}
+          onPress={onLogoutPressed}
+        />
       </View>
     </DrawerContentScrollView>
   );
 }
 
 const styles = StyleSheet.create({
+  labelContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    width: "100%",
+  },
+  labelText: {
+    fontSize: 16,
+  },
+  badge: {
+    backgroundColor: "red",
+    borderRadius: 12,
+    minWidth: 24,
+    height: 24,
+    justifyContent: "center",
+    alignItems: "center",
+    marginLeft: 8,
+  },
+  badgeText: {
+    color: "white",
+    fontSize: 14,
+    fontWeight: "bold",
+  },
   drawerContent: {
     flex: 1,
   },

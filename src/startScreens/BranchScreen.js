@@ -1,110 +1,292 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext, useCallback } from "react";
+import { View, StyleSheet } from "react-native";
 import { Text, Button } from "react-native-paper";
 import Background from "../components/generate/Background";
 import Logo from "../components/generate/Logo";
 import SelectOption from "../components/generate/SelectOption";
-import { storeData } from "../helpers/storage";
 import Loader from "../components/generate/loader";
+import { getData, storeData, removeData } from "../helpers/storage";
+import { domainValidator } from "../helpers/domainValidator";
 import { AuthContext } from "../context/AuthProvider";
 import axiosInstance from "../apiConfig/apiRequests";
 import { LanguageContext } from "../components/Language";
+import useErrorDisplay from "../hooks/useErrorDisplay";
 
 export const BranchScreen = ({ navigation }) => {
-  const { setIsDataSet, domain, branchid, setBranchid } = useContext(AuthContext);
-  const [branches, setBranches] = useState([]);
-  const [selected, setSelected] = useState(branchid);
-  const [isLoading, setIsLoading] = useState(true);
-  const [errorText, setErrorText] = useState("");
+  const { domain, branchid, setBranchid, intervalId, readRestData, handleError } = useContext(AuthContext);
   const { dictionary, userLanguage } = useContext(LanguageContext);
 
-  const branchApi = async () => {
-    const url = `https://${domain}/api/v1/admin/branches`;
-    if (!url) {
-      console.error("URL is empty");
-      return;
-    }
-    try {
-      const response = await axiosInstance.post(url, {
-        lang: userLanguage,
+  // Always call all hooks at the top level - NEVER conditionally
+  const [branches, setBranches] = useState([]);
+  const [branch, setBranch] = useState([]);
+  const [selected, setSelected] = useState(branchid);
+  const [isLoading, setIsLoading] = useState(true);
+  const [options, setOptions] = useState({ url_branches: "" });
+  const [shouldRedirectToDomain, setShouldRedirectToDomain] = useState(false);
+  const [currentDomain, setCurrentDomain] = useState(domain); // Track current domain for change detection
+
+  const { setError, clearError, errorDisplay } = useErrorDisplay({ showInline: true });
+
+  // Check if domain is invalid (but don't return early)
+  const isDomainInvalid = !domain || domainValidator(domain) !== '';
+
+  // Handle domain redirection in useEffect instead of early return
+  useEffect(() => {
+    if (shouldRedirectToDomain) {
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Domain' }],
       });
-      const data = response.data.branches || [];
-      setBranches(data.map((item) => ({
-        label: item.title,
-        value: item.id,
-        enabled: item.temp_close
-      })));
-      setErrorText("");
-    } catch (error) {
-      if (error.response && (error.response.status === 500 || error.response.status === 404)) {
-        setIsDataSet(false);
+    }
+  }, [shouldRedirectToDomain, navigation]);
+
+  // Validate domain before using it for API calls
+  const apiOptions = useCallback(() => {
+    console.log('[BranchScreen] Setting API options for domain:', domain);
+    if (domain && domainValidator(domain) === '') {
+      const newUrl = `https://${domain}/api/v1/admin/branches`;
+      console.log('[BranchScreen] Valid domain, setting URL to:', newUrl);
+      setOptions(prevOptions => ({
+        ...prevOptions,
+        url_branches: newUrl,
+      }));
+    } else {
+      console.log('[BranchScreen] Invalid or missing domain, clearing URL');
+      setOptions(prevOptions => ({ ...prevOptions, url_branches: "" }));
+    }
+  }, [domain]);
+
+  const showInvalidDomainError = useCallback(() => {
+    const message = dictionary?.["errors.INVALID_DOMAIN"] || "Invalid domain entered. Please try again.";
+    handleError({ message }, "INVALID_DOMAIN");
+  }, [dictionary, handleError]);
+
+  const branchApi = useCallback(async () => {
+    try {
+      // Double-check domain validity before making API call
+      if (!domain || domainValidator(domain) !== '') {
+        console.log('[BranchScreen] Invalid domain detected in branchApi:', domain);
+        showInvalidDomainError();
+        setIsLoading(false);
+        setBranch([]);
         setBranches([]);
-        setErrorText("Unable to fetch branch list.");
-      } else {
-        setIsDataSet(false);
-        setBranches([]);
-        setErrorText("An error occurred while fetching branch list. Please try again.");
+        // Clear domain from storage and trigger redirect
+        await removeData("domain").catch(() => console.log('Failed to clear domain'));
+        setShouldRedirectToDomain(true);
+        return;
       }
+      
+      if (!options.url_branches) {
+        console.log('[BranchScreen] No API URL configured yet, waiting...');
+        setIsLoading(false);
+        return; // Don't show error, just wait for URL to be set
+      }
+
+      setIsLoading(true);
+      clearError();
+      console.log('[BranchScreen] Making API call to:', options.url_branches);
+      
+      const response = await axiosInstance.post(options.url_branches);
+      const data = response.data?.branches || [];
+
+      console.log('[BranchScreen] API call successful, received branches:', data.length);
+      setBranch(data);
+      setBranches(data.map((item) => ({
+        label: item.titles?.[userLanguage] || item.name || 'Branch',
+        value: item.id,
+        enabled: item.temp_close,
+      })));
+      
+      // Reset redirect flag if we successfully got data
+      setShouldRedirectToDomain(false);
+    } catch (apiError) {
+      console.error('[BranchScreen] API error:', apiError);
+      
+      // Enhanced error detection for invalid domains
+      const errorMessage = apiError?.message?.toLowerCase() || '';
+      const errorCode = apiError?.code;
+      const errorType = apiError?.type;
+      const statusCode = apiError?.response?.status;
+      
+      let isDomainError = false;
+      if (
+        errorCode === 'ERR_NETWORK' ||
+        errorType === 'INVALID_DOMAIN' ||
+        errorMessage.includes('network') ||
+        errorMessage.includes('dns') ||
+        errorMessage.includes('not found') ||
+        errorMessage.includes('enotfound') ||
+        statusCode === 502 ||
+        statusCode === 503
+      ) {
+        isDomainError = true;
+      }
+      
+      if (isDomainError) {
+        console.log('[BranchScreen] Domain error detected, clearing and redirecting');
+        showInvalidDomainError();
+        try {
+          await removeData("domain");
+          setShouldRedirectToDomain(true);
+        } catch (storageError) {
+          console.error('Failed to clear domain:', storageError);
+          setShouldRedirectToDomain(true);
+        }
+      } else {
+        const msg = statusCode === 500 || statusCode === 404
+          ? dictionary["errors.FETCH_BRANCH_ERROR"] || "Unable to fetch branch list."
+          : dictionary["errors.GENERAL"] || "An error occurred. Please try again.";
+        setError({ type: "FETCH_BRANCH_ERROR", message: msg });
+      }
+      
+      setBranch([]);
+      setBranches([]);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [domain, options.url_branches, dictionary, userLanguage, showInvalidDomainError, clearError]);
 
   const onCheckPressed = () => {
     if (selected === null) {
-      setErrorText("Branch must be chosen!");
+      setError({ type: "VALIDATION_ERROR", message: "Branch must be chosen!" });
       return;
     }
     navigation.navigate("Login");
   };
 
+  // Main effect for domain changes - clear state and set up API options
   useEffect(() => {
-    if (domain) {
+    console.log('[BranchScreen] Domain changed from', currentDomain, 'to', domain);
+    
+    // Always clear previous state when domain changes (including from undefined to a value)
+    if (currentDomain !== domain) {
+      console.log('[BranchScreen] Domain change detected, clearing all state');
       setBranches([]);
+      setBranch([]);
       setSelected(null);
-      setErrorText("");
+      const domainWasCleared = Boolean(currentDomain) && !domain;
+      if (!domainWasCleared) {
+        clearError();
+      }
+      clearInterval(intervalId);
+      setShouldRedirectToDomain(false);
+      setCurrentDomain(domain);
+      
+      // Clear any cached branch data from storage when domain changes
+      if (currentDomain && currentDomain !== domain) {
+        console.log('[BranchScreen] Clearing cached branch data due to domain change');
+        removeData(["branches", "branch"]).catch(() => {
+          console.log('[BranchScreen] Failed to clear cached branch data');
+        });
+      }
+    }
+    
+    // Handle domain validation and API setup
+    if (!domain) {
+      console.log('[BranchScreen] No domain provided');
+      setIsLoading(false);
+      setOptions({ url_branches: "" });
+      return;
+    }
+    
+    if (domainValidator(domain) !== '') {
+      console.log('[BranchScreen] Invalid domain format:', domain);
+      showInvalidDomainError();
+      setIsLoading(false);
+      setOptions({ url_branches: "" });
+      removeData("domain").then(() => {
+        setShouldRedirectToDomain(true);
+      }).catch(() => {
+        setShouldRedirectToDomain(true);
+      });
+      return;
+    }
+    
+    // Valid domain - set up API options
+    console.log('[BranchScreen] Valid domain, setting up API');
+    setIsLoading(true); // Start loading when valid domain is detected
+    apiOptions();
+  }, [domain, userLanguage, dictionary, intervalId, clearError, apiOptions, currentDomain, showInvalidDomainError]);
+
+  // Separate effect for API calls when URL is ready
+  useEffect(() => {
+    if (domain && domainValidator(domain) === '' && options.url_branches) {
+      console.log('[BranchScreen] API URL ready, triggering branch fetch:', options.url_branches);
       branchApi();
     }
-  }, [domain]);
+  }, [domain, options.url_branches, branchApi]);
+
+  // Cleanup effect when component unmounts or domain changes
+  useEffect(() => {
+    return () => {
+      console.log('[BranchScreen] Cleanup: clearing intervals and cached data');
+      clearInterval(intervalId);
+      // Clear any cached branch data when component unmounts
+      setBranches([]);
+      setBranch([]);
+    };
+  }, [intervalId]);
 
   useEffect(() => {
-    if (selected !== null) {
-      const selectedBranch = branches.find((branch) => branch.value === selected);
-      if (selectedBranch) {
-        storeData("branchName", selectedBranch.label);
-      }
-      storeData("branch", selected);
-      setIsDataSet((data) => !data);
-      setBranchid(selected);
-    }
-  }, [selected]);
+    const saveSelection = async () => {
+      if (selected === null) return;
 
-  if (isLoading) {
-    return <Loader error={errorText} />;
-  }
+      const item = branch.find((entry) => entry.id === selected);
+      setBranchid(selected);
+      await storeData("branch", selected);
+
+      if (item) {
+        await storeData("branches", item);
+        await readRestData();
+      }
+
+      clearInterval(intervalId);
+    };
+
+    saveSelection();
+  }, [domain, selected, userLanguage, branch, setBranchid, readRestData, intervalId]);
 
   return (
-    <Background>
-      <Logo />
-      <SelectOption
-        value={selected}
-        onValueChange={(value) => {
-          setSelected(value);
-          setErrorText("");
-        }}
-        items={branches}
-        keyExtractor={(item) => (item && item.id ? item.id.toString() : '')}
-        error={!!errorText}
-        errorText={errorText}
-      />
-      <Button
-        mode="contained"
-        textColor="white"
-        buttonColor="#000"
-        onPress={onCheckPressed}
-      >
-        {dictionary['save']}
-      </Button>
-    </Background>
+    <View style={styles.screen}>
+      {errorDisplay}
+      <Background>
+        <Logo />
+      {isLoading || shouldRedirectToDomain ? (
+        <Loader />
+      ) : (
+        <>
+          <SelectOption
+            value={selected}
+            onValueChange={(value) => {
+              setSelected(value);
+              clearError();
+            }}
+            items={branches}
+            placeholder={dictionary["pt.chooseBranch"]}
+            keyExtractor={(item) => (item && item.id ? item.id.toString() : '')}
+          />
+
+          <Button
+            mode="contained"
+            textColor="white"
+            buttonColor="#000"
+            style={styles.button}
+            onPress={onCheckPressed}
+          >
+            {dictionary['save']}
+          </Button>
+        </>
+      )}
+      </Background>
+    </View>
   );
 };
 
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+  },
+  button: {
+    marginTop: 17,
+  },
+});

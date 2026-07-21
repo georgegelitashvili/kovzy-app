@@ -4,7 +4,6 @@ import { Button as PaperButton } from 'react-native-paper';
 import { theme } from '../../core/theme';
 
 export default function Button({ mode, style, ...props }) {
-
   return (
     <PaperButton
       style={[

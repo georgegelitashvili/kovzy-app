@@ -2,17 +2,20 @@
   "expo": {
     "name": "kovzy",
     "slug": "kovzy",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash.png",
+      "image": "./assets/splash-icon-dark.png",
       "resizeMode": "cover",
       "backgroundColor": "#ffffff"
     },
     "updates": {
+      "checkAutomatically": "ON_LOAD",
       "fallbackToCacheTimeout": 0,
+      "enabled": true,
       "url": "https://u.expo.dev/7c64e824-e18a-4864-bfc6-5399fa7da11a"
     },
     "assetBundlePatterns": [
@@ -30,10 +33,21 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FFFFFF"
       },
+      "permissions": [
+        "NOTIFICATIONS",
+        "BACKGROUND_FETCH",
+        "VIBRATE",
+        "WAKE_LOCK",
+        "REQUEST_IGNORE_BATTERY_OPTIMIZATIONS",
+        "RECEIVE_BOOT_COMPLETED",
+        "FOREGROUND_SERVICE",
+        "MODIFY_AUDIO_SETTINGS",
+        "ACCESS_NOTIFICATION_POLICY",
+        "SCHEDULE_EXACT_ALARM"
+      ],
       "jsEngine": "hermes",
       "package": "com.kovzy.app",
-      "softwareKeyboardLayoutMode": "pan",
-      "versionCode": 13
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -47,7 +61,37 @@
       "policy": "appVersion"
     },
     "plugins": [
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-updates",
+      [
+        "expo-av",
+        {
+          "microphonePermission": false
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#ffffff",
+          "sounds": [
+            "./src/assets/audio/plucky.mp3"
+          ],
+          "defaultChannel": "kovzyOrders",
+          "enableBackgroundRemoteNotifications": true
+        }
+      ],
+      "expo-asset",
+      "expo-font",
+      "@react-native-community/datetimepicker",
+      [
+        "@sentry/react-native/expo",
+        {
+          "url": "https://us.sentry.io/",
+          "organization": "4506904411439104",
+          "project": "4506904415764480"
+        }
+      ]
     ]
   }
 }

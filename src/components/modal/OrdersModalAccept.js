@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useContext } from "react";
 import { Text, Button } from "react-native-paper";
-import TextField from "../generate/TextField";
 import SelectOption from "../generate/SelectOption";
 import Loader from "../generate/loader";
 import {
@@ -9,93 +8,66 @@ import {
   Keyboard,
   TouchableWithoutFeedback,
   Alert,
+  useWindowDimensions,
 } from "react-native";
 import axiosInstance from "../../apiConfig/apiRequests";
 import { String, LanguageContext } from "../Language";
 
 export default function OrdersModalContent(props) {
-  const [forClient, setForClient] = useState({ value: "", error: "" });
-  const [forDelivery, setForDelivery] = useState({ value: "", error: "" });
-
-  const [options, setOptions] = useState(
-    props.deliveron?.status !== -2 && props.takeAway !== 1
-      ? props.options.url_deliveronRecheck
-      : props.options.url_acceptOrder
-  );
-
+  const { width, height } = useWindowDimensions();
   const [orderData, setOrderData] = useState({});
   const [acceptData, setAcceptData] = useState({});
   const [deliveron, setDeliveron] = useState({ data: [], error: "" });
-  const [selected, setSelected] = useState(props.items ? props.items[0]?.value : null);
+  const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [ready, setReady] = useState(false);
   const { dictionary } = useContext(LanguageContext);
 
-  const deliveronOff = () => {
-    let shouldReturn = false;
-    if (ready === false) {
-      shouldReturn = true;
-    }
+  // Calculate responsive dimensions
+  const isSmallScreen = width < 400;
+  const isMediumScreen = width >= 400 && width < 600;
+  const isLargeScreen = width >= 600;
+  const isLandscape = width > height;
 
-    if (props.deliveron?.status !== -2) {
-      axiosInstance.post(props.options.url_acceptOrder, acceptData.data)
-        .catch((error) => {
-          console.log(error);
-        });
-    }
+  const contentPadding = isSmallScreen ? 15 : isMediumScreen ? 18 : 20;
+  const buttonPadding = isSmallScreen ? 5 : isMediumScreen ? 6 : 7;
+  const buttonMargin = isSmallScreen ? 8 : isMediumScreen ? 9 : 10;
+  const titleFontSize = isSmallScreen ? 16 : isMediumScreen ? 17 : 18;
+  const inputFontSize = isSmallScreen ? 13 : 14;
 
-    return shouldReturn;
-  };
-
-  const acceptOrder = () => {
-    if (deliveron?.data != null && selected === null) {
-      setDeliveron({ ...deliveron, error: "delivery option must choose!" });
-      return false;
-    }
-
-    if (options) {
-      setLoading(true);
-      axiosInstance.post(options, orderData.data).then(resp => {
-        if (resp.data.data?.original?.status === -2 && resp.data.data?.original?.error !== "") {
-          setLoading(false);
-          setReady(false);
-          Alert.alert("ALERT", resp.data.data.original.error, [
-            { text: 'OK', onPress: () => props.hideModal() },
-          ]);
-
-          return false;
-        }
-
-        if (resp.data.data.status !== -2 || resp.data.data.status !== -1) {
-          setLoading(false);
-          setReady(true);
-          Alert.alert("ALERT", dictionary['dv.orderSuccess'], [
-            { text: 'OK', onPress: () => props.hideModal() },
-          ]);
-        }
-      }).catch((error) => {
-        console.log(error);
-      });
-    }
-  };
-
-  useEffect(() => {
-    const shouldReturn = deliveronOff();
-    if (shouldReturn) {
+  useEffect(() => {    
+    if (props.takeAway === 1) {
+      setDeliveron({ data: [], error: "" });
       return;
     }
-
-    setReady(false);
-  }, [ready]);
-
-  useEffect(() => {
-    setDeliveron({ data: props.items, error: "" });
-    setSelected(props.items ? props.items[0]?.value : null);
+    
+    if (props.deliveron?.content && 
+        ((Array.isArray(props.deliveron.content) && props.deliveron.content.length > 0) || 
+         (typeof props.deliveron.content === 'object' && Object.keys(props.deliveron.content).length > 0))) {
+      const content = Array.isArray(props.deliveron.content) ? props.deliveron.content : [props.deliveron.content];
+      setDeliveron({ data: content, error: "" });
+      if (content.length > 0) {
+        setSelected(content[0]?.id || content[0]?.companyId || content[0]?.type || null);
+      }
+    } else if (props.deliveron?.status === undefined && props.takeAway !== 1 && 
+      (!props.deliveron?.content || 
+       (typeof props.deliveron.content === 'string') ||
+       (Array.isArray(props.deliveron.content) && props.deliveron.content.length === 0) || 
+       (typeof props.deliveron.content === 'object' && Object.keys(props.deliveron.content).length === 0) ||
+       props.deliveron?.response?.data?.original?.error || 
+       props.deliveron?.content === undefined || 
+       props.deliveron?.content === null)) {
+      Alert.alert(
+        dictionary["general.alerts"],
+        dictionary["dv.empty"],
+        [{ text: dictionary["okay"], onPress: () => props.hideModal() }]
+      );
+      props.hideModal();
+    }
   }, [props.deliveron]);
 
   useEffect(() => {
-    if (props.takeAway !== 1 && selected && props.deliveron.content) {
-      const contentArray = Array.isArray(props.deliveron.content) ? props.deliveron.content : [props.deliveron.content];
+    if (props.takeAway !== 1 && selected && deliveron.data) {
+      const contentArray = Array.isArray(deliveron.data) ? deliveron.data : [deliveron.data];
       contentArray.forEach((item) => {
         if (item.id == selected || item.companyId == selected || item.type == selected) {
           setOrderData({
@@ -107,8 +79,7 @@ export default function OrdersModalContent(props) {
               companyId: item.companyId,
               companyName: item.name ?? item.companyName,
               type: item.type == "glovo" || item.type == "wolt" ? item.type : item.type,
-              orderDelyTime: forClient.value,
-              orderPrepTime: forDelivery.value,
+              orderDelyTime: props.forDelivery !== 0 ? props.forDelivery : null,
             },
           });
 
@@ -116,8 +87,7 @@ export default function OrdersModalContent(props) {
             ...acceptData,
             data: {
               Orderid: props.itemId,
-              orderPrepTime: forDelivery.value,
-              orderDelyTime: forClient.value,
+              orderDelyTime: props.forDelivery !== 0 ? props.forDelivery : null,
             },
           });
         }
@@ -127,66 +97,85 @@ export default function OrdersModalContent(props) {
         ...orderData,
         data: {
           Orderid: props.itemId,
-          orderDelyTime: forClient.value,
-          orderPrepTime: forDelivery.value,
+          orderDelyTime: props.forDelivery !== 0 ? props.forDelivery : null,
         },
       });
       setAcceptData({
         ...acceptData,
         data: {
           Orderid: props.itemId,
-          orderPrepTime: forDelivery.value,
-          orderDelyTime: forClient.value,
+          orderDelyTime: props.forDelivery !== 0 ? props.forDelivery : null,
         },
       });
     }
-  }, [selected, forClient, forDelivery, props.deliveron, props.takeAway]);
+  }, [selected, props.forDelivery, props.takeAway, deliveron.data]);
+
+  const acceptOrder = async () => {
+    if (props.takeAway !== 1 && props.deliveron?.status !== -2 && deliveron?.data != null && selected === null) {
+      setDeliveron({ ...deliveron, error: "Delivery option must be chosen!" });
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      // Step 1: Send `url_deliveronRecheck` request if deliveron is enabled and not takeaway
+      if (props.deliveron?.status !== -2 && props.takeAway !== 1) {
+        const recheckResponse = await axiosInstance.post(props.options.url_deliveronRecheck, orderData.data);
+
+        // Check for error in the response
+        if (recheckResponse.data.data?.original?.status === -2 && recheckResponse.data.data?.original?.error) {
+          Alert.alert(dictionary["general.alerts"], recheckResponse.data.data.original.error, [
+            { text: dictionary["okay"], onPress: () => props.hideModal() },
+          ]);
+          setLoading(false);
+          return;
+        }
+      }
+
+      // Step 2: Send `url_acceptOrder` request
+      const acceptResponse = await axiosInstance.post(props.options.url_acceptOrder, acceptData.data);
+
+      if (acceptResponse.data.data?.original?.status === -2 && acceptResponse.data.data?.original?.error !== "") {
+        setLoading(false);
+        setReady(false);
+        Alert.alert("ALERT", acceptResponse.data.data.original.error, [
+          { text: 'OK', onPress: () => props.hideModal() },
+        ]);
+
+        return false;
+      }
+
+      Alert.alert(dictionary["general.alerts"], dictionary['dv.orderSuccess'], [
+        { text: dictionary["okay"], onPress: () => props.hideModal() },
+      ]);
+    } catch (error) {
+      Alert.alert(dictionary["general.alerts"], "შეცდომა მოხდა. გთხოვთ სცადოთ თავიდან.", [
+        { text: dictionary["okay"], onPress: () => props.hideModal() },
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <>
       <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
-        <View style={styles.content}>
-          {loading ? <Loader /> : null}
-          <Text textColor="black" style={styles.contentTitle}>
-            {dictionary["orders.approvingWarning"]}
-          </Text>
-          <TextField
-            label={dictionary["general.AOPT"]}
-            editable={true}
-            clearButtonMode="always"
-            value={forClient?.value || ""}
-            onChangeText={(text) => setForClient({ value: text, error: "" })}
-            error={!!forClient?.error}
-            errorText={forClient?.error || ""}
-            autoCapitalize="none"
-            typeOfKeyboard="number"
-          />
+        <View style={[styles.content, { padding: contentPadding }]}>
+          {loading && <Loader />}
 
           {props.deliveron?.status !== -2 && props.takeAway !== 1 ? (
-            <>
-              <TextField
-                label={dictionary["general.AOPTD"]}
-                editable={true}
-                clearButtonMode="always"
-                value={forDelivery?.value || ""}
-                onChangeText={(text) => setForDelivery({ value: text, error: "" })}
-                error={!!forDelivery?.error}
-                errorText={forDelivery?.error || ""}
-                autoCapitalize="none"
-                typeOfKeyboard="number"
-              />
-              <SelectOption
-                value={selected}
-                onValueChange={(value) => {
-                  setSelected(value);
-                  setDeliveron({ ...deliveron, error: "" });
-                }}
-                items={deliveron?.data || []}
-                key={(item) => item?.id || ""}
-                error={!!deliveron?.error}
-                errorText={deliveron?.error || ""}
-              />
-            </>
+            <SelectOption
+              value={selected}
+              onValueChange={(value) => {
+                setSelected(value);
+                setDeliveron({ ...deliveron, error: "" });
+              }}
+              items={deliveron?.data || []}
+              key={(item) => item?.id || item?.companyId || item?.type || ""}
+              error={!!deliveron?.error}
+              errorText={deliveron?.error || ""}
+            />
           ) : null}
 
           <View style={styles.buttonModal}>
@@ -194,17 +183,16 @@ export default function OrdersModalContent(props) {
               mode="contained"
               textColor="white"
               style={styles.buttonAccept}
+              contentStyle={styles.buttonAcceptContent}
+              labelStyle={styles.buttonAcceptLabel}
               onPress={acceptOrder}
+              disabled={loading || (
+                props.deliveron?.status === 1 && 
+                props.takeAway !== 1 && 
+                deliveron?.data?.length === 0
+              )}
             >
-              {dictionary["orders.approve"]}
-            </Button>
-            <Button
-              mode="contained"
-              textColor="white"
-              style={styles.buttonClose}
-              onPress={props.hideModal}
-            >
-              {dictionary["close"]}
+              {loading ? "მიღება..." : (dictionary["orders.approve"] || "დადასტურება")}
             </Button>
           </View>
         </View>
@@ -215,37 +203,38 @@ export default function OrdersModalContent(props) {
 
 const styles = StyleSheet.create({
   content: {
-    backgroundColor: "#fff",
     width: "100%",
-    padding: 20,
   },
   contentTitle: {
     width: "100%",
-    fontSize: 18,
     marginTop: 20,
     marginBottom: 20,
+    fontWeight: "500",
   },
   contentInput: {
     width: "100%",
-    backgroundColor: "#fff",
     marginBottom: 25,
     paddingLeft: 1,
-    fontSize: 14,
   },
   buttonModal: {
     flexDirection: "row",
-    justifyContent: "space-around",
-    paddingTop: 20
+    justifyContent: "center",
+    alignItems: "center",
+    paddingTop: 48,
+    width: "100%",
   },
   buttonAccept: {
-    padding: 7,
-    justifyContent: "space-between",
-    backgroundColor: "#2fa360",
-    marginRight: 10,
+    backgroundColor: "#28A745",
+    borderRadius: 10,
+    minWidth: 220,
   },
-  buttonClose: {
-    padding: 7,
-    justifyContent: "space-between",
-    backgroundColor: "#6c757d",
+  buttonAcceptContent: {
+    minHeight: 56,
+    paddingHorizontal: 48,
+    justifyContent: "center",
+  },
+  buttonAcceptLabel: {
+    fontSize: 18,
+    fontWeight: "700",
   },
 });

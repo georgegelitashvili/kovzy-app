@@ -3,48 +3,94 @@ import { createStackNavigator } from "@react-navigation/stack";
 import { Appbar, useTheme } from "react-native-paper";
 
 import { LanguageContext } from "./Language";
+import { useAuthActions } from "../context/AuthProvider";
 import { DomainScreen } from "../startScreens/DomainScreen";
 import { BranchScreen } from "../startScreens/BranchScreen";
 import { LoginScreen } from "../startScreens/LoginScreen";
 import Orders from "../Orders";
+import QrOrders from "../QrOrders";
 import Products from "../Products";
+import Reports from "../Reports";
 import ProductsDetail from "./products/ProductsDetail";
 import SettingsScreen from '../SettingsScreen';
 import NotificationScreen from './settings/NotificationScreen';
 
 const Stack = createStackNavigator();
 
-const Header = ({ options, navigation }) => {
+const Header = ({ options, navigation, route, showDrawer = false }) => {
   const theme = useTheme();
+  const { clearErrors } = useAuthActions();
   const headerStyle = options?.headerStyle;
-  const title = options?.headerTitle ?? options?.title ?? navigation?.route?.name;
+  const title = options?.headerTitle ?? options?.title ?? route?.name;
+  const canGoBack = navigation?.canGoBack?.() ?? false;
+
+  const handleBackPress = () => {
+    if (route?.name === "Login") {
+      navigation.reset({
+        index: 0,
+        routes: [{ name: "Branch" }],
+      });
+      clearErrors?.();
+      return;
+    }
+
+    if (route?.name === "Branch") {
+      navigation.reset({
+        index: 0,
+        routes: [{ name: "Domain" }],
+      });
+      return;
+    }
+
+    if (canGoBack) {
+      navigation.goBack();
+    }
+  };
+
+  const showBackButton =
+    canGoBack || route?.name === "Branch" || route?.name === "Login";
+
+  const openDrawer = () => {
+    if (typeof navigation.toggleDrawer === "function") {
+      navigation.toggleDrawer();
+      return;
+    }
+
+    navigation.getParent?.()?.toggleDrawer?.();
+  };
 
   return (
     <Appbar.Header
       theme={{ colors: { primary: theme.colors.surface } }}
-      style={{ marginTop: headerStyle?.marginTop, backgroundColor: 'white', }}>
-      {navigation?.canGoBack() ?
-        <Appbar.BackAction
-          style={{ color: '#000', fontWeight: 'bold' }}
-          onPress={navigation.goBack}
-        />
-        : null}
+      style={{ marginTop: headerStyle?.marginTop, backgroundColor: 'white' }}
+    >
+      {showBackButton && (
+        <Appbar.BackAction onPress={handleBackPress} />
+      )}
+      {!showBackButton && showDrawer && (
+        <Appbar.Action icon="menu" onPress={openDrawer} />
+      )}
+
       <Appbar.Content
         title={title}
-        titleStyle={{ fontSize: headerStyle?.fontSize, color: '#000', fontWeight: 'bold' }}
+        titleStyle={{ fontSize: headerStyle?.fontSize, fontWeight: 'bold' }}
       />
     </Appbar.Header>
   );
 };
 
-export const AuthNavigator = () => {
+export const AuthNavigator = ({ initialRouteName }) => {
   const { dictionary, userLanguage } = useContext(LanguageContext);
 
   return (
     <Stack.Navigator
+      initialRouteName={initialRouteName || "Domain"}
       screenOptions={({ navigation, route }) => ({
         headerMode: 'screen',
-        header: (props) => <Header {...props} />,
+        header: (props) => {
+          const { key, ...otherProps } = props;
+          return <Header {...otherProps} showDrawer={false} />;
+        },
         ...route.params?.options, // Pass route params as options
       })}
     >
@@ -52,7 +98,7 @@ export const AuthNavigator = () => {
         name="Domain"
         options={{
           headerTitle: dictionary["domains.addDomain"],
-          unmountOnBlur: true
+          headerLeft: () => null
         }}
         component={DomainScreen}
       />
@@ -60,7 +106,6 @@ export const AuthNavigator = () => {
         name="Branch"
         options={{
           headerTitle: dictionary["branches.branches"],
-          unmountOnBlur: true
         }}
         component={BranchScreen}
       />
@@ -68,7 +113,6 @@ export const AuthNavigator = () => {
         name="Login"
         options={{
           headerTitle: dictionary["nav.auth"],
-          unmountOnBlur: true
         }}
         component={LoginScreen}
       />
@@ -82,7 +126,10 @@ export const OrdersNavigator = () => {
       screenOptions={({ navigation, route }) => ({
         headerMode: "screen",
         headerBackTitleVisible: false,
-        header: (props) => <Header {...props} />,
+        header: (props) => {
+          const { key, ...otherProps } = props; // Destructure key from props
+          return <Header {...otherProps} />; // Spread otherProps without key
+        },
         ...route.params?.options, // Pass route params as options
       })}
     >
@@ -90,6 +137,50 @@ export const OrdersNavigator = () => {
     </Stack.Navigator>
   );
 };
+
+export const QrOrdersNavigator = () => {
+  return (
+    <Stack.Navigator
+      screenOptions={({ navigation, route }) => ({
+        headerMode: "screen",
+        headerBackTitleVisible: false,
+        header: (props) => <Header {...props} navigation={navigation} route={route} />,
+        ...route.params?.options,
+      })}
+    >
+      <Stack.Screen 
+        name="QrOrdersScreen"
+        options={{ 
+          headerShown: false,
+          unmountOnBlur: true 
+        }} 
+        component={QrOrders} 
+      />
+    </Stack.Navigator>
+  );
+};
+
+export const ReportsNavigator = () => {
+  return (
+    <Stack.Navigator
+      screenOptions={({ navigation, route }) => ({
+        headerMode: "screen",
+        headerBackTitleVisible: false,
+        header: (props) => {
+          const { key, ...otherProps } = props;
+          return <Header {...otherProps} />;
+        },
+        ...route.params?.options,
+      })}
+    >
+      <Stack.Screen 
+        name="ReportsScreen" 
+        options={{ headerShown: false, unmountOnBlur: true }} 
+        component={Reports} 
+      />
+    </Stack.Navigator>
+  );
+}
 
 export const ProductsNavigator = () => {
   const { dictionary } = useContext(LanguageContext);
@@ -99,7 +190,10 @@ export const ProductsNavigator = () => {
       screenOptions={({ navigation, route }) => ({
         headerMode: "screen",
         headerBackTitleVisible: false,
-        header: (props) => <Header {...props} />,
+        header: (props) => {
+          const { key, ...otherProps } = props; // Destructure key from props
+          return <Header {...otherProps} />; // Spread otherProps without key
+        },
         ...route.params?.options, // Pass route params as options
       })}
     >
@@ -124,12 +218,18 @@ export const SettingsNavigator = () => {
 
   return (
     <Stack.Navigator
-      screenOptions={({ navigation, route }) => ({
-        headerMode: "screen",
-        headerBackTitleVisible: false,
-        header: (props) => <Header {...props} />,
-        ...route.params?.options, // Pass route params as options
-      })}
+      screenOptions={({ navigation, route }) => {
+        const { key, ...options } = route.params?.options || {}; // Exclude key prop
+        return {
+          headerMode: "screen",
+          headerBackTitleVisible: false,
+          header: (props) => {
+            const { key, ...otherProps } = props; // Destructure key from props
+            return <Header {...otherProps} />; // Spread otherProps without key
+          },
+          ...options, // Pass route params as options without key
+        };
+      }}
     >
       <Stack.Screen
         name="Setting"
@@ -138,14 +238,18 @@ export const SettingsNavigator = () => {
       />
       <Stack.Screen
         name="MusicList"
-        options={({ route }) => ({
-          headerTitle: "Notifications",
-          headerStyle: { marginTop: 0 },
-          headerContentStyle: { fontSize: 10 },
-          unmountOnBlur: true,
-          ...route.params?.options, // Pass route params as options
-        })}
-        component={NotificationScreen} />
+        options={({ route }) => {
+          const { key, ...options } = route.params?.options || {}; // Exclude key prop
+          return {
+            headerTitle: dictionary['sound'],
+            headerStyle: { marginTop: 0 },
+            headerContentStyle: { fontSize: 10 },
+            unmountOnBlur: true,
+            ...options, // Pass route params as options without key
+          };
+        }}
+        component={NotificationScreen}
+      />
     </Stack.Navigator>
   );
 };

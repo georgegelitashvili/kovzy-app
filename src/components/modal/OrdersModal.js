@@ -1,11 +1,50 @@
-import React, { useEffect, useCallback, useState, useMemo, useContext } from "react";
-import { StyleSheet, View, Dimensions, Platform, Alert, useWindowDimensions } from "react-native";
-import Modal from "react-native-modal";
-import { AuthContext, AuthProvider } from "../../context/AuthProvider";
+import React, { useState, useCallback, useMemo, useContext, useEffect } from "react";
+import { StyleSheet, View, Modal, Text, TouchableOpacity, useWindowDimensions } from "react-native";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import OrdersModalAccept from "./OrdersModalAccept";
 import OrdersModalReject from "./OrdersModalReject";
 import OrdersModalStatus from "./OrdersModalStatus";
+import TimePicker from "../generate/TimePicker";
+import { LanguageContext } from "../Language";
 
+const generateItems = (deliveron) => {
+  if (Array.isArray(deliveron) && deliveron.length > 0) {
+    return deliveron.map((item) => ({
+      label: `${item.name || item.companyName} - ${item.price ?? item.price_before_accept}`,
+      value: item.id ?? item.companyId ?? item.type,
+    }));
+  }
+
+  if (deliveron?.data?.original?.content) {
+    const content = deliveron.data.original.content;
+    if (Array.isArray(content)) {
+      return content.map((item) => ({
+        label: `${item.name || item.companyName} - ${item.price ?? item.price_before_accept}`,
+        value: item.id ?? item.companyId ?? item.type,
+      }));
+    }
+    return [{
+      label: `${content.name || content.companyName} - ${content.price ?? content.price_before_accept}`,
+      value: content.id ?? content.companyId ?? content.type,
+    }];
+  }
+
+  if (deliveron?.original?.content) {
+    const content = deliveron.original.content;
+    if (Array.isArray(content)) {
+      return content.map((item) => ({
+        label: `${item.name || item.companyName} - ${item.price ?? item.price_before_accept}`,
+        value: item.id ?? item.companyId ?? item.type,
+      }));
+    }
+    return [{
+      label: `${content.name || content.companyName} - ${content.price ?? content.price_before_accept}`,
+      value: content.id ?? content.companyId ?? content.type,
+    }];
+  }
+
+  return [];
+};
 
 export default function OrdersModal({
   isVisible,
@@ -16,145 +55,154 @@ export default function OrdersModal({
   deliveronOptions,
   type,
   options,
-  takeAway
+  takeAway,
+  PendingOrders,
 }) {
-  const [visible, setVisible] = useState(isVisible);
-  const { intervalId, setIntervalId } = useContext(AuthContext);
-  const { width: deviceWidth, height: deviceHeight } = useWindowDimensions();
+  // ALWAYS call ALL hooks at the top level - NEVER conditionally
+  const { width, height } = useWindowDimensions();
+  const { dictionary } = useContext(LanguageContext);
+  const [forDelivery, setForDelivery] = useState(0); // Default to 0
 
+  // Calculate responsive dimensions
+  const isSmallScreen = width < 400;
+  const isMediumScreen = width >= 400 && width < 600;
+  const isLargeScreen = width >= 600;
+  const isLandscape = width > height;
+
+  const modalWidth = isSmallScreen ? "90%" : isMediumScreen ? "85%" : "80%";
+  const modalMaxHeight = isLandscape ? "90%" : "80%";
+  const modalPadding = isSmallScreen ? 8 : isMediumScreen ? 12 : 15;
+  const titleFontSize = isSmallScreen ? 16 : isMediumScreen ? 17 : 18;
+
+  const items = useMemo(() => generateItems(deliveron), [deliveron]);
+
+  const hideModal = useCallback(() => onChangeState(false), [onChangeState]);
+
+  // Reset forDelivery when the modal is visible
   useEffect(() => {
-    setVisible(isVisible);
+    if (isVisible) {
+      setForDelivery(0);
+    }
   }, [isVisible]);
 
-  const hideModal = useCallback(() => {
-    onChangeState(false);
-  }, [onChangeState]);
+  const modalContent = useMemo(() => {
+    const commonProps = {
+      itemId: hasItemId,
+      deliveron: deliveron.original ?? deliveron,
+      options,
+      takeAway,
+      hideModal,
+    };
 
-  const handleChangeStateClick = useCallback(() => {
-    onChangeState(false);
-  });
-
-  const items = useMemo(() => {
-    if (deliveron.original?.status !== -2) {
-      const content = deliveron.original?.content;
-      if (!content) return null;
-      if (Array.isArray(content)) {
-        return content.map((item) => ({
-          label: !item.name ? item.companyName + ' - ' + item.price : item.name + ' - ' + item.price ?? item.price_before_accept,
-          value: !item.id ? item.companyId ?? item.type : item.id,
-        }));
-      } else {
-        return [
-          {
-            label: !content.name ? content.companyName + ' - ' + content.price : content.name + ' - ' + content.price_before_accept,
-            value: !content.id ? content.companyId ?? content.type : content.id,
-          },
-        ];
-      }
-    } else {
-      return null;
-    }
-  }, [deliveron.original?.content, deliveron.original?.status]);
-
-  const loadModalComponent = () => {
     switch (type) {
-      case 'accept':
+      case "accept":
         return (
           <OrdersModalAccept
-            itemId={hasItemId}
-            deliveron={deliveron.original}
-            deliveronOptions={deliveronOptions}
-            options={options}
+            {...commonProps}
             items={items}
-            takeAway={takeAway}
-            hideModal={hideModal}
-          />
-        )
-      case 'reject':
-        return (
-          <OrdersModalReject
-            itemId={hasItemId}
-            deliveron={deliveron.original ?? deliveron}
-            orders={orders}
-            options={options}
-            takeAway={takeAway}
-            hideModal={hideModal}
-          />
-        )
-      case 'status':
-        return (
-          <OrdersModalStatus
-            itemId={hasItemId}
-            orders={orders}
-            deliveron={deliveron.original ?? deliveron}
-            options={options}
             deliveronOptions={deliveronOptions}
-            takeAway={takeAway}
-            hideModal={hideModal}
+            forDelivery={forDelivery}
           />
-        )
+        );
+      case "reject":
+        return <OrdersModalReject {...commonProps} orders={orders} PendingOrders={PendingOrders} />;
+      case "status":
+        return <OrdersModalStatus {...commonProps} orders={orders} deliveronOptions={deliveronOptions} />;
+      default:
+        return (
+          <View>
+            <Text>Error: Invalid Modal Type</Text>
+          </View>
+        ); // Fallback for unknown type
     }
-  }
+  }, [type, hasItemId, deliveron, options, takeAway, items, deliveronOptions, orders, forDelivery]);
 
-  if (takeAway !== 1 && (deliveron.length === 0 || deliveron.original?.content.length === 0)) {
+  // Check if we should hide the modal (after all hooks are called)
+  const shouldHide = type !== "reject" && type !== "status" && type !== "accept";
+
+  // Return null only after all hooks have been called
+  if (shouldHide) {
     return null;
   }
 
   return (
-    <>
-      {visible === false ? handleChangeStateClick() : null}
-
+    <Modal
+      visible={isVisible}
+      animationType="slide"
+      transparent={true}
+      onRequestClose={hideModal}
+    >
       <View style={styles.modal}>
-        <Modal
-          isVisible={visible}
-          deviceWidth={deviceWidth}
-          deviceHeight={deviceHeight}
-          backdropColor="#141414"
-          backdropOpacity={0.8}
-          animationIn="zoomInDown"
-          animationOut="slideOutDown"
-          animationInTiming={600}
-          animationOutTiming={1000}
-          backdropTransitionInTiming={600}
-          backdropTransitionOutTiming={1000}
-        >
-          <View style={styles.modalContent}>
-            {loadModalComponent()}
-          </View>
-        </Modal>
+        <View style={[
+          styles.modalContent, 
+          { 
+            width: modalWidth, 
+            maxHeight: modalMaxHeight,
+            padding: modalPadding 
+          }
+        ]}>
+          {type === "accept" && (
+            <TouchableOpacity
+              style={styles.closeIconButton}
+              onPress={hideModal}
+              hitSlop={10}
+            >
+              <MaterialCommunityIcons name="close" size={24} color="#6c757d" />
+            </TouchableOpacity>
+          )}
+          {type === "accept" && (
+            <View style={styles.headerContent}>
+              <Text style={[styles.contentTitle, { fontSize: titleFontSize }]}>
+                {dictionary["orders.approvingWarning"]}
+              </Text>
+              <TimePicker
+                onChange={(newTime) => setForDelivery(newTime)}
+                showButton={false}
+                backgroundColor={"white"}
+              />
+            </View>
+          )}
+          {modalContent}
+        </View>
       </View>
-    </>
+    </Modal>
   );
 }
-
 
 const styles = StyleSheet.create({
   modal: {
     flex: 1,
-    justifyContent: 'center', // Center the content vertically
-    alignItems: 'center', // Center the content horizontally
-    backgroundColor: 'transparent', // Ensure the background is transparent
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
   },
   modalContent: {
-    backgroundColor: '#fff', // Background color of the modal content
-    borderRadius: 13,
-    borderColor: 'rgba(0, 0, 0, 0.1)',
-    width: '90%', // Adjust the width as needed
-    padding: 20, // Add padding as needed
+    backgroundColor: "white",
+    borderRadius: 10,
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    position: "relative",
   },
-  buttonModal: {
-    flexDirection: "row",
-    justifyContent: "space-around",
+  closeIconButton: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    zIndex: 2,
+    padding: 4,
   },
-  buttonAccept: {
-    padding: 7,
-    justifyContent: "space-between",
-    backgroundColor: "#2fa360",
-    marginRight: 10,
+  headerContent: {
+    marginBottom: 10,
+    marginTop: 12,
   },
-  buttonClose: {
-    padding: 7,
-    justifyContent: "space-between",
-    backgroundColor: "#6c757d",
+  contentTitle: {
+    marginVertical: 10,
+    textAlign: "center",
+    fontWeight: "500",
   },
 });

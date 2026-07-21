@@ -23,40 +23,61 @@ export const storeData = async (key, value) => {
       console.log(e.message);
     }
 };
-  
-// getting data from secure Storage
-export const getSecureData = async (key) => {
-  try {
-    const savedValue = await SecureStore.getItemAsync(key);
-    const currentUser = JSON.parse(savedValue);
 
-    if (currentUser !== null) {
-      return currentUser;
-    }
-  } catch (e) {
-    console.log(e.message);
-  }
-};
-
-    // getting data from Async Storage
-export const getMultipleData = async (keys) => {
-  try {
-    const savedValues = await AsyncStorage.multiGet(keys);
-    return savedValues.map(([key, value]) => JSON.parse(value));
-  } catch (e) {
-    console.log(e.message);
-    throw e; // Re-throw the error to propagate it to the calling code
-  }
-};
-
-  // remove all data from Async Storage
-  export const removeData = async (key) => {
+  // getting data from secure Storage
+  export const getSecureData = async (key) => {
     try {
-      await AsyncStorage.removeItem(key);
-      return true;
+      const savedValue = await SecureStore.getItemAsync(key);
+      const currentUser = JSON.parse(savedValue);
+
+      if (currentUser !== null) {
+        return currentUser;
+      }
     } catch (e) {
       console.log(e.message);
+    }
+  };
+
+  // getting data from Async Storage
+  export const getMultipleData = async (keys) => {
+    try {
+      const savedValues = await AsyncStorage.multiGet(keys);
+
+      const parsedValues = savedValues.map(([key, value]) => {
+        if (value === null || value === undefined) {
+          console.warn(`⚠️ Value for key "${key}" not found in AsyncStorage`);
+          return null;
+        }
+
+        try {
+          return JSON.parse(value);
+        } catch (parseError) {
+          console.error(`❌ JSON parse error for key "${key}":`, parseError);
+          return null;
+        }
+      });
+
+      return parsedValues;
+    } catch (e) {
+      console.error('❌ Error reading multiple data:', e.message);
+      throw e;
+    }
+    };
+
+  // remove data from Async Storage
+  export const removeData = async (keys) => {
+    try {
+      if (Array.isArray(keys)) {
+        await AsyncStorage.multiRemove(keys);
+        console.log(`Removed multiple keys: ${keys.join(', ')}`);
+      } else {
+        await AsyncStorage.removeItem(keys);
+        console.log(`Removed key: ${keys}`);
+      }
+      return true;
+    } catch (e) {
+      console.log(`Error removing data:`, e.message);
       return false;
     }
-};
-  
+  };
+    

@@ -1,426 +1,980 @@
-import React, { useState, useEffect, useCallback, useContext, useRef } from "react";
+import React, { useState, useEffect, useCallback, useContext, useRef, useReducer, useMemo } from "react";
 import {
   StyleSheet,
   Dimensions,
   View,
-  ScrollView,
-  TouchableOpacity,
   Alert,
   AppState,
-  FlatList
+  FlatList,
 } from "react-native";
-import { Text, Button, Divider, Card } from "react-native-paper";
+
+import { Text } from "react-native-paper";
 import { FlatGrid } from "react-native-super-grid";
-import { MaterialCommunityIcons, SimpleLineIcons } from "@expo/vector-icons";
 import * as Updates from 'expo-updates';
+import { Audio } from 'expo-av';
+import NetInfo from '@react-native-community/netinfo';
 
-import { AuthContext, AuthProvider } from "../../context/AuthProvider";
+import { useAuthState } from "../../context/AuthProvider";
 import Loader from "../generate/loader";
-import { String, LanguageContext } from "../Language";
+import { LanguageContext } from "../Language";
 import axiosInstance from "../../apiConfig/apiRequests";
-import OrdersDetail from "./OrdersDetail";
 import OrdersModal from "../modal/OrdersModal";
-import printRows from "../../PrintRows";
+import OrdersModalEdit from "../modal/OrdersModalEdit";
+import OrdersModalTimePicker from "../modal/OrdersModalTimePicker";
+import ErrorDisplay from "../generate/ErrorDisplay";
+import useErrorHandler from "../../hooks/useErrorHandler";
+import eventEmitter from "../../utils/EventEmitter";
+
+import NotificationSound from '../../utils/NotificationSound';
 import NotificationManager from '../../utils/NotificationManager';
+import { orderReducer, initialState } from '../../reducers/orderReducer';
+import OrderCard from "./OrderCard";
+import { handleDelaySet, handleSetDeliveryScheduled } from '../../utils/timeUtils';
+import debounce from 'lodash.debounce';
+import { useOrderDetails } from "../../hooks/useOrderDetails";
+import { CONNECTION_EVENTS } from "../../utils/connectionMonitor";
 
-const width = Dimensions.get("window").width;
+// This will be replaced with a dynamic calculation based on screen size
+const initialWidth = Dimensions.get("window").width;
+const getColumnsByScreenSize = (screenWidth) => {
+  if (screenWidth < 750) return 1; // Mobile phones
+  if (screenWidth < 960) return 2; // Tablets
+  return 3; // Larger screens
+};
 
-const numColumns = printRows(width);
-const cardSize = width / numColumns;
+const initialColumns = getColumnsByScreenSize(initialWidth);
+const getCardSize = (width, columns) => width / columns - (columns > 1 ? 15 : 30);
 
-let ordersCount;
-let temp = 0;
+const calculateCardSize = (width, columns) => {
+  const marginBetweenCards = 10;
+  const totalMargin = marginBetweenCards * (columns + 1);
+  return (width - totalMargin) / columns;
+};
+let newOrderCount;
+const type = 0;
 
-// render entered orders function
 export const EnteredOrdersList = () => {
-  const { domain, branchid, setUser, user, intervalId, setIntervalId, shouldRenderAuthScreen, setShouldRenderAuthScreen } = useContext(AuthContext);
-  const notificationManagerRef = useRef(null);
-  const [orders, setOrders] = useState([]);
-  const [fees, setFees] = useState([]);
-  const [currency, setCurrency] = useState("");
-
+  const { domain, branchid, user } = useAuthState();
+  const { dictionary, languageId } = useContext(LanguageContext);
+  const [state, dispatch] = useReducer(orderReducer, initialState);
+  // Use the custom hook for order details management
+  const {
+    orderDetails,
+    loadingDetails,
+    fetchBatchOrderDetails,
+    fetchOrderDetailsLazy,
+    fetchSingleOrderDetails,
+    isOrderDetailsLoaded,
+    isOrderLoading,
+    clearOrderDetails,
+    invalidateOrderDetails,
+    getOrderDetails
+  } = useOrderDetails();
+  
+  const NotificationSoundRef = useRef(null);
+  const soundRef = useRef(null);
+  const intervalRef = useRef(null);
+  const [width, setWidth] = useState(Dimensions.get('window').width);
+  const [numColumns, setNumColumns] = useState(getColumnsByScreenSize(initialWidth));
+  const [cardSize, setCardSize] = useState(getCardSize(width, numColumns));
+  const [retryCount, setRetryCount] = useState(0);
+  const [isPickerVisible, setPickerVisible] = useState(false);
+  const [pickerMode, setPickerMode] = useState('postpone'); // 'postpone' | 'schedule'
+  const [editOrder, setEditOrder] = useState(null);
   const [appState, setAppState] = useState(AppState.currentState);
-
+  const [isConnected, setIsConnected] = useState(true);
+  const [isLanguageChangeLoading, setIsLanguageChangeLoading] = useState(false);
+  const { error, setError, setApiError, clearError } = useErrorHandler();
   const [options, setOptions] = useState({
     url_unansweredOrders: "",
     url_deliveronRecheck: "",
     url_acceptOrder: "",
-    url_rejectOrder: ""
-  }); // api options
-  const [optionsIsLoaded, setOptionsIsLoaded] = useState(false); // api options
-  const [deliveronOptions, setDeliveronOptions] = useState({});
-  const [isDeliveronOptions, setIsDeliveronOptions] = useState(false);
+    url_rejectOrder: "",
+    url_pushToken: "",
+    url_updateOrderCart: "",
+    url_setDeliveryScheduled: "",
+  });
+  const [optionsIsLoaded, setOptionsIsLoaded] = useState(false);
+  const processedOrdersRef = useRef(new Set());
+  const lastOrdersRef = useRef(new Set());
+  const isInitialFetchRef = useRef(true);
+  const isLanguageChangeInProgressRef = useRef(false);
+  const isComponentMountedRef = useRef(false);
+  const isFirstAppLaunchRef = useRef(true); // Track if this is the very first app launch
+  const hasShownInitialAlertRef = useRef(false); // Track if we've shown initial load alert
+  const shownAlertsRef = useRef(new Set()); // Track shown alert order IDs to prevent duplicates
+  const abortControllerRef = useRef(null); // For cancelling in-flight requests
+  const lastRequestTimestampRef = useRef(0); // Track request timestamps to prevent stale responses
+  const [layoutKey, setLayoutKey] = useState(0);
+  const ordersRef = useRef(state.orders);
+  const loadingRef = useRef(state.loading);
+  const retryCountRef = useRef(retryCount);
+  const startIntervalRef = useRef(null);
+  const debouncedFetchRef = useRef(null);
+  const fetchEnteredOrdersRef = useRef(null);
 
-  const [deliveron, setDeliveron] = useState([]);
-  const [visible, setVisible] = useState(false); // modal state
-  const [itemId, setItemId] = useState(null); //item id for modal
-  const [itemTakeAway, setItemTakeAway] = useState(0);
-  const [isOpen, setOpenState] = useState([]); // my accordion state
-  const [modalType, setModalType] = useState("");
+  useEffect(() => {
+    ordersRef.current = state.orders;
+  }, [state.orders]);
 
-  const [loading, setLoading] = useState(true);
-  const [loadingOptions, setLoadingOptions] = useState(false);
+  useEffect(() => {
+    loadingRef.current = state.loading;
+  }, [state.loading]);
 
-  const [width, setWidth] = useState(Dimensions.get('window').width);
-  const [numColumns, setNumColumns] = useState(printRows(width));
-  const [cardSize, setCardSize] = useState(width / numColumns);
+  useEffect(() => {
+    retryCountRef.current = retryCount;
+  }, [retryCount]);
 
-  const { dictionary, languageId } = useContext(LanguageContext);
+  const MAX_RETRIES = 15;
+  const RETRY_DELAY = 5000;
+  const FETCH_INTERVAL = 3000;
+  const DEBOUNCE_DELAY = 300;
+  const LOADER_TIMEOUT = 10000; // 10 seconds max for loader
 
-  const onChangeModalState = (newState) => {
-    console.log("modal close: ", newState);
-    setTimeout(() => {
-      setVisible(newState);
-      setIsDeliveronOptions(newState);
-      setItemId(null);
-      setDeliveron([]);
-    }, 0);
-  };
+  // Loader failsafe - force hide loader after timeout
+  useEffect(() => {
+    let loaderTimeout;
+    
+    if (state.loading) {
+      loaderTimeout = setTimeout(() => {
+        dispatch({ type: 'SET_LOADING', payload: false });
+      }, LOADER_TIMEOUT);
+    }
+    
+    return () => {
+      if (loaderTimeout) {
+        clearTimeout(loaderTimeout);
+      }
+    };
+  }, [state.loading]);
 
-  const toggleContent = (value) => {
-    setOpenState([...isOpen, value]);
-
-    let index = isOpen.indexOf(value);
-    if (index > -1) setOpenState([...isOpen.filter((i) => i !== value)]);
-  };
-
-  const handleReload = async () => {
-    await Updates.reloadAsync();
-  };
-
-  const apiOptions = useCallback(() => {
-    setOptions({
-      url_unansweredOrders: `https://${domain}/api/v1/admin/getUnansweredOrders`,
-      url_deliveronRecheck: `https://${domain}/api/v1/admin/deliveronRecheck`,
-      url_acceptOrder: `https://${domain}/api/v1/admin/acceptOrder`,
-      url_rejectOrder: `https://${domain}/api/v1/admin/rejectOrder`,
-    });
-    setOptionsIsLoaded(true);
-  }, [domain]);
-
-  // modal show
-  const showModal = (type) => {
-    setModalType(type);
-    setVisible(true);
-  };
-
-  // Update layout on dimension change
   useEffect(() => {
     const updateLayout = () => {
       const newWidth = Dimensions.get('window').width;
-      const columns = printRows(newWidth);
+      const columns = getColumnsByScreenSize(newWidth);
       setWidth(newWidth);
       setNumColumns(columns);
-      setCardSize(newWidth / columns);
+      setCardSize(getCardSize(newWidth, columns));
     };
 
     const subscription = Dimensions.addEventListener('change', updateLayout);
     return () => subscription?.remove();
   }, []);
 
-  const fetchEnteredOrders = async () => {
+  const apiOptions = useCallback(() => {
+    setOptions({
+      url_unansweredOrders: `https://${domain}/api/v1/admin/getUnansweredOrders`,
+      url_delayOrders: `https://${domain}/api/v1/admin/postponeOrder`,
+      url_deliveronRecheck: `https://${domain}/api/v1/admin/deliveronRecheck`,
+      url_acceptOrder: `https://${domain}/api/v1/admin/acceptOrder`,
+      url_rejectOrder: `https://${domain}/api/v1/admin/rejectOrder`,
+      url_pushToken: `https://${domain}/api/v1/admin/storePushToken`,
+      url_updateOrderCart: `https://${domain}/api/v1/admin/updateOrderCart`,
+      url_setDeliveryScheduled: `https://${domain}/api/v1/admin/setDeliveryScheduled`,
+    });
+    setOptionsIsLoaded(true);
+  }, [domain]);
+
+  const fetchEnteredOrders = useCallback(async () => {
+    if (!user || !options.url_unansweredOrders || global.isLoggedOut) {
+      if (__DEV__) {
+        console.log('[EnteredOrdersList] Skipped fetchEnteredOrders: no user, no url, or logged out');
+      }
+      return;
+    }
+
+    const wasFirstAppLaunch = isFirstAppLaunchRef.current;
+    const wasInitialFetch = isInitialFetchRef.current;
+
+    // Only show loader for the very first app launch or initial fetch
+    const shouldShowLoader = wasFirstAppLaunch && wasInitialFetch;
+    if (__DEV__) {
+      console.log('fetchEnteredOrders: shouldShowLoader=', shouldShowLoader, {
+        wasFirstAppLaunch,
+        wasInitialFetch,
+        isLanguageChangeInProgress: isLanguageChangeInProgressRef.current
+      });
+    }
+
+    if (shouldShowLoader) {
+      if (__DEV__) {
+        console.log('Setting loading to true for initial fetch');
+      }
+      dispatch({ type: 'SET_LOADING', payload: true });
+    }
+
     try {
-      if (!user || !options.url_unansweredOrders) {
-        return null;
+      lastRequestTimestampRef.current = Date.now();
+
+      const resp = await axiosInstance.post(
+        options.url_unansweredOrders,
+        {
+          type: 0,
+          page: 1,
+          branchid,
+          Languageid: languageId,
+          postponeOrder: false,
+        },
+        { signal: abortControllerRef.current?.signal }
+      );
+
+      const newOrders = resp.data.data;
+      const newOrderIds = newOrders.map(o => o.id);
+      const currentOrderIds = ordersRef.current.map(o => o.id);
+
+      const isFirstFetch = wasInitialFetch && !isLanguageChangeInProgressRef.current;
+      const isFirstLoad = ordersRef.current.length === 0 && newOrders.length > 0;
+
+      const genuinelyNewOrders = newOrders.filter(order => !lastOrdersRef.current.has(order.id));
+      const genuinelyNewOrderIds = genuinelyNewOrders.map(o => o.id);
+
+      const shouldShowInitialAlert =
+        (wasFirstAppLaunch || isFirstFetch || isFirstLoad) &&
+        newOrders.length > 0 &&
+        !isLanguageChangeInProgressRef.current &&
+        !hasShownInitialAlertRef.current;
+
+      const shouldShowRuntimeAlert =
+        genuinelyNewOrderIds.length > 0 &&
+        !isLanguageChangeInProgressRef.current &&
+        !wasFirstAppLaunch;
+
+      const showAlert = shouldShowInitialAlert || shouldShowRuntimeAlert;
+
+      if (showAlert) {
+        const alertKey = (shouldShowInitialAlert ? newOrderIds : genuinelyNewOrderIds)
+          .sort()
+          .join('-');
+
+        if (!shownAlertsRef.current.has(alertKey)) {
+          shownAlertsRef.current.add(alertKey);
+
+          if (shouldShowInitialAlert) {
+            hasShownInitialAlertRef.current = true;
+          }
+
+          NotificationSoundRef.current?.orderReceived?.().catch(error => {
+            console.warn("🔈 Sound error:", error);
+          });
+        }
       }
 
-      const resp = await axiosInstance.post(options.url_unansweredOrders, {
-        type: 0,
-        page: 1,
-        branchid: branchid,
-        Languageid: languageId
+      // Fetch cart details for any orders not yet loaded (initial + newly arrived)
+      const ordersNeedingDetails = newOrderIds.filter(id => !isOrderDetailsLoaded(id));
+
+      if (ordersNeedingDetails.length > 0 && !isLanguageChangeInProgressRef.current) {
+        try {
+          await fetchBatchOrderDetails(ordersNeedingDetails, false);
+        } catch (e) {
+          console.error('❌ Order detail fetch failed', e);
+        }
+      }
+
+      if ((isFirstFetch || isFirstLoad) && !isLanguageChangeInProgressRef.current) {
+        isInitialFetchRef.current = false;
+      }
+
+      // Track seen order IDs so runtime alerts only fire for true newcomers
+      newOrderIds.forEach(id => lastOrdersRef.current.add(id));
+
+      dispatch({
+        type: 'SET_ORDERS',
+        payload: {
+          orders: newOrders,
+          fees: resp.data.fees,
+          currency: resp.data.currency,
+          scheduled: resp.data.scheduled,
+          loading: false
+        }
       });
-      const data = resp.data.data;
-      const feesData = resp.data.fees;
-      setOrders(data);
-      setFees(feesData);
-      setCurrency(resp.data.currency);
+
+      eventEmitter.emit('orderBadgeUpdate', { type: 0, count: newOrders.length });
+
+      // Always ensure loading is false after fetch
+      if (loadingRef.current) {
+        if (__DEV__) {
+          console.log('Forcing loading to false after fetch');
+        }
+        dispatch({ type: 'SET_LOADING', payload: false });
+      }
+
+      // Reset flags
+      if (wasInitialFetch) {
+        isInitialFetchRef.current = false;
+      }
+      if (wasFirstAppLaunch) {
+        isFirstAppLaunchRef.current = false;
+      }
+
+      setRetryCount(0);
     } catch (error) {
-      console.log('Error fetching entered orders full:', error);
-      const statusCode = error?.status || 'Unknown';
-      console.log('Status code entered orders:', statusCode);
-      clearInterval(intervalId);
-      handleReload();
-    } finally {
-      setLoading(false);
+      const isCancelled =
+        error.name === 'AbortError' ||
+        error.code === 'ERR_CANCELED' ||
+        error.message?.includes('canceled');
+
+      if (isCancelled) {
+        if (__DEV__) {
+          console.log('🚫 Request was cancelled');
+        }
+        return;
+      }
+
+      console.error('Fetch error:', error);
+      dispatch({ type: 'SET_LOADING', payload: false });
+
+      if (wasInitialFetch) {
+        isInitialFetchRef.current = false;
+      }
+      if (wasFirstAppLaunch) {
+        isFirstAppLaunchRef.current = false;
+      }
+
+      if (retryCountRef.current < MAX_RETRIES) {
+        setRetryCount(prev => prev + 1);
+        if (intervalRef.current) clearInterval(intervalRef.current);
+        setTimeout(() => startIntervalRef.current?.(), RETRY_DELAY);
+      } else {
+        if (intervalRef.current) clearInterval(intervalRef.current);
+        handleReload();
+      }
+    }
+  }, [
+    user,
+    options.url_unansweredOrders,
+    branchid,
+    languageId,
+    isOrderDetailsLoaded,
+    fetchBatchOrderDetails
+  ]);
+
+  useEffect(() => {
+    fetchEnteredOrdersRef.current = fetchEnteredOrders;
+  }, [fetchEnteredOrders]);
+
+  useEffect(() => {
+    debouncedFetchRef.current = debounce(() => {
+      if (optionsIsLoaded && user && options.url_unansweredOrders && !global.isLoggedOut) {
+        fetchEnteredOrdersRef.current?.();
+      }
+    }, DEBOUNCE_DELAY);
+
+    return () => {
+      debouncedFetchRef.current?.cancel?.();
+    };
+  }, [optionsIsLoaded, user, options.url_unansweredOrders]);
+
+  const startInterval = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+    }
+    // Prevent polling if logged out or no user
+    if (!user || global.isLoggedOut) return;
+    intervalRef.current = setInterval(() => {
+      debouncedFetchRef.current?.();
+    }, FETCH_INTERVAL);
+  }, [user]);
+
+  useEffect(() => {
+    startIntervalRef.current = startInterval;
+  }, [startInterval]);
+
+  const handleRefresh = useCallback(() => {
+    debouncedFetchRef.current?.();
+  }, []);
+
+  
+  const initializeNotifications = async () => {
+    try {
+      await NotificationManager.initialize(options, branchid, NotificationSoundRef);
+    } catch (error) {
+      console.error('Error initializing NotificationManager:', error);
     }
   };
 
-  const startInterval = () => {
-    console.log('call interval');
-    const newIntervalId = setInterval(() => {
-      if (optionsIsLoaded) {
-        console.log('fetchEnteredOrders called');
-        fetchEnteredOrders();
-      } else {
-        console.log('Options not loaded');
-      }
-    }, 5000);
 
-    setIntervalId(newIntervalId); // Update the intervalId state immediately
-  };
-  const handleAppStateChange = (nextAppState) => {
+  const handleAppStateChange = useCallback((nextAppState) => {
     if (appState.match(/inactive|background/) && nextAppState === "active") {
-      startInterval();
+      if (!isLanguageChangeInProgressRef.current) {
+        lastOrdersRef.current.clear();
+        shownAlertsRef.current.clear(); // Clear shown alerts on app resume
+      }
+      startIntervalRef.current?.();
     } else {
-      clearInterval(intervalId);
+      if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      }
     }
     setAppState(nextAppState);
-  };
+  }, [appState]);
+
 
   useEffect(() => {
     if (domain && branchid) {
       apiOptions();
     } else if (domain || branchid) {
       setOptionsIsLoaded(false);
-      setOrders([]);
+      dispatch({ type: 'SET_ORDERS', payload: { orders: [], fees: [], currency: "", scheduled: [], loading: false }});
+      // Clear order details cache when switching domains/branches
+      clearOrderDetails();
+      // Clear alert tracking when switching domains/branches
+      shownAlertsRef.current.clear();
+      lastOrdersRef.current.clear();
+      // Stop any playing sound when switching domains/branches
+      if (NotificationSoundRef?.current?.stopSound) {
+        NotificationSoundRef.current.stopSound();
+      }
     }
-  }, [domain, branchid, apiOptions]);
+  }, [domain, branchid, apiOptions, clearOrderDetails]);
+
+  // Monitor internet connectivity
+  useEffect(() => {
+    const unsubscribe = NetInfo.addEventListener(state => {
+      const connectionStatus = state.isConnected && state.isInternetReachable !== false;
+      setIsConnected(connectionStatus);
+      
+      if (connectionStatus && !isConnected && !isLanguageChangeInProgressRef.current) {
+        // Connection restored, restart interval (but not during language change)
+        if (optionsIsLoaded) {
+          startIntervalRef.current?.();
+        }
+      } else if (!connectionStatus && isConnected) {
+        // Connection lost, stop interval and clear alerts
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+        }
+        // Stop any playing sound when connection is lost
+        if (NotificationSoundRef?.current?.stopSound) {
+          NotificationSoundRef.current.stopSound();
+        }
+      }
+    });
+    
+    return () => unsubscribe();
+  }, [isConnected, optionsIsLoaded]);
 
   useEffect(() => {
-    apiOptions();
-
-    if (optionsIsLoaded) {
+    if (optionsIsLoaded && !isLanguageChangeInProgressRef.current) {
       const subscribe = AppState.addEventListener('change', handleAppStateChange);
-      console.log('Starting interval...');
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+      if (isConnected && user && !global.isLoggedOut) {
+        startIntervalRef.current?.();
+      }
 
-      // Clear any existing interval
-      clearInterval(intervalId);
-      // Start the interval
-      startInterval();
+      // Listen for forceLogout event to clear interval
+      const logoutListener = () => {
+        if (intervalRef.current) clearInterval(intervalRef.current);
+      };
+      const logoutListenerId = eventEmitter.addEventListener('forceLogout', logoutListener);
 
-      console.log('Interval started.');
       return () => {
-        clearInterval(intervalId); // Clear the interval in the cleanup function
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+        }
+        dispatch({ type: 'UPDATE_ORDER_COUNT', payload: 0 });
         subscribe.remove();
+        eventEmitter.removeEventListener(logoutListenerId);
       };
     }
-  }, [optionsIsLoaded, languageId, appState]);
+  }, [optionsIsLoaded, appState, isConnected, user]);
 
-
-  // set deliveron data
+  // Separate effect for language changes - force initial fetch  
   useEffect(() => {
-    if (itemId && itemTakeAway !== 1) {
-      setDeliveronOptions((prev) => ({ ...prev, data: { orderId: itemId } }));
-      setIsDeliveronOptions(true);
-      setLoadingOptions(true);
+    if (!isComponentMountedRef.current) {
+      isComponentMountedRef.current = true;
+      return;
     }
-  }, [itemId, itemTakeAway]);
 
-  useEffect(() => {
-    if (isDeliveronOptions) {
-      axiosInstance
-        .post(options.url_deliveronRecheck, deliveronOptions.data)
-        .then((resp) => {
-          return resp.data.data
-        })
-        .then((data) => {
-          if (data.original?.content.length === 0) {
-            Alert.alert("ALERT", dictionary["dv.empty"], [
-              {
-                text: "okay", onPress: () => {
-                  setIsDeliveronOptions(false);
-                  setItemId(null);
-                  setDeliveron([]);
-                  console.log('deliveron null modal');
-                }
-              },
-            ])
+    if (optionsIsLoaded && user && options.url_unansweredOrders) {
+      if (__DEV__) {
+        console.log(`🔄 User manually changed language to ${languageId}, forcing complete refresh`);
+      }
+      setIsLanguageChangeLoading(true);
+      isLanguageChangeInProgressRef.current = true;
+      isFirstAppLaunchRef.current = false;
+      lastOrdersRef.current.clear();
+      shownAlertsRef.current.clear();
+
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+
+      abortControllerRef.current = new AbortController();
+
+      (async () => {
+        try {
+          const languageChangeTimestamp = Date.now();
+          lastRequestTimestampRef.current = languageChangeTimestamp;
+
+          if (languageChangeTimestamp < lastRequestTimestampRef.current) {
+            console.log('🚫 Ignoring stale language change response', {
+              responseTimestamp: languageChangeTimestamp,
+              latestTimestamp: lastRequestTimestampRef.current,
+            });
+            return;
           }
-          setDeliveron(data)
-        });
-    }
-  }, [isDeliveronOptions]);
 
-  useEffect(() => {
-    if (deliveron || deliveron.original) {
-      setLoadingOptions(false);
-    }
-  }, [deliveron, deliveron.original]);
+          const languageResponse = await axiosInstance.post(
+            options.url_unansweredOrders,
+            {
+              type: 0,
+              page: 1,
+              branchid: branchid,
+              Languageid: languageId,
+              postponeOrder: false,
+            },
+            { signal: abortControllerRef.current?.signal }
+          );
 
-  useEffect(() => {
-    if (orders) {
-      ordersCount = Object.keys(orders).length;
-      if (ordersCount > temp) {
-        if (notificationManagerRef.current) {
-          notificationManagerRef.current.orderReceived();
+          const newOrders = languageResponse.data.data;
+          const newOrderIds = newOrders.map(order => order.id);
+
+          dispatch({
+            type: 'SET_ORDERS',
+            payload: {
+              orders: newOrders,
+              fees: languageResponse.data.fees,
+              currency: languageResponse.data.currency,
+              scheduled: languageResponse.data.scheduled,
+              loading: false,
+            },
+          });
+
+          if (newOrderIds.length > 0) {
+            await fetchBatchOrderDetails(newOrderIds, false);
+          }
+
+          newOrders.forEach(order => lastOrdersRef.current.add(order.id));
+          isLanguageChangeInProgressRef.current = false;
+
+          if (!loadingDetails) {
+            setIsLanguageChangeLoading(false);
+          }
+
+          if (isConnected) {
+            startIntervalRef.current?.();
+          }
+        } catch (error) {
+          if (
+            error.name === 'AbortError' ||
+            error.code === 'ERR_CANCELED' ||
+            error.message?.includes('canceled') ||
+            error.originalError?.name === 'CanceledError' ||
+            (error.originalError && error.originalError.toString().includes('canceled'))
+          ) {
+            console.log('🚫 Language change request was cancelled - this is expected during language switching');
+            return;
+          }
+
+          isLanguageChangeInProgressRef.current = false;
+          if (!loadingDetails) {
+            setIsLanguageChangeLoading(false);
+          }
+          if (isConnected) {
+            startIntervalRef.current?.();
+          }
         }
-      }
-      temp = ordersCount;
+      })();
     }
-  }, [orders]);
+  }, [languageId, loadingDetails, fetchBatchOrderDetails, optionsIsLoaded, user, options.url_unansweredOrders, branchid, isConnected, startInterval]);
 
-  const renderEnteredOrdersList = ({ item }) => {
-    const deliveryPrice = parseFloat(item.delivery_price);
-    const additionalFees = parseFloat(item.service_fee) / 100;
-    const feeData = JSON.parse(item.fees_details || '{}');
-    const feesDetails = fees?.reduce((acc, fee) => {
-      const feeId = fee['id'];
-      if (feeData[feeId]) {
-        acc.push(`${fee['value']} : ${parseFloat(feeData[feeId])}`);
-      }
-      return acc;
-    }, []);
+  // Monitor loadingDetails and hide language change loader when details are fully loaded
+  useEffect(() => {
+    if (isLanguageChangeInProgressRef.current === false && isLanguageChangeLoading && !loadingDetails) {
+      setIsLanguageChangeLoading(false);
+    }
+  }, [loadingDetails, isLanguageChangeLoading]);
 
-    return (
-      <Card key={item.id} style={styles.card}>
-        <TouchableOpacity onPress={() => toggleContent(item.id)}>
-          <Card.Content style={styles.head}>
-            <Text variant="headlineMedium" style={styles.header}>
-              <MaterialCommunityIcons
-                name="music-accidental-sharp"
-                style={styles.leftIcon}
-              />
-              {item.id}
-            </Text>
-            <Text style={styles.takeAway}>{item.take_away === 1 ? "("+dictionary["orders.takeAway"] + ")" : ""}</Text>
-            <Text variant="headlineMedium" style={styles.header}>
-              <SimpleLineIcons
-                name={!isOpen.includes(item.id) ? "arrow-up" : "arrow-down"}
-                style={styles.rightIcon}
-              />
-            </Text>
-          </Card.Content>
-        </TouchableOpacity>
-        {!isOpen.includes(item.id) ? (
-          <Card.Content>
-            <Text variant="titleSmall" style={styles.title}>
-              {dictionary["orders.status"]}: {dictionary["orders.pending"]}
-            </Text>
+  // Initialize notifications
+  useEffect(() => {
+    if (!optionsIsLoaded) return;
+    initializeNotifications();
+  }, [optionsIsLoaded]);
 
-            <Text variant="titleSmall" style={styles.title} numberOfLines={2} ellipsizeMode="tail">
-              {dictionary["orders.fName"]}: {item.firstname} {item.lastname}
-            </Text>
-
-            <Text variant="titleSmall" style={styles.title}>
-              {dictionary["orders.phone"]}: {item.phone_number}
-            </Text>
-
-            <Text variant="titleSmall" style={styles.title} ellipsizeMode="tail">
-              {dictionary["orders.address"]}: {item.address}
-            </Text>
-
-            {item.delivery_scheduled ? (
-              <Text variant="titleSmall" style={styles.title} numberOfLines={2} ellipsizeMode="tail">
-                {dictionary["orders.scheduledDeliveryTime"]}: {item.delivery_scheduled}
-              </Text>
-            ) : null}
-
-            {item.comment ? (
-              <Text variant="titleSmall" style={styles.title} numberOfLines={2} ellipsizeMode="tail">
-                {dictionary["orders.comment"]}: {item.comment}
-              </Text>
-            ) : null}
-
-            <Text variant="titleSmall" style={styles.title} numberOfLines={2} ellipsizeMode="tail">
-              {dictionary["orders.paymentMethod"]}: {item.payment_type}
-            </Text>
-
-            <Divider />
-            <OrdersDetail orderId={item.id} />
-            <Divider />
-
-            <Text variant="titleMedium" style={styles.title}> {dictionary["orders.initialPrice"]}: {item.real_price} {currency}</Text>
-
-            <Text variant="titleMedium" style={styles.title}> {dictionary["orders.discountedPrice"]}: {item.price} {currency}</Text>
-
-            <Text variant="titleMedium" style={styles.title}> {dictionary["orders.deliveryPrice"]}: {deliveryPrice} {currency}</Text>
-
-            {feesDetails?.length > 0 && (
-              <View>
-                <Text variant="titleMedium" style={styles.title}>
-                  {dictionary["orders.additionalFees"]}: {additionalFees} {currency}
-                </Text>
-                <View style={styles.feeDetailsContainer}>
-                  {feesDetails.map((fee, index) => (
-                    <Text key={index} style={styles.feeDetailText}>
-                      {fee} {currency}
-                    </Text>
-                  ))}
-                </View>
-              </View>
-            )}
-
-            <Text variant="titleMedium" style={styles.title}>
-              {dictionary["orders.totalcost"]}: {item.total_cost} {currency}
-            </Text>
-
-            <Card.Actions>
-              <Button
-                textColor="white"
-                buttonColor="#2fa360"
-                onPress={() => {
-                  setItemId(item.id);
-                  setItemTakeAway(item.take_away);
-                  showModal("accept");
-                }}
-              >
-                {dictionary["orders.accept"]}
-              </Button>
-              <Button
-                textColor="white"
-                buttonColor="#f14c4c"
-                onPress={() => {
-                  setItemId(item.id);
-                  showModal("reject");
-                }}
-              >
-                {dictionary["orders.reject"]}
-              </Button>
-            </Card.Actions>
-          </Card.Content>
-        ) : null}
-      </Card>
-    )
+  const handleReload = async () => {
+    await Updates.reloadAsync();
   };
 
-  if (loading) {
-    return <Loader show={loading} />;
-  }
+  const handleToggleContent = useCallback((id) => {
+    dispatch({ type: 'TOGGLE_CONTENT', payload: id });
 
-  if (!orders || orders.length === 0) {
-    return null;
-  }
+    // Lazy load when expanding if details are missing (or prior fetch failed)
+    if (!state.isOpen.includes(id) && !isOrderDetailsLoaded(id)) {
+      fetchOrderDetailsLazy(id);
+    }
+  }, [state.isOpen, isOrderDetailsLoaded, fetchOrderDetailsLazy]);
+
+  const handleAcceptOrder = useCallback(async (itemId, itemTakeAway) => {
+    try {
+      // Check internet connection first
+      const netInfo = await NetInfo.fetch();
+      if (!netInfo.isConnected || netInfo.isInternetReachable === false) {
+        dispatch({ type: 'SET_LOADING', payload: false });
+        Alert.alert(
+          dictionary["general.alerts"] || "შეტყობინება",
+          dictionary["connection.required"] || "ინტერნეტ კავშირი საჭიროა შეკვეთების დასამუშავებლად",
+          [{ text: dictionary["okay"] || "კარგი" }]
+        );
+        return;
+      }
+
+      dispatch({ type: 'SET_LOADING', payload: true });
+
+      if (itemTakeAway === 1) {
+        // Set both modal state and loading state in a single batch
+        dispatch({
+          type: 'BATCH_UPDATE',
+          payload: {
+            loading: false,
+            modalState: {
+              visible: true,
+              modalType: 'accept',
+              itemId: itemId,
+              itemTakeAway: itemTakeAway
+            }
+          }
+        });
+        return;
+      }
+
+      const response = await axiosInstance.post(options.url_deliveronRecheck, {
+        orderId: itemId,
+      });
+
+      // Prepare state updates to be dispatched together
+      const updates = { loading: false };
+
+      if (response.data?.data?.original?.content.length !== 0) {
+        updates.deliveron = response.data.data;
+        updates.modalState = {
+          visible: true,
+          modalType: 'accept',
+          itemId: itemId,
+          itemTakeAway: itemTakeAway
+        };
+
+        // Dispatch all state updates in a single action
+        dispatch({
+          type: 'BATCH_UPDATE',
+          payload: updates
+        });
+      } else if (response.data?.data?.original?.content.length === 0) {
+        dispatch({
+          type: 'BATCH_UPDATE',
+          payload: {
+            loading: false,
+            deliveron: []
+          }
+        });
+
+        Alert.alert("ALERT", dictionary["dv.empty"] || "მიწოდების ინფორმაცია ცარიელია", [
+          {
+            text: dictionary["okay"] || "კარგი",
+            onPress: () => {
+              dispatch({
+                type: 'SET_DELIVERON_DATA',
+                payload: []
+              });
+            }
+          },
+        ]);
+      }
+    } catch (error) {
+      console.error('Error in handleAcceptOrder:', error);
+      dispatch({
+        type: 'BATCH_UPDATE',
+        payload: {
+          loading: false,
+          deliveron: []
+        }
+      });
+    }
+  }, [options.url_deliveronRecheck, dictionary]);
+
+  const handleRejectOrder = useCallback(async (id) => {
+    // Check internet connection first
+    const netInfo = await NetInfo.fetch();
+    if (!netInfo.isConnected || netInfo.isInternetReachable === false) {
+      dispatch({ type: 'SET_LOADING', payload: false });
+      Alert.alert(
+        dictionary["general.alerts"] || "შეტყობინება",
+        dictionary["connection.required"] || "ინტერნეტ კავშირი საჭიროა შეკვეთების დასამუშავებლად",
+        [{ text: dictionary["okay"] || "კარგი" }]
+      );
+      return;
+    }
+    
+    dispatch({ type: 'SET_LOADING', payload: true });
+    
+    dispatch({
+      type: 'SET_MODAL_STATE',
+      payload: {
+        visible: true,
+        modalType: 'reject',
+        itemId: id,
+        itemTakeAway: null
+      }
+    });
+    
+    dispatch({ type: 'SET_LOADING', payload: false });
+  }, []);
+
+  const handleDelayOrder = useCallback((id, scheduledTime) => {
+    dispatch({ type: 'SET_LOADING', payload: true });
+    dispatch({ type: 'SET_MODAL_STATE', payload: { itemId: id } });
+    dispatch({ type: 'SET_DELIVERY_SCHEDULED', payload: scheduledTime });
+    setPickerMode('postpone');
+    setPickerVisible(true);
+    dispatch({ type: 'SET_LOADING', payload: false });
+  }, []);
+
+  const handleScheduleOrder = useCallback((id) => {
+    dispatch({ type: 'SET_LOADING', payload: true });
+    dispatch({ type: 'SET_MODAL_STATE', payload: { itemId: id } });
+    setPickerMode('schedule');
+    setPickerVisible(true);
+    dispatch({ type: 'SET_LOADING', payload: false });
+  }, []);
+
+  const handleModalClose = useCallback(() => {
+    dispatch({ type: 'RESET_MODAL_STATE' });
+  }, []);
+
+  const handleDelaySetWrapper = useCallback(async (delay) => {
+    if (pickerMode === 'schedule') {
+      await handleSetDeliveryScheduled({
+        delay,
+        itemId: state.itemId,
+        options,
+        dictionary,
+        setLoadingOptions: (value) => dispatch({ type: 'SET_LOADING_OPTIONS', payload: value }),
+        setPickerVisible,
+        setLoading: (value) => dispatch({ type: 'SET_LOADING', payload: value }),
+        onSuccess: async () => {
+          await fetchEnteredOrdersRef.current?.();
+        },
+      });
+      return;
+    }
+
+    const params = {
+      delay,
+      deliveryScheduled: state.deliveryScheduled,
+      scheduled: state.scheduled,
+      itemId: state.itemId,
+      options,
+      dictionary,
+      setLoadingOptions: (value) => dispatch({ type: 'SET_LOADING_OPTIONS', payload: value }),
+      setPostponeOrder: (value) => dispatch({ type: 'SET_POSTPONE_ORDER', payload: value }),
+      setPickerVisible,
+      setLoading: (value) => dispatch({ type: 'SET_LOADING', payload: value })
+    };
+
+    await handleDelaySet(params);
+  }, [pickerMode, state.deliveryScheduled, state.scheduled, state.itemId, options, dictionary]);
+
+  const handleEditOrder = useCallback(async (item) => {
+    const orderIdStr = String(item.id);
+    let details = getOrderDetails(orderIdStr);
+    if (!details || details.length === 0) {
+      details = await fetchSingleOrderDetails(orderIdStr);
+    }
+    setEditOrder({ order: item, orderData: details || [] });
+  }, [getOrderDetails, fetchSingleOrderDetails]);
+
+  const handleEditClose = useCallback(() => {
+    setEditOrder(null);
+  }, []);
+
+  const handleOrderUpdated = useCallback(async (orderId) => {
+    invalidateOrderDetails(orderId);
+    await fetchEnteredOrdersRef.current?.();
+    if (state.isOpen.includes(orderId)) {
+      await fetchSingleOrderDetails(String(orderId));
+    }
+  }, [invalidateOrderDetails, state.isOpen, fetchSingleOrderDetails]);
+
+  // Memoize order details per order to avoid unnecessary re-renders
+  const renderOrderCard = useCallback(({ item }) => {
+    const orderDataForItem = getOrderDetails(item.id) || [];
+    const detailsLoading = isOrderLoading(item.id) ||
+      (state.isOpen.includes(item.id) && !isOrderDetailsLoaded(item.id));
+    return (
+      <View style={{
+        width: cardSize,
+        marginHorizontal: 5
+      }}>
+        <OrderCard
+          key={item.id}
+          item={item}
+          currency={state.currency}
+          isOpen={state.isOpen.includes(item.id)}
+          fees={state.fees}
+          scheduled={state.scheduled}
+          dictionary={dictionary}
+          orderData={orderDataForItem}
+          detailsLoading={detailsLoading}
+          onToggle={handleToggleContent}
+          onAccept={handleAcceptOrder}
+          onDelay={handleDelayOrder}
+          onSchedule={handleScheduleOrder}
+          onReject={handleRejectOrder}
+          onEdit={handleEditOrder}
+          loading={state.loading}
+        />
+      </View>
+    );
+  }, [state.currency, state.isOpen, state.fees, state.scheduled, state.loading, dictionary, getOrderDetails, isOrderLoading, isOrderDetailsLoaded, handleToggleContent, handleAcceptOrder, handleDelayOrder, handleScheduleOrder, handleRejectOrder, handleEditOrder, cardSize]);
+
+  const keyExtractor = useCallback((item) => String(item.id), []);
+
+  // Provide getItemLayout for FlatList performance
+  const getItemLayout = useCallback((data, index) => {
+    return {
+      length: cardSize,
+      offset: cardSize * index,
+      index,
+    };
+  }, [cardSize]);
+
+  // Reset processed orders when component unmounts or app goes to background
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState) => {
+      if (nextAppState === 'background') {
+        processedOrdersRef.current.clear();
+        shownAlertsRef.current.clear();
+        hasShownInitialAlertRef.current = false;
+        if (NotificationSoundRef?.current?.stopSound) {
+          NotificationSoundRef.current.stopSound();
+        }
+      }
+    };
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    return () => {
+      subscription.remove();
+      processedOrdersRef.current.clear();
+      shownAlertsRef.current.clear();
+      hasShownInitialAlertRef.current = false;
+      setIsLanguageChangeLoading(false);
+      isLanguageChangeInProgressRef.current = false;
+      isFirstAppLaunchRef.current = true;
+      if (NotificationSoundRef?.current?.stopSound) {
+        NotificationSoundRef.current.stopSound();
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    // Listen for forceLogout event to clear all orders and state
+    const logoutListener = () => {
+      dispatch({ type: 'RESET_ALL_STATE' });
+      processedOrdersRef.current.clear();
+      shownAlertsRef.current.clear();
+      hasShownInitialAlertRef.current = false;
+      setIsLanguageChangeLoading(false);
+      isLanguageChangeInProgressRef.current = false;
+      isFirstAppLaunchRef.current = true;
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      if (NotificationSoundRef?.current?.stopSound) {
+        NotificationSoundRef.current.stopSound();
+      }
+    };
+    const logoutListenerId = eventEmitter.addEventListener('forceLogout', logoutListener);
+
+    const retryListenerId = eventEmitter.addEventListener(CONNECTION_EVENTS.RETRY, () => {
+      fetchEnteredOrdersRef.current?.();
+      startIntervalRef.current?.();
+    });
+
+    return () => {
+      eventEmitter.removeEventListener(logoutListenerId);
+      eventEmitter.removeEventListener(retryListenerId);
+    };
+  }, []);
 
   return (
-    <View style={{ flex: 1, width: width }}>
-      {loadingOptions ? <Loader /> : null}
-      <NotificationManager ref={notificationManagerRef} />
-
-      <FlatList
-        data={[{}]} // Dummy data for the FlatList since we're using ListHeaderComponent for main content
-        renderItem={null} // No items in the FlatList itself
-        keyExtractor={() => 'dummy'} // Static key for the dummy item
-        showsVerticalScrollIndicator={false}
-        ListHeaderComponent={
-          <View style={{ flexDirection: 'row', flexWrap: 'nowrap', flex: 1 }}>
-            {visible && (
-              <OrdersModal
-                isVisible={visible}
-                onChangeState={onChangeModalState}
-                orders={orders}
-                hasItemId={itemId}
-                deliveron={deliveron ?? null}
-                deliveronOptions={deliveronOptions}
-                type={modalType}
-                options={options}
-                takeAway={itemTakeAway}
-              />
-            )}
-            <FlatGrid
-              adjustGridToStyles={true}
-              itemDimension={cardSize}
-              spacing={10}
-              data={orders}
-              renderItem={renderEnteredOrdersList}
-              keyExtractor={(item) => (item && item.id ? item.id.toString() : '')}
-              itemContainerStyle={{ justifyContent: 'space-between' }}
-              style={{ flex: 1 }}
-              onEndReachedThreshold={0.5}
+    <View style={styles.container}>
+      {state.loadingOptions && <Loader />}
+      <NotificationSound ref={NotificationSoundRef} />
+      {(state.loading || isLanguageChangeLoading) && <Loader show={state.loading || isLanguageChangeLoading} />}
+      {!isLanguageChangeLoading && (
+        <>
+          <ErrorDisplay 
+            error={error} 
+            onDismiss={clearError} 
+            style={styles.errorDisplay} 
+          />
+          {state.visible && (
+            <OrdersModal
+              isVisible={state.visible}
+              onChangeState={handleModalClose}
+              orders={state.orders}
+              hasItemId={state.itemId}
+              deliveron={state.deliveron}
+              deliveronOptions={state.deliveronOptions}
+              type={state.modalType}
+              options={options}
+              takeAway={state.itemTakeAway}
+              PendingOrders={true}
             />
-          </View>
-        }
-      />
+          )}
+          <OrdersModalEdit
+            visible={!!editOrder}
+            onClose={handleEditClose}
+            order={editOrder?.order}
+            orderData={editOrder?.orderData}
+            currency={state.currency}
+            updateUrl={options.url_updateOrderCart}
+            onUpdated={handleOrderUpdated}
+          />
+          <OrdersModalTimePicker
+            visible={isPickerVisible}
+            initialMinutes={30}
+            loading={state.loadingOptions}
+            title={
+              pickerMode === "schedule"
+                ? dictionary["orders.scheduleOrder"]
+                : dictionary["orders.postponeOrder"] || dictionary["orders.scheduleOrder"]
+            }
+            onConfirm={handleDelaySetWrapper}
+            onClose={() => {
+              setPickerVisible(false);
+              setPickerMode("postpone");
+              dispatch({ type: "SET_LOADING_OPTIONS", payload: false });
+            }}
+          />
+          <FlatList
+            key={`flat-list-${numColumns}`}
+            data={state.orders}
+            renderItem={renderOrderCard}
+            keyExtractor={keyExtractor}
+            numColumns={numColumns}
+            getItemLayout={getItemLayout}
+            removeClippedSubviews={true}
+            maxToRenderPerBatch={10}
+            windowSize={10}
+            initialNumToRender={10}
+            onEndReachedThreshold={0.5}
+            contentContainerStyle={[
+              styles.listContainer,
+              { paddingHorizontal: 5 }
+            ]}
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <Text>{dictionary["orders.noOrders"]}</Text>
+              </View>
+            }
+            refreshing={state.loading}
+            onRefresh={handleRefresh}
+          />
+        </>
+      )}
     </View>
   );
 };
@@ -428,11 +982,25 @@ export const EnteredOrdersList = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: "flex-start",
+  },
+  errorDisplay: {
+    zIndex: 1000, 
+    width: '92%',
+    alignSelf: 'center',
+  },
+  listContainer: {
+    padding: 5,
+    paddingBottom: 20,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
   },
   card: {
-    backgroundColor: "#fff",
-    margin: 10,
+    flex: 1,
+    margin: 5,
     borderRadius: 10,
     shadowColor: "#000",
     shadowOffset: {
@@ -475,6 +1043,18 @@ const styles = StyleSheet.create({
   },
   feeDetailText: {
     fontSize: 15,
-    color: '#333',
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+  },
+  modalContent: {
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    padding: 20,
+    elevation: 5,
+    width: "80%",
   },
 });

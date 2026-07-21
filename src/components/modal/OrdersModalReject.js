@@ -1,26 +1,37 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { Text, Button } from 'react-native-paper';
-import { StyleSheet, View, Keyboard, TouchableWithoutFeedback, Alert } from 'react-native';
+import { StyleSheet, View, Keyboard, TouchableWithoutFeedback, Alert, useWindowDimensions } from 'react-native';
 import axiosInstance from "../../apiConfig/apiRequests";
 import Loader from "../generate/loader";
 import { String, LanguageContext } from '../Language';
 
 
 export default function OrdersModalContent(props) {
-  const [options, setOptions] = useState(props.options.url_rejectOrder);
+  const { width, height } = useWindowDimensions();
   const [orderData, setOrderData] = useState({});
-
   const [loading, setLoading] = useState(false);
-
   const { dictionary } = useContext(LanguageContext);
+
+  // Calculate responsive dimensions
+  const isSmallScreen = width < 400;
+  const isMediumScreen = width >= 400 && width < 600;
+  const isLargeScreen = width >= 600;
+  const isLandscape = width > height;
+
+  const contentPadding = isSmallScreen ? 15 : isMediumScreen ? 18 : 20;
+  const buttonPadding = isSmallScreen ? 5 : isMediumScreen ? 6 : 7;
+  const buttonMargin = isSmallScreen ? 8 : isMediumScreen ? 9 : 10;
+  const titleFontSize = isSmallScreen ? 16 : isMediumScreen ? 17 : 18;
+  const inputFontSize = isSmallScreen ? 13 : 14;
 
   const rejectOrder = () => {
     setLoading(true);
-    axiosInstance.post(options, orderData.data).then(resp => {
+    axiosInstance.post(props.options.url_rejectOrder, orderData.data).then(resp => {
+      console.log(resp.data);
       if (resp.data.data?.status == 0 || resp.data.data?.status == -1) {
         setLoading(false);
-          Alert.alert("ALERT", dictionary['orders.declined'], [
-            {text: 'OK', onPress: () => props.hideModal()},
+        Alert.alert(dictionary["general.alerts"], dictionary['orders.declined'], [
+            { text: dictionary["okay"], onPress: () => props.hideModal()},
           ]);
         }
       });
@@ -35,6 +46,7 @@ export default function OrdersModalContent(props) {
             ...orderData, data: {
               Orderid: props.itemId,
               deliveronOrderId: deliveronId['order_id_deliveron'] ?? null,
+              PendingOrders: props.PendingOrders
             }
           })
         }
@@ -43,6 +55,7 @@ export default function OrdersModalContent(props) {
       setOrderData({
         ...orderData, data: {
           Orderid: props.itemId,
+          PendingOrders: props.PendingOrders
         }
       })
     }
@@ -50,13 +63,38 @@ export default function OrdersModalContent(props) {
 
     return (
         <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
-        <View style={styles.content}>
+        <View style={[styles.content, { padding: contentPadding }]}>
           {loading ? <Loader /> : null}
-          <Text textColor="black" style={styles.contentTitle}>{dictionary['orders.rejectionWarning']}</Text>
+          <Text textColor="black" style={[styles.contentTitle, { fontSize: titleFontSize }]}>
+            {dictionary['orders.rejectionWarning']}
+          </Text>
 
             <View style={styles.buttonModal}>
-              <Button mode="contained" textColor="white" style={styles.buttonReject} onPress={rejectOrder}>{dictionary['orders.reject']}</Button>
-              <Button mode="contained" textColor="white" style={styles.buttonClose} onPress={props.hideModal}>{dictionary['close']}</Button>
+              <Button 
+                mode="contained" 
+                textColor="white" 
+                style={[
+                  styles.buttonReject, 
+                  { 
+                    padding: buttonPadding,
+                    marginRight: buttonMargin 
+                  }
+                ]} 
+                onPress={rejectOrder}
+              >
+                {dictionary['orders.reject']}
+              </Button>
+              <Button 
+                mode="contained" 
+                textColor="white" 
+                style={[
+                  styles.buttonClose, 
+                  { padding: buttonPadding }
+                ]} 
+                onPress={props.hideModal}
+              >
+                {dictionary['close']}
+              </Button>
           </View>
         </View>
         </TouchableWithoutFeedback>
@@ -66,36 +104,34 @@ export default function OrdersModalContent(props) {
 
   const styles = StyleSheet.create({
     content: {
-      backgroundColor: '#fff',
       width: '100%',
-      padding: 20,
     },
     contentTitle: {
       width: '100%',
-      fontSize: 18,
       marginTop: 20,
       marginBottom: 20,
+      fontWeight: "500",
     },
     contentInput: {
       width: "100%",
-      backgroundColor: "#fff",
       marginBottom: 25,
       paddingLeft: 1,
-      fontSize: 14,
     },
     buttonModal: {
       flexDirection: "row",
       justifyContent: "space-around",
+      flexWrap: "wrap",
     },
     buttonReject: {
-      padding: 7,
       justifyContent: "space-between",
       backgroundColor: "#f14c4c",
-      marginRight: 10
+      borderRadius: 8,
+      minWidth: 100,
     },
     buttonClose: {
-      padding: 7,
       justifyContent: "space-between",
       backgroundColor: "#6c757d",
+      borderRadius: 8,
+      minWidth: 100,
     }
   });

@@ -1,28 +1,46 @@
 // useFetchLanguages.js
 import { useState, useEffect } from 'react';
-import axiosInstance from "../apiConfig/apiRequests";
+import axiosInstance from '../apiConfig/apiRequests';
 
+export const useFetchLanguages = (apiUrls) => {
+  const [languages, setLanguages] = useState([]);
 
-export const useFetchLanguages = (domain) => {
-    const [languages, setLanguages] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
-    const path = `https://${domain}/api/v1/admin/languages`;
+  useEffect(() => {
+    let cancelled = false;
 
-    useEffect(() => {
-        const fetchLanguages = async () => {
-            try {
-                const response = await axiosInstance.post(path);
-                setLanguages(response.data.languages);
-            } catch (err) {
-                setError(err);
-            } finally {
-                setLoading(false);
-            }
-        };
+    const fetchLanguages = async () => {
+      if (!apiUrls?.languages) {
+        if (!cancelled) {
+          setLanguages([]);
+        }
+        return;
+      }
 
-        fetchLanguages();
-    }, [path]);
+      try {
+        const response = await axiosInstance.post(apiUrls.languages);
+        if (cancelled) {
+          return;
+        }
 
-    return { languages, loading, error };
+        if (response.data?.languages) {
+          setLanguages(response.data.languages);
+        } else {
+          setLanguages([]);
+        }
+      } catch (error) {
+        console.error('Error fetching languages:', error);
+        if (!cancelled) {
+          setLanguages([]);
+        }
+      }
+    };
+
+    fetchLanguages();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [apiUrls]);
+
+  return { languages };
 };
