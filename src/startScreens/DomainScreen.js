@@ -42,27 +42,27 @@ export const DomainScreen = ({ navigation }) => {
     }
 
     // domainValidator returns a string error or empty string
-    // const domainError = domainValidator(trimmedDomain);
-    // if (domainError && typeof domainError === 'string' && domainError.length > 0) {
-    //   setError({ type: "VALIDATION_ERROR", message: domainError });
-    //   return;
-    // }
+    const domainError = domainValidator(trimmedDomain);
+    if (domainError && typeof domainError === 'string' && domainError.length > 0) {
+      setError({ type: "VALIDATION_ERROR", message: domainError });
+      return;
+    }
 
     // Validate domain exists in the backend system
     setIsChecking(true);
     try {
-      // const result = await checkDomain(trimmedDomain);
+      const result = await checkDomain(trimmedDomain);
       
-      // if (!result.success) {
-      //   const errorPayload = {
-      //     type: result.error?.type || "WEBSITE_NOT_FOUND",
-      //   };
-      //   if (result.error?.message) {
-      //     errorPayload.message = result.error.message;
-      //   }
-      //   setError(errorPayload);
-      //   return;
-      // }
+      if (!result.success) {
+        const errorPayload = {
+          type: result.error?.type || "WEBSITE_NOT_FOUND",
+        };
+        if (result.error?.message) {
+          errorPayload.message = result.error.message;
+        }
+        setError(errorPayload);
+        return;
+      }
 
       // Domain is valid - save and navigate
       await storeData("domain", trimmedDomain);
