@@ -73,17 +73,28 @@ function OrdersDetail({ orderId, orderData, onDataLoaded, isLoading = false }) {
           <Text style={{ fontWeight: "700", fontSize: 20 }}>X{item.amount}</Text>
         </Text>
 
+        {item.product_articul ? (
+          <Text style={styles.option}>
+            {dictionary["prod.articul"] || "Articul"}: {item.product_articul}
+          </Text>
+        ) : null}
+
         {item.type === 1
           ? item.children?.map((child) => (
             <View key={`child-${child.id}`}>
               <Text style={styles.option}>{child.name}:</Text>
+              {child.product_articul ? (
+                <Text style={styles.option}>
+                  {dictionary["prod.articul"] || "Articul"}: {child.product_articul}
+                </Text>
+              ) : null}
               {renderCustomizables(child.customizables)}
             </View>
           ))
           : renderCustomizables(item.customizables)}
       </View>
     ),
-    [renderCustomizables]
+    [renderCustomizables, dictionary]
   );
 
   const keyExtractor = useCallback(
