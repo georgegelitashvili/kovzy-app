@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext, useCallback, useMemo, memo, useRef } from "react";
-import { StyleSheet, View, TouchableOpacity, Dimensions, RefreshControl, useWindowDimensions, Alert } from "react-native";
+import { StyleSheet, View, TouchableOpacity, Dimensions, RefreshControl, useWindowDimensions, Alert, ActivityIndicator } from "react-native";
 import NetInfo from "@react-native-community/netinfo";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Text, Button, Card, Checkbox, Chip } from "react-native-paper";
@@ -10,7 +10,6 @@ import Loader from "./components/generate/loader";
 import TextField from './components/generate/TextField';
 import { LanguageContext } from "./components/Language";
 import axiosInstance from "./apiConfig/apiRequests";
-import throttle from 'lodash.throttle';
 import useErrorDisplay from "./hooks/useErrorDisplay";
 import ProductsBulkActivityModal from "./components/modal/ProductsBulkActivityModal";
 
@@ -55,14 +54,13 @@ const MemoizedProductCard = memo(({ item, isExcluded, isExcludedQr, isExcludedOn
   return (
     <Card key={item.id} style={styles.card}>
       <Card.Content style={styles.cardContent}>
-        <Text variant="titleMedium" style={styles.title}>
+        <Text variant="titleMedium" style={styles.productName} numberOfLines={2}>
           {item.name}
         </Text>
         <Checkbox
           status={checkedItems.includes(item.id) ? 'checked' : 'unchecked'}
-          color='#3490dc'
+          color="#3490dc"
           onPress={() => onCheckboxPress(item.id)}
-          style={styles.checkbox}
         />
       </Card.Content>
 
@@ -125,34 +123,75 @@ export default function Products({ navigation }) {
   const [excluded, setExcluded] = useState([]);
   const [selectedCategories, setSelectedCategories] = useState([]);
   const [categoryPickerKey, setCategoryPickerKey] = useState(0);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [isConnected, setIsConnected] = useState(true);
   const [showSearch, setShowSearch] = useState(false);
   const [showFilter, setShowFilter] = useState(false);
   const [checkedItems, setCheckedItems] = useState([]);
+  const [searchText, setSearchText] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [bulkModalVisible, setBulkModalVisible] = useState(false);
   const [bulkLoading, setBulkLoading] = useState(false);
   const fetchRequestIdRef = useRef(0);
+  const showSearchRef = useRef(false);
+  showSearchRef.current = showSearch;
+  const searchQueryRef = useRef("");
+  searchQueryRef.current = searchQuery;
+  const productsRef = useRef([]);
+  productsRef.current = products;
+  const pageRef = useRef(1);
+  const hasMoreRef = useRef(true);
+  const inFlightRef = useRef(false);
+  const listReadyRef = useRef(false);
+  const branchEnabledRef = useRef(branchEnabled);
+  branchEnabledRef.current = branchEnabled;
+
+  const handleSearchChange = useCallback((text) => {
+    setSearchText(text);
+  }, []);
+
+  // Commit the typed text after a short pause. A closed branch must not
+  // start a product search request.
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      if (!branchEnabledRef.current) return;
+      const next = searchText.trim();
+      if (searchQueryRef.current === next) return;
+      searchQueryRef.current = next;
+      setSearchQuery(next);
+    }, 300);
+
+    return () => clearTimeout(handle);
+  }, [searchText]);
 
   // Calculate button width based on screen size
   const buttonWidth = Math.max(80, (width - 30) / 3); // Minimum 80px, but distribute space evenly
 
-  const fetchData = useCallback(async (pageOverride) => {
-    const requestId = ++fetchRequestIdRef.current;
-
-    if (!user || !domain || !branchid) {
-      if (requestId === fetchRequestIdRef.current) {
-        setLoading(false);
-        setRefreshing(false);
-      }
+  const fetchData = useCallback(async (pageOverride = 1, { append = false } = {}) => {
+    if (append && (inFlightRef.current || !hasMoreRef.current || !listReadyRef.current)) {
       return;
     }
 
-    const requestPage = pageOverride ?? page;
+    const requestId = ++fetchRequestIdRef.current;
+    inFlightRef.current = true;
+    const requestPage = pageOverride;
+
+    if (!append) {
+      listReadyRef.current = false;
+      hasMoreRef.current = true;
+    }
+
+    if (!user || !domain || !branchid) {
+      if (requestId === fetchRequestIdRef.current) {
+        inFlightRef.current = false;
+        setLoading(false);
+        setRefreshing(false);
+        setLoadingMore(false);
+      }
+      return;
+    }
 
     try {
       clearError();
@@ -163,7 +202,7 @@ export default function Products({ navigation }) {
           page: requestPage,
           categoryids: selectedCategories.length > 0 ? selectedCategories : null,
           branchid: Number(branchid),
-          like: searchQuery || null,
+          like: searchQueryRef.current || null,
         }
       );
 
@@ -190,27 +229,55 @@ export default function Products({ navigation }) {
         isExcludedOnline: newExcluded.some((item) => item.productid === product.id && item.disabled_by === "online"),
       }));
 
-      setProducts(updatedProducts);
-      setTotalPages(total / perPage);
+      const existing = append ? productsRef.current : [];
+      const seen = new Set(existing.map((item) => item.id));
+      const fresh = updatedProducts.filter((item) => !seen.has(item.id));
+      const nextProducts = append ? [...existing, ...fresh] : updatedProducts;
+      const pageSize = Number(perPage) || updatedProducts.length || 1;
+      const totalCount = Number(total) || 0;
+      // A full page only means more data when the loaded count is still under
+      // the API total. Once that total is reached, stop.
+      const more = fresh.length > 0
+        && nextProducts.length < totalCount
+        && updatedProducts.length >= pageSize;
+
+      productsRef.current = nextProducts;
+      pageRef.current = requestPage;
+      hasMoreRef.current = more;
+      listReadyRef.current = true;
+      setProducts(nextProducts);
 
       if (__DEV__) {
-        console.log(`[Products] Loaded ${updatedProducts.length} product(s) for branch ${branchid}`);
+        console.log(`[Products] Page ${requestPage}: ${nextProducts.length}/${totalCount} product(s) for branch ${branchid}`);
       }
     } catch (error) {
       if (requestId !== fetchRequestIdRef.current) {
         return;
       }
       console.error('Error fetching products:', error);
-      setProducts([]);
-      setExcluded([]);
+      if (!append) {
+        productsRef.current = [];
+        setProducts([]);
+        setExcluded([]);
+        hasMoreRef.current = false;
+        listReadyRef.current = false;
+      }
       setApiError(error);
     } finally {
       if (requestId === fetchRequestIdRef.current) {
+        inFlightRef.current = false;
         setLoading(false);
         setRefreshing(false);
+        setLoadingMore(false);
       }
     }
-  }, [user, domain, branchid, userLanguage, page, selectedCategories, searchQuery, clearError, setApiError]);
+  }, [user, domain, branchid, userLanguage, selectedCategories, clearError, setApiError]);
+
+  const loadMoreProducts = useCallback(() => {
+    if (inFlightRef.current || !hasMoreRef.current || !listReadyRef.current) return;
+    setLoadingMore(true);
+    fetchData(pageRef.current + 1, { append: true });
+  }, [fetchData]);
 
   useEffect(() => {
     return () => {
@@ -233,15 +300,18 @@ export default function Products({ navigation }) {
       return;
     }
 
-    setLoading(true);
-    setCategory([]);
-    fetchData();
-  }, [isConnected, page, userLanguage, selectedCategories, branchid, searchQuery, fetchData, user, domain]);
+    // Replacing the screen with the loader unmounts the search field and
+    // dismisses the keyboard. Keep the field mounted while a search is open.
+    if (!showSearchRef.current) {
+      setLoading(true);
+      setCategory([]);
+    }
+    fetchData(1);
+  }, [isConnected, userLanguage, selectedCategories, branchid, searchQuery, fetchData, user, domain]);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
       if (!user || !domain || !branchid) return;
-      setPage(1);
       setRefreshing(true);
       fetchData(1);
     });
@@ -267,52 +337,27 @@ export default function Products({ navigation }) {
     if (selectedCategoriesRef.current.length > 0) {
       setSelectedCategories([]);
       setCategoryPickerKey((key) => key + 1);
-      setPage(1);
     }
   }, [showFilter]);
 
   useEffect(() => {
     if (!showSearch) {
+      setSearchText("");
       setSearchQuery("");
     }
   }, [showSearch]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await fetchData();
+    await fetchData(1);
     setCheckedItems([]);
   }, [fetchData]);
 
-  const branchEnabledRef = useRef(branchEnabled);
-  branchEnabledRef.current = branchEnabled;
-
-  const handleSearchChange = useMemo(
-    () =>
-      throttle((query) => {
-        if (!branchEnabledRef.current) return;
-        setSearchQuery(query);
-        setPage(1);
-      }, 500),
-    []
-  );
-
+  // Drop a search from the previous branch so it cannot apply to the new one.
   useEffect(() => {
-    return () => {
-      handleSearchChange.cancel();
-    };
-  }, [handleSearchChange]);
-
-  // Drop any pending throttled search when branch context changes so a
-  // previously scheduled call cannot apply against the new branch.
-  useEffect(() => {
-    handleSearchChange.cancel();
-  }, [branchEnabled, handleSearchChange]);
-
-  useEffect(() => {
-    handleSearchChange.cancel();
+    setSearchText("");
     setSearchQuery("");
-    setPage(1);
-  }, [branchid, handleSearchChange]);
+  }, [branchid]);
 
   const handleAddCategoryFilter = useCallback((categoryId) => {
     if (categoryId == null || !branchEnabled) return;
@@ -320,20 +365,17 @@ export default function Products({ navigation }) {
 
     setSelectedCategories((prev) => [...prev, categoryId]);
     setCategoryPickerKey((key) => key + 1);
-    setPage(1);
   }, [branchEnabled, selectedCategories]);
 
   const handleRemoveCategoryFilter = useCallback((categoryId) => {
     if (!branchEnabled) return;
     setSelectedCategories((prev) => prev.filter((id) => id !== categoryId));
-    setPage(1);
   }, [branchEnabled]);
 
   const handleClearCategoryFilters = useCallback(() => {
     if (!branchEnabled) return;
     setSelectedCategories([]);
     setCategoryPickerKey((key) => key + 1);
-    setPage(1);
   }, [branchEnabled]);
 
   const handleButtonPress = useCallback(async (item, disabled_by) => {
@@ -383,13 +425,10 @@ export default function Products({ navigation }) {
           }
         });
       }
-      
-
-      onRefresh();
     } catch (error) {
       console.error('Error updating product activity:', error);
     }
-  }, [domain, branchid, branchEnabled, excluded, onRefresh]);
+  }, [domain, branchid, branchEnabled]);
 
   const isProductExcludedForChannel = useCallback((productId, disabledBy) => {
     return excluded.some((item) => {
@@ -513,12 +552,12 @@ export default function Products({ navigation }) {
       .filter(Boolean)
   , [selectedCategories, category]);
 
-  if (loading) {
+  if (loading && !showSearch) {
     return <Loader />;
   }
 
   return (
-    <>
+    <View style={styles.screen}>
       {errorDisplay}
       <View style={styles.buttonContainer}>
         <View style={[styles.buttonWrapper, { width: buttonWidth }]}>
@@ -583,7 +622,7 @@ export default function Products({ navigation }) {
             editable={true}
             clearButtonMode='always'
             autoCapitalize="none"
-            value={searchQuery}
+            value={searchText}
             onChangeText={handleSearchChange}
           />
         )}
@@ -629,52 +668,33 @@ export default function Products({ navigation }) {
         maxItemsPerRow={4}
         renderItem={renderItem}
         adjustGridToStyles={true}
+        style={styles.productList}
         contentContainerStyle={{ justifyContent: "flex-start" }}
         keyExtractor={(item) => item.id.toString()}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
-        extraData={[excluded, checkedItems]}
+        extraData={[excluded, checkedItems, loadingMore]}
         initialNumToRender={10}
         windowSize={5}
         updateCellsBatchingPeriod={50}
         removeClippedSubviews={true}
+        onEndReached={loadMoreProducts}
+        onEndReachedThreshold={0.4}
+        ListFooterComponent={
+          loadingMore ? (
+            <ActivityIndicator style={styles.listFooter} color="#3490dc" />
+          ) : null
+        }
       />
-
-      <View style={styles.paginationContainer}>
-        <TouchableOpacity
-          onPress={() => setPage(page - 1)}
-          disabled={page === 1 || !branchEnabled}
-        >
-          <Text
-            style={[
-              styles.paginationButton,
-              (page === 1 || !branchEnabled) && styles.paginationButtonDisabled,
-            ]}
-          >
-            {dictionary["prevPage"]}
-          </Text>
-        </TouchableOpacity>
-        <Text style={styles.paginationText}>{page}</Text>
-        <TouchableOpacity
-          onPress={() => setPage(page + 1)}
-          disabled={page === Math.ceil(totalPages) || !branchEnabled}
-        >
-          <Text
-            style={[
-              styles.paginationButton,
-              (page === Math.ceil(totalPages) || !branchEnabled) && styles.paginationButtonDisabled,
-            ]}
-          >
-            {dictionary["nextPage"]}
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+  },
   container: {
     flex: 1,
     justifyContent: "flex-start",
@@ -718,34 +738,21 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     justifyContent: "space-between",
   },
+  productName: {
+    flex: 1,
+    flexShrink: 1,
+    marginRight: 8,
+  },
   cardActions: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
   },
-  paginationContainer: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: 15,
-    marginBottom: 15,
+  productList: {
+    flex: 1,
   },
-  paginationButton: {
-    backgroundColor: "#ccc",
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    marginHorizontal: 5,
-    borderRadius: 5,
-  },
-  paginationButtonDisabled: {
-    opacity: 0.5,
-  },
-  paginationText: {
-    fontSize: 17,
-    fontWeight: "bold",
-  },
-  checkbox: {
-    transform: [{ scale: 1.5 }],
+  listFooter: {
+    marginVertical: 16,
   },
   buttonContainer: {
     flexDirection: 'row',
